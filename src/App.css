@@ -1,0 +1,15 @@
+.App {
+  font-family: sans-serif;
+  background-color: #f5f5f5;
+  position: relative;
+  padding: 16px;
+  width: 1284px;
+  margin: auto; 
+}
+
+/* Project info --------------------------------------------------------------- */
+.ProjectInfo {
+  margin: 6px;
+  font-size: 14px;
+  text-align: center;
+}
