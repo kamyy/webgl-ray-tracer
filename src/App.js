@@ -1,5 +1,4 @@
 import React, { Component } from 'react';
-import './App.css';
 
 export let GL = null;
 
@@ -19,15 +18,30 @@ class App extends Component {
         this.onMouseDown = this.onMouseDown.bind(this);
 
         this.rootNode = null;
+
+        this.appStyle = {
+            fontFamily: 'sans-serif',
+            backgroundColor: '#f5f5f5',
+            position: 'relative',
+            padding: 16,
+            width: 1284,
+            margin: 'auto', 
+        }
+
+        this.projectInfoStyle = {
+            margin: 6,
+            fontSize: 14,
+            textAlign: 'center',
+        }
     }
 
     render() {
-        return <div className="App">
+        return <div style={this.appStyle}>
             <canvas id='Canvas' width='1280' height='720'>Please use a browser that supports WebGL 2</canvas> 
             <hr/>
-            <p className='ProjectInfo'>MIT License</p>
-            <p className='ProjectInfo'><a href='https://github.com/kamyy/webgl-ray-tracer'>Project @ GitHub</a></p>
-            <p className='ProjectInfo'>Copyright &copy; 2019 <a href='mailto:kam.yin.yip@gmail.com'>Kam Y Yip</a></p>
+            <p style={this.projectInfoStyle}>MIT License</p>
+            <p style={this.projectInfoStyle}><a href='https://github.com/kamyy/webgl-ray-tracer'>Project @ GitHub</a></p>
+            <p style={this.projectInfoStyle}>Copyright &copy; 2019 <a href='mailto:kam.yin.yip@gmail.com'>Kam Y Yip</a></p>
         </div>
     }
 
@@ -74,8 +88,6 @@ class App extends Component {
         if (this.lButtonDown || this.rButtonDown) {
         }
     }
-
-
 }
 
 export default App;
