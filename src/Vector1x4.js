@@ -37,7 +37,7 @@ export default class Vector1x4 {
         if (typeof rhs === "number") {
             return new Vector1x4(this.x * rhs, this.y * rhs, this.z * rhs);
         }
-        throw new Error('rhs argument not a Vector1x4!');
+        throw new Error('rhs argument not a Vector1x4 or a Matrix4x4!');
     }
 
     div(rhs) {
