@@ -26,18 +26,15 @@ export default class Vector1x4 {
         return new Vector1x4(-this.x, -this.y, -this.z);
     }
 
-    mul(rhs: Vector1x4 | Matrix4x4) {
-        if (rhs instanceof Matrix4x4) {
-            const x = this.x * rhs.m[_11] + this.y * rhs.m[_21] + this.z * rhs.m[_31] + this.w * rhs.m[_41];
-            const y = this.x * rhs.m[_12] + this.y * rhs.m[_22] + this.z * rhs.m[_32] + this.w * rhs.m[_42];
-            const z = this.x * rhs.m[_13] + this.y * rhs.m[_23] + this.z * rhs.m[_33] + this.w * rhs.m[_43];
-            const w = this.x * rhs.m[_14] + this.y * rhs.m[_24] + this.z * rhs.m[_34] + this.w * rhs.m[_44];
-            return new Vector1x4(x, y, z, w);
-        }
-        if (typeof rhs === "number") {
+    mul(rhs: number | Matrix4x4) {
+        if (typeof rhs === 'number') {
             return new Vector1x4(this.x * rhs, this.y * rhs, this.z * rhs);
-        }
-        throw new Error('rhs argument not a Vector1x4 or a Matrix4x4!');
+        } 
+        const x = this.x * rhs._m[_11] + this.y * rhs._m[_21] + this.z * rhs._m[_31] + this.w * rhs._m[_41];
+        const y = this.x * rhs._m[_12] + this.y * rhs._m[_22] + this.z * rhs._m[_32] + this.w * rhs._m[_42];
+        const z = this.x * rhs._m[_13] + this.y * rhs._m[_23] + this.z * rhs._m[_33] + this.w * rhs._m[_43];
+        const w = this.x * rhs._m[_14] + this.y * rhs._m[_24] + this.z * rhs._m[_34] + this.w * rhs._m[_44];
+        return new Vector1x4(x, y, z, w);
     }
 
     div(rhs: number): Vector1x4 {
