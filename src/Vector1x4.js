@@ -1,5 +1,11 @@
 // @flow
-import Matrix4x4, {_11, _12, _13, _14, _21, _22, _23, _24, _31, _32, _33, _34, _41, _42, _43, _44 } from './Matrix4x4.js';
+import Matrix4x4, {
+    _00, _01, _02, _03, 
+    _10, _11, _12, _13, 
+    _20, _21, _22, _23, 
+    _30, _31, _32, _33 
+} 
+from './Matrix4x4.js';
 
 export default class Vector1x4 {
     x: number;
@@ -30,10 +36,10 @@ export default class Vector1x4 {
         if (typeof rhs === 'number') {
             return new Vector1x4(this.x * rhs, this.y * rhs, this.z * rhs);
         } 
-        const x = this.x * rhs._m[_11] + this.y * rhs._m[_21] + this.z * rhs._m[_31] + this.w * rhs._m[_41];
-        const y = this.x * rhs._m[_12] + this.y * rhs._m[_22] + this.z * rhs._m[_32] + this.w * rhs._m[_42];
-        const z = this.x * rhs._m[_13] + this.y * rhs._m[_23] + this.z * rhs._m[_33] + this.w * rhs._m[_43];
-        const w = this.x * rhs._m[_14] + this.y * rhs._m[_24] + this.z * rhs._m[_34] + this.w * rhs._m[_44];
+        const x = this.x * rhs._m[_00] + this.y * rhs._m[_10] + this.z * rhs._m[_20] + this.w * rhs._m[_30];
+        const y = this.x * rhs._m[_01] + this.y * rhs._m[_11] + this.z * rhs._m[_21] + this.w * rhs._m[_31];
+        const z = this.x * rhs._m[_02] + this.y * rhs._m[_12] + this.z * rhs._m[_22] + this.w * rhs._m[_32];
+        const w = this.x * rhs._m[_03] + this.y * rhs._m[_13] + this.z * rhs._m[_23] + this.w * rhs._m[_33];
         return new Vector1x4(x, y, z, w);
     }
 
@@ -64,4 +70,3 @@ export default class Vector1x4 {
         return "[Vector1x4 " + this.x + ", " + this.y + ", " + this.z + ", " + this.w + "]"; 
     }
 }
-
