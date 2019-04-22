@@ -70,7 +70,7 @@ class App extends React.Component {
             const dir = new Vector1x4(x, y, z);
             const ray = new Ray(org, dir);
 
-            const sphere = new Sphere(new Vector1x4(0, 100, 0), 10);
+            const sphere = new Sphere(new Vector1x4(-50, 100, 0), 30);
 
             let k = 0;
 
