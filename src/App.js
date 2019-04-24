@@ -7,7 +7,7 @@ import Ray from './Ray';
 import {
     RayIntersectSphereResult,
     rayIntersectSphere
-} 
+}
 from './Intersect';
 
 export let x2d = null;
@@ -38,7 +38,7 @@ class App extends React.Component {
             position: 'relative',
             padding: 16,
             width: this.props.wd + 4,
-            margin: 'auto', 
+            margin: 'auto',
         }
 
         const projectInfoStyle = {
@@ -48,7 +48,7 @@ class App extends React.Component {
         }
 
         return <div style={appStyle}>
-            <canvas id='Canvas' width={this.props.wd} height={this.props.ht}>Please use a browser that supports WebGL 2</canvas> 
+            <canvas id='Canvas' width={this.props.wd} height={this.props.ht}>Please use a browser that supports WebGL 2</canvas>
             <hr/>
             <p style={projectInfoStyle}>MIT License</p>
             <p style={projectInfoStyle}><a href='https://github.com/kamyy/webgl-ray-tracer'>Project @ GitHub</a></p>
@@ -76,20 +76,21 @@ class App extends React.Component {
 
             for (let i = 0; i < this.props.ht; ++i) { // top to bottom
                 for (let j = 0; j < this.props.wd; ++j) { // left to right
-                    dir.x = x + j;
-                    dir.z = z - i;
 
-                    if (rayIntersectSphere(ray, sphere)) {
-                        image.data[k++] = 128;
-                        image.data[k++] = 0;
-                        image.data[k++] = 0;
-                        image.data[k++] = 255;
-                    } else {
-                        image.data[k++] = 0;
-                        image.data[k++] = 0;
-                        image.data[k++] = 0;
-                        image.data[k++] = 255;
+                    let r = 0;
+
+                    for (let n = 0; n < 100; ++n) {
+                        dir.x = x + j + Math.random();
+                        dir.z = z - i - Math.random();
+                        if (rayIntersectSphere(ray, sphere)) {
+                            r += 128;
+                        }
                     }
+
+                    image.data[k++] = r / 100;
+                    image.data[k++] = 0;
+                    image.data[k++] = 0;
+                    image.data[k++] = 255;
                 }
             }
 
@@ -134,9 +135,9 @@ class App extends React.Component {
             case 2: this.rButtonDown = true; break;
             default: break;
             }
-            this.lx = x; 
+            this.lx = x;
             this.ly = y;
-        } 
+        }
     }
 
     onMouseMove(event) {
