@@ -25,10 +25,10 @@ export function rayIntersectSphere(ray: Ray, sphere: Sphere): RayIntersectSphere
 
     const discriminant = (b * b) - (4 * a * c);
     if (discriminant > 0) {
-        const aa = 2 * a;
+        const aa = 1 / (2 * a);
         const sq = Math.sqrt(discriminant); 
-        const t0 = (-b - sq) / aa;
-        const t1 = (-b + sq) / aa;
+        const t0 = (-b - sq) * aa;
+        const t1 = (-b + sq) * aa;
         const pos0 = ray.getPos(t0);
         const pos1 = ray.getPos(t1);
 
