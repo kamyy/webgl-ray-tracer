@@ -1,5 +1,8 @@
 import * as React from 'react';
 
+import Shader from './Shader';
+
+/*
 import Vector1x4 from './Vector1x4';
 import Sphere from './Sphere';
 import Ray from './Ray';
@@ -9,8 +12,9 @@ import {
     rayIntersectSphere
 }
 from './Intersect';
+*/
 
-export let x2d = null;
+export let GL = null;
 
 class App extends React.Component {
     constructor(props) {
@@ -56,6 +60,7 @@ class App extends React.Component {
         </div>
     }
 
+/*
     testSphere() {
         if (x2d) {
             const image = x2d.createImageData(this.props.wd, this.props.ht);
@@ -97,22 +102,31 @@ class App extends React.Component {
             x2d.putImageData(image, 0, 0);
         }
     }
+    */
 
     componentDidMount() {
         this.canvas = document.getElementById('Canvas');
-        x2d = this.canvas.getContext('2d');
+        GL = this.canvas.getContext('webgl2', {
+            depth: false,
+            alpha: false,
+        });
 
-        if (x2d) {
+        if (GL) {
             this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
             this.canvas.onmousedown = this.onMouseDown;
             window.onmousemove = this.onMouseMove;
             window.onmouseup = this.onMouseUp;
 
-            this.testSphere();
+            const shader = new Shader();
+            shader.init().then(ok => {
+                if (ok) {
+                    shader.drawScene();
+                }
+            });
 
-            //x2d.getSupportedExtensions().forEach(item => console.log(item));
+            // this.testSphere();
+
             //GL.clearColor(0.392156899, 0.584313750, 0.929411829, 1.0); // cornflower blue
-            //GL.clearDepth(1.0); // depth buffer clear value
         }
     }
 
