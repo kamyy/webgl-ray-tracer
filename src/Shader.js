@@ -7,7 +7,7 @@ import { GL } from './App';
 const vertShaderURL = '/vert.glsl';
 const fragShaderURL = '/frag.glsl';
 
-async function fetchShader(url: string) {
+async function fetchShader(url: string): Promise<string> {
     const response = await fetch(url);
     if (!response.ok) {
         throw new Error(`Cannot GET ${url} status=${response.status}`);
@@ -16,12 +16,16 @@ async function fetchShader(url: string) {
 }
 
 export default class Shader {
+    halfWd: number;
+    halfHt: number;
     vs: WebGLShader | null;
     fs: WebGLShader | null;
     program: WebGLProgram | null;
     vtxBuff: WebGLBuffer  | null;
 
-    constructor() {
+    constructor(halfWd: number, halfHt: number) {
+        this.halfWd = halfWd;
+        this.halfHt = halfHt;
         this.vs = null;
         this.fs = null;
         this.program = null;
@@ -81,18 +85,21 @@ export default class Shader {
             }
             GL.bindBuffer(GL.ARRAY_BUFFER, null);
 
-            console.log(`${e}`);
-            return false;
+            //console.log(`${e}`);
+            throw e;
+            //return false;
         });
     }
 
-    drawScene(): boolean {
+    drawScene() {
         if (this.program && this.vtxBuff) {
-            console.log('drawing scene');
             GL.useProgram(this.program);
+            GL.uniform1f(GL.getUniformLocation(this.program, 'half_wd'), this.halfWd);
+            GL.uniform1f(GL.getUniformLocation(this.program, 'half_ht'), this.halfHt);
+            GL.uniform1f(GL.getUniformLocation(this.program, 'eye_to_y'), this.halfHt / Math.tan(45 * Math.PI / 180));
 
             const vertexAttributeDescs = Object.freeze([ 
-                {   attrib: 'a_clip_space_pos',
+                {   attrib: 'clip_space_pos',
                     length: 2,
                     stride: 8,
                     offset: 0
@@ -107,10 +114,8 @@ export default class Shader {
                 }
             }
 
-            GL.drawArrays(GL.TRIANGLE_FAN, 0, 4);
-            return true;
+            GL.drawArrays(GL.TRIANGLE_FAN, 0, 4); // cover entire canvas in rectangle
         }
-        return false;
     }
 }
 

@@ -2,18 +2,6 @@ import * as React from 'react';
 
 import Shader from './Shader';
 
-/*
-import Vector1x4 from './Vector1x4';
-import Sphere from './Sphere';
-import Ray from './Ray';
-
-import {
-    RayIntersectSphereResult,
-    rayIntersectSphere
-}
-from './Intersect';
-*/
-
 export let GL = null;
 
 class App extends React.Component {
@@ -117,16 +105,12 @@ class App extends React.Component {
             window.onmousemove = this.onMouseMove;
             window.onmouseup = this.onMouseUp;
 
-            const shader = new Shader();
+            const shader = new Shader(this.props.wd / 2, this.props.ht / 2);
             shader.init().then(ok => {
                 if (ok) {
                     shader.drawScene();
                 }
             });
-
-            // this.testSphere();
-
-            //GL.clearColor(0.392156899, 0.584313750, 0.929411829, 1.0); // cornflower blue
         }
     }
 
