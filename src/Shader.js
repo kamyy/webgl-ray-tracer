@@ -84,10 +84,7 @@ export default class Shader {
                 this.vs = null;
             }
             GL.bindBuffer(GL.ARRAY_BUFFER, null);
-
-            //console.log(`${e}`);
             throw e;
-            //return false;
         });
     }
 
