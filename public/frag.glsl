@@ -1,6 +1,8 @@
 #version 300 es
 
-precision mediump float;
+precision highp float;
+
+const int SPHERE_COUNT = 2;
 
 struct Ray {
     vec3 origin;
@@ -19,20 +21,22 @@ struct RayIntersectSphereResult {
     vec3  nrm;
 };
 
-const int MAX_SPHERE_COUNT = 8;
-uniform Sphere spheres[MAX_SPHERE_COUNT];
-
-in float      eye_to_x;
+uniform Sphere spheres[SPHERE_COUNT];
 uniform float eye_to_y;
-in float      eye_to_z;
 
-out vec4      color;
+in float eye_to_x;
+in float eye_to_z;
+in float random_n;
 
-bool rayIntersectSphere(Ray ray, Sphere sphere, float t0, float t1, out RayIntersectSphereResult result) {
-    vec3  l = ray.origin - sphere.center;
-    float a = dot(ray.dir, ray.dir);
-    float b = dot(ray.dir, l) * 2.0;
-    float c = dot(l, l) - sphere.radiusSquared;
+out vec4 color;
+
+float random_v;
+
+bool rayIntersectSphere(Ray r, Sphere s, float t0, float t1, out RayIntersectSphereResult res) {
+    vec3  l = r.origin - s.center;
+    float a = dot(r.dir, r.dir);
+    float b = dot(r.dir, l) * 2.0;
+    float c = dot(l, l) - s.radiusSquared;
 
     float discriminant = (b * b) - (4.0 * a * c);
     if (discriminant > 0.0) {
@@ -41,18 +45,17 @@ bool rayIntersectSphere(Ray ray, Sphere sphere, float t0, float t1, out RayInter
         float t;
 
         t = (-b - sq) * aa;
-        if (t0 < t && t < t1) {
-            result.t = t;
-            result.pos = ray.origin + (ray.dir * t);
-            result.nrm = normalize(result.pos - sphere.center);
+        if (t0 < t) {
+            res.t = t;
+            res.pos = r.origin + (r.dir * t);
+            res.nrm = normalize(res.pos - s.center);
             return true;
         }
-
-        t = (+b - sq) * aa;
-        if (t0 < t && t < t1) {
-            result.t = t;
-            result.pos = ray.origin + (ray.dir * t);
-            result.nrm = normalize(result.pos - sphere.center);
+        t = (-b + sq) * aa;
+        if (t0 < t) {
+            res.t = t;
+            res.pos = r.origin + (r.dir * t);
+            res.nrm = normalize(res.pos - s.center);
             return true;
         }
     }
@@ -63,9 +66,9 @@ bool rayIntersectNearestSphere(Ray ray, float t0, float t1, out RayIntersectSphe
     RayIntersectSphereResult current;
     bool contact = false;
 
-    for (int i = 0; i < MAX_SPHERE_COUNT; ++i) {
-        if (rayIntersectSphere(ray, sphere[i], t0, t1, current))
-            if(!contact || current.t < nearest.t) {
+    for (int i = 0; i < SPHERE_COUNT; ++i) {
+        if (rayIntersectSphere(ray, spheres[i], t0, t1, current)) {
+            if (!contact || current.t < nearest.t) {
                 nearest = current;
                 contact = true;
             }
@@ -74,70 +77,87 @@ bool rayIntersectNearestSphere(Ray ray, float t0, float t1, out RayIntersectSphe
     return contact;
 }
 
-float rand(vec2 v) {
-    return fract(sin(dot(v.xy, vec2(12.9898,78.233))) * 43758.5453);
+uint hash(uint x) {
+    // A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
+    x += ( x << 10u );
+    x ^= ( x >>  6u );
+    x += ( x <<  3u );
+    x ^= ( x >> 11u );
+    x += ( x << 15u );
+    return x;
+}
+
+float floatConstruct(uint m) {
+    // Construct a float with half-open range [0:1] using low 23 bits.
+    // All zeroes yields 0.0, all ones yields the next smallest representable value below 1.0.
+    const uint ieeeMantissa = 0x007FFFFFu; // binary32 mantissa bitmask
+    const uint ieeeOne      = 0x3F800000u; // 1.0 in IEEE binary32
+    m &= ieeeMantissa;                     // Keep only mantissa bits (fractional part)
+    m |= ieeeOne;                          // Add fractional part to 1.0
+    float  f = uintBitsToFloat( m );       // Range [1:2]
+    return f - 1.0;                        // Range [0:1]
+} 
+
+float rand() { 
+    // Pseudo-random value in half-open range [0:1]. 
+    random_v = floatConstruct(hash(floatBitsToUint(random_v))); 
+    return random_v;
 }
 
 vec3 randomPosInUnitSphere() {
-    vec3 v = vec3( rand( vec2(eye_to_x, eye_to_y) ),
-                   rand( vec2(eye_to_y, eye_to_z) ),
-                   rand( vec2(eye_to_z, eye_to_x) ) ) * 2.0 - vec3(1.0, 1.0, 1.0);
-    while (dot(v, v) > 1.0) {
-        v.x = rand(vec2(v.x, v.y));
-        v.y = rand(vec2(v.y, v.z));
-        v.z = rand(vec2(v.z, v.x));
-        v = v * 2.0 - vec3(1.0, 1.0, 1.0);
+    vec3 p;
+    do { 
+        p = vec3(rand(), rand(), rand()) * 2.0 + vec3(-1.0, -1.0, -1.0); 
+    } while (dot(p, p) > 0.999);
+
+    return p;
+}
+
+vec3 Color(Ray r, float t0, float t1) {
+    RayIntersectSphereResult res;
+    vec3 p;
+    int  i;
+    int  j;
+
+    for (i = 0; i < 8; ++i) {
+        if (!rayIntersectNearestSphere(r, t0, t1, res)) {
+            break;
+        }
+        p = res.pos + res.nrm + randomPosInUnitSphere();
+        r = Ray(res.pos, p - res.pos);
     }
-    return v;
-}
 
-vec3 f4(Ray ray) {
-}
+    float t = (1.0 + normalize(r.dir).z) * 0.5;
+    vec3  c = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
 
-vec3 f3(Ray ray) {
-    RayIntersectSphereResult r;
-
-    if (rayIntersectNearestSphere(ray, 0.0, 1.0, r)) {
-        vec3 end = r.pos + r.nrm + randomPosInUnitSphere();
-        Ray ray3 = Ray(r.pos, end - r.pos);
-        return f4(ray3) * .5;
+    for (j = 0; j < 8; ++j) {
+        if (j == i) {
+            break;
+        }
+        c *= 0.5;
     }
-    vec3  n = normalize(ray.dir);
-    float t = 0.5 * n.z + 1.0;
-    return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
-}
 
-vec3 f0(Ray ray) {
-    RayIntersectSphereResult r;
-
-    if (rayIntersectNearestSphere(ray, 0.0, 1.0, r)) {
-        vec3 end = r.pos + r.nrm + randomPosInUnitSphere();
-        Ray ray0 = Ray(r.pos, end - r.pos);
-        return f1(ray0) * .5;
-    } 
-    vec3  n = normalize(ray.dir);
-    float t = 0.5 * n.z + 1.0;
-    return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
+    return c;
 }
 
 void main() {
-    Ray r = Ray(
-        vec3(0.0, 0.0, 0.0), 
-        vec3(eye_to_x, eye_to_y, eye_to_z)
-    );
+    random_v = random_n;
 
-    Sphere s = Sphere(
-        vec3(-50.0, 100.0, 0.0),
-        30.0,
-        30.0 * 30.0
-    );
+    Ray r;
+    r.origin.x = 0.0;
+    r.origin.y = 0.0;
+    r.origin.z = 0.0;
+    r.dir.x = 0.0;
+    r.dir.y = eye_to_y;
+    r.dir.z = 0.0;
 
+    vec3 sum = vec3(0.0, 0.0, 0.0);
 
-    if (rayIntersectSphere(r, s, 0.0, 1000.0, result)) {
-
-
-        color = vec4(1.0, 0.0, 0.0, 1.0);
-    } else {
-        color = vec4(0.0, 0.0, 0.5, 1.0);
+    for (int i = 0; i < 200; ++i) {
+        r.dir.x = eye_to_x + rand();
+        r.dir.z = eye_to_z + rand();
+        sum += Color(r, 0.001, 9000.0);
     }
+
+    color = vec4(sum / 200.0, 1.0);
 }

@@ -48,50 +48,6 @@ class App extends React.Component {
         </div>
     }
 
-/*
-    testSphere() {
-        if (x2d) {
-            const image = x2d.createImageData(this.props.wd, this.props.ht);
-
-            const halfWd = this.props.wd * 0.5;
-            const halfHt = this.props.ht * 0.5;
-            const x = -halfWd;
-            const y = +halfHt / Math.tan(45 * Math.PI / 180);
-            const z = +halfHt;
-
-            const org = new Vector1x4();
-            const dir = new Vector1x4(x, y, z);
-            const ray = new Ray(org, dir);
-
-            const sphere = new Sphere(new Vector1x4(-50, 100, 0), 30);
-
-            let k = 0;
-
-            for (let i = 0; i < this.props.ht; ++i) { // top to bottom
-                for (let j = 0; j < this.props.wd; ++j) { // left to right
-
-                    let r = 0;
-
-                    for (let n = 0; n < 100; ++n) {
-                        dir.x = x + j + Math.random();
-                        dir.z = z - i - Math.random();
-                        if (rayIntersectSphere(ray, sphere)) {
-                            r += 128;
-                        }
-                    }
-
-                    image.data[k++] = r / 100;
-                    image.data[k++] = 0;
-                    image.data[k++] = 0;
-                    image.data[k++] = 255;
-                }
-            }
-
-            x2d.putImageData(image, 0, 0);
-        }
-    }
-    */
-
     componentDidMount() {
         this.canvas = document.getElementById('Canvas');
         GL = this.canvas.getContext('webgl2', {

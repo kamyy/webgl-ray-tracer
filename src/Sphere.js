@@ -2,8 +2,8 @@
 import Vector1x4 from './Vector1x4.js';
 
 export default class Sphere {
-    center:        Vector1x4;
-    radius:        number;
+    center: Vector1x4;
+    radius: number;
 
     constructor(center: Vector1x4, radius: number) {
         this.center = center;

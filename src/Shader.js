@@ -1,5 +1,7 @@
 // @flow
 import { GL } from './App';
+import Sphere from './Sphere';
+import Vector1x4 from './Vector1x4';
 
 //const g_up     = new Vector1x4(0.0, 0.0, 1.0, 0.0);
 //const g_origin = new Vector1x4(0.0, 0.0, 0.0, 1.0);
@@ -21,7 +23,7 @@ export default class Shader {
     vs: WebGLShader | null;
     fs: WebGLShader | null;
     program: WebGLProgram | null;
-    vtxBuff: WebGLBuffer  | null;
+    vtxBuff: WebGLBuffer | null;
 
     constructor(halfWd: number, halfHt: number) {
         this.halfWd = halfWd;
@@ -62,7 +64,13 @@ export default class Shader {
 
             this.vtxBuff = GL.createBuffer();
             GL.bindBuffer(GL.ARRAY_BUFFER, this.vtxBuff);
-            GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([ -1, -1, +1, -1, +1, +1, -1, +1 ]), GL.STATIC_DRAW);
+            GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([ 
+                    -1, -1, Math.random(),
+                    +1, -1, Math.random(), 
+                    +1, +1, Math.random(), 
+                    -1, +1, Math.random() 
+                ]), GL.STATIC_DRAW
+            );
 
             return true;
         })
@@ -89,29 +97,64 @@ export default class Shader {
     }
 
     drawScene() {
+        const spheres = [
+            new Sphere(
+                new Vector1x4(0.0, 1200.0, 0.0), 200.0
+            ),
+            new Sphere(
+                new Vector1x4(0.0, 1300.0, -700.0), 400.0
+            ),
+        ];
+
         if (this.program && this.vtxBuff) {
             GL.useProgram(this.program);
+            
+            // vertex shader attributes
+            const desc = {
+                attrib: 'vert_data',
+                length: 3,
+                stride: 12,
+                offset: 0
+            };
+            const loc = GL.getAttribLocation(this.program, desc.attrib);
+            GL.vertexAttribPointer(
+                loc, 
+                desc.length, 
+                GL.FLOAT, 
+                false, 
+                desc.stride, 
+                desc.offset
+            );
+            GL.enableVertexAttribArray(loc);
+
+            // vertex shader uniforms
             GL.uniform1f(GL.getUniformLocation(this.program, 'half_wd'), this.halfWd);
             GL.uniform1f(GL.getUniformLocation(this.program, 'half_ht'), this.halfHt);
-            GL.uniform1f(GL.getUniformLocation(this.program, 'eye_to_y'), this.halfHt / Math.tan(45 * Math.PI / 180));
 
-            const vertexAttributeDescs = Object.freeze([ 
-                {   attrib: 'clip_space_pos',
-                    length: 2,
-                    stride: 8,
-                    offset: 0
-                },
-            ]);
+            // fragment shader uniforms
+            spheres.forEach((sphere, i) => {
+                GL.uniform3f(
+                    GL.getUniformLocation(this.program, `spheres[${i}].center`), 
+                    sphere.center.x, 
+                    sphere.center.y, 
+                    sphere.center.z 
+                );
+                GL.uniform1f(
+                    GL.getUniformLocation(this.program, `spheres[${i}].radius`), 
+                    sphere.radius
+                );
+                GL.uniform1f(
+                    GL.getUniformLocation(this.program, `spheres[${i}].radiusSquared`), 
+                    sphere.radiusSquared
+                );
+            });
+            GL.uniform1f(
+                GL.getUniformLocation(this.program, 'eye_to_y'), 
+                this.halfHt / (Math.tan(45 * Math.PI / 180))
+            );
 
-            for (let desc of vertexAttributeDescs) {
-                const loc = GL.getAttribLocation(this.program, desc.attrib);
-                if (loc !== -1) {
-                    GL.vertexAttribPointer(loc, desc.length, GL.FLOAT, false, desc.stride, desc.offset);
-                    GL.enableVertexAttribArray(loc);
-                }
-            }
-
-            GL.drawArrays(GL.TRIANGLE_FAN, 0, 4); // cover entire canvas in rectangle
+            // cover entire canvas in rectangle
+            GL.drawArrays(GL.TRIANGLE_FAN, 0, 4);
         }
     }
 }
