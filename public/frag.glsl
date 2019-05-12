@@ -2,8 +2,6 @@
 
 precision highp float;
 
-const int SPHERE_COUNT = 2;
-
 struct Ray {
     vec3 origin;
     vec3 dir;
@@ -21,16 +19,21 @@ struct RayIntersectSphereResult {
     vec3  nrm;
 };
 
-uniform Sphere spheres[SPHERE_COUNT];
-uniform float eye_to_y;
+const int       MAX_SPHERES         = 2;
+const int       MAX_BOUNCES         = 8;
+const int       MAX_PRIMARY_RAYS    = 100;
+const float     MAX_FLOAT           = intBitsToFloat(2139095039);
 
-in float eye_to_x;
-in float eye_to_z;
-in float random_n;
+float g_random_v;
 
-out vec4 color;
+uniform Sphere uni_spheres[MAX_SPHERES];
+uniform float  uni_eye_to_y;
 
-float random_v;
+in float var_eye_to_x;
+in float var_eye_to_z;
+in float var_random_n;
+
+out vec4 out_color;
 
 bool rayIntersectSphere(Ray r, Sphere s, float t0, float t1, out RayIntersectSphereResult res) {
     vec3  l = r.origin - s.center;
@@ -66,8 +69,8 @@ bool rayIntersectNearestSphere(Ray ray, float t0, float t1, out RayIntersectSphe
     RayIntersectSphereResult current;
     bool contact = false;
 
-    for (int i = 0; i < SPHERE_COUNT; ++i) {
-        if (rayIntersectSphere(ray, spheres[i], t0, t1, current)) {
+    for (int i = 0; i < MAX_SPHERES; ++i) {
+        if (rayIntersectSphere(ray, uni_spheres[i], t0, t1, current)) {
             if (!contact || current.t < nearest.t) {
                 nearest = current;
                 contact = true;
@@ -100,8 +103,8 @@ float floatConstruct(uint m) {
 
 float rand() { 
     // Pseudo-random value in half-open range [0:1]. 
-    random_v = floatConstruct(hash(floatBitsToUint(random_v))); 
-    return random_v;
+    g_random_v = floatConstruct(hash(floatBitsToUint(g_random_v))); 
+    return g_random_v;
 }
 
 vec3 randomPosInUnitSphere() {
@@ -113,13 +116,13 @@ vec3 randomPosInUnitSphere() {
     return p;
 }
 
-vec3 Color(Ray r, float t0, float t1) {
+vec3 getPixelColor(Ray r, float t0, float t1) {
     RayIntersectSphereResult res;
     vec3 p;
     int  i;
     int  j;
 
-    for (i = 0; i < 8; ++i) {
+    for (i = 0; i < MAX_BOUNCES; ++i) {
         if (!rayIntersectNearestSphere(r, t0, t1, res)) {
             break;
         }
@@ -130,7 +133,7 @@ vec3 Color(Ray r, float t0, float t1) {
     float t = (1.0 + normalize(r.dir).z) * 0.5;
     vec3  c = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
 
-    for (j = 0; j < 8; ++j) {
+    for (j = 0; j < MAX_BOUNCES; ++j) {
         if (j == i) {
             break;
         }
@@ -141,23 +144,23 @@ vec3 Color(Ray r, float t0, float t1) {
 }
 
 void main() {
-    random_v = random_n;
+    g_random_v = var_random_n;
 
     Ray r;
     r.origin.x = 0.0;
     r.origin.y = 0.0;
     r.origin.z = 0.0;
     r.dir.x = 0.0;
-    r.dir.y = eye_to_y;
+    r.dir.y = uni_eye_to_y;
     r.dir.z = 0.0;
 
     vec3 sum = vec3(0.0, 0.0, 0.0);
 
-    for (int i = 0; i < 200; ++i) {
-        r.dir.x = eye_to_x + rand();
-        r.dir.z = eye_to_z + rand();
-        sum += Color(r, 0.001, 9000.0);
+    for (int i = 0; i < MAX_PRIMARY_RAYS; ++i) {
+        r.dir.x = var_eye_to_x + rand();
+        r.dir.z = var_eye_to_z + rand();
+        sum += getPixelColor(r, 0.001, MAX_FLOAT);
     }
 
-    color = vec4(sum / 200.0, 1.0);
+    out_color = vec4(sum / float(MAX_PRIMARY_RAYS), 1.0);
 }

@@ -23,7 +23,7 @@ export default class Shader {
     vs: WebGLShader | null;
     fs: WebGLShader | null;
     program: WebGLProgram | null;
-    vtxBuff: WebGLBuffer | null;
+    vtxBuff: WebGLBuffer  | null;
 
     constructor(halfWd: number, halfHt: number) {
         this.halfWd = halfWd;
@@ -111,7 +111,7 @@ export default class Shader {
             
             // vertex shader attributes
             const desc = {
-                attrib: 'vert_data',
+                attrib: 'att_vert_data',
                 length: 3,
                 stride: 12,
                 offset: 0
@@ -128,29 +128,29 @@ export default class Shader {
             GL.enableVertexAttribArray(loc);
 
             // vertex shader uniforms
-            GL.uniform1f(GL.getUniformLocation(this.program, 'half_wd'), this.halfWd);
-            GL.uniform1f(GL.getUniformLocation(this.program, 'half_ht'), this.halfHt);
+            GL.uniform1f(GL.getUniformLocation(this.program, 'uni_half_wd'), this.halfWd);
+            GL.uniform1f(GL.getUniformLocation(this.program, 'uni_half_ht'), this.halfHt);
 
             // fragment shader uniforms
             spheres.forEach((sphere, i) => {
                 GL.uniform3f(
-                    GL.getUniformLocation(this.program, `spheres[${i}].center`), 
+                    GL.getUniformLocation(this.program, `uni_spheres[${i}].center`), 
                     sphere.center.x, 
                     sphere.center.y, 
                     sphere.center.z 
                 );
                 GL.uniform1f(
-                    GL.getUniformLocation(this.program, `spheres[${i}].radius`), 
+                    GL.getUniformLocation(this.program, `uni_spheres[${i}].radius`), 
                     sphere.radius
                 );
                 GL.uniform1f(
-                    GL.getUniformLocation(this.program, `spheres[${i}].radiusSquared`), 
+                    GL.getUniformLocation(this.program, `uni_spheres[${i}].radiusSquared`), 
                     sphere.radiusSquared
                 );
             });
             GL.uniform1f(
-                GL.getUniformLocation(this.program, 'eye_to_y'), 
-                this.halfHt / (Math.tan(45 * Math.PI / 180))
+                GL.getUniformLocation(this.program, 'uni_eye_to_y'), 
+                this.halfHt / (Math.tan(30 * Math.PI / 180))
             );
 
             // cover entire canvas in rectangle
