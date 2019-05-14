@@ -11,23 +11,36 @@ struct Sphere {
     vec3  center;
     float radius;
     float radiusSquared;
+    uint  mat;
 };
+
+struct Material {
+    uint typeOf;
+    vec3 albedo;
+}
 
 struct RayIntersectSphereResult {
     float t;
     vec3  pos;
     vec3  nrm;
+    uint  mat;
 };
 
-const int       MAX_SPHERES         = 2;
-const int       MAX_BOUNCES         = 8;
-const int       MAX_PRIMARY_RAYS    = 100;
-const float     MAX_FLOAT           = intBitsToFloat(2139095039);
+const uint MATERIAL_MATTE = 0;
+const uint MATERIAL_METAL = 1;
+const uint MATERIAL_MAX   = 2;
+
+const uint MAX_SPHERES = 2;
+const uint MAX_BOUNCES = 8;
+const uint MAX_PRIMARY_RAYS = 100;
+
+const float MAX_FLOAT = intBitsToFloat(2139095039);
 
 float g_random_v;
 
-uniform Sphere uni_spheres[MAX_SPHERES];
-uniform float  uni_eye_to_y;
+uniform float    uni_eye_to_y;
+uniform Sphere   uni_spheres[MAX_SPHERES];
+uniform Material uni_materials[MAX_MATERIALS]
 
 in float var_eye_to_x;
 in float var_eye_to_z;
@@ -35,6 +48,48 @@ in float var_random_n;
 
 out vec4 out_color;
 
+// ----------------------------------------------------------------------------
+// randomness functions
+//
+uint hash(uint x) {
+    // A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
+    x += ( x << 10u );
+    x ^= ( x >>  6u );
+    x += ( x <<  3u );
+    x ^= ( x >> 11u );
+    x += ( x << 15u );
+    return x;
+}
+
+float floatConstruct(uint m) {
+    // Construct a float with half-open range [0:1] using low 23 bits.
+    // All zeroes yields 0.0, all ones yields the next smallest representable value below 1.0.
+    const uint ieeeMantissa = 0x007FFFFFu; // binary32 mantissa bitmask
+    const uint ieeeOne      = 0x3F800000u; // 1.0 in IEEE binary32
+    m &= ieeeMantissa;                     // Keep only mantissa bits (fractional part)
+    m |= ieeeOne;                          // Add fractional part to 1.0
+    float  f = uintBitsToFloat( m );       // Range [1:2]
+    return f - 1.0;                        // Range [0:1]
+}
+
+float rand() {
+    // Pseudo-random value in half-open range [0:1].
+    g_random_v = floatConstruct(hash(floatBitsToUint(g_random_v)));
+    return g_random_v;
+}
+
+vec3 randomPosInUnitSphere() {
+    vec3 p;
+    do {
+        p = vec3(rand(), rand(), rand()) * 2.0 + vec3(-1.0, -1.0, -1.0);
+    } while (dot(p, p) > 0.999);
+
+    return p;
+}
+
+// ----------------------------------------------------------------------------
+// intersect functions
+//
 bool rayIntersectSphere(Ray r, Sphere s, float t0, float t1, out RayIntersectSphereResult res) {
     vec3  l = r.origin - s.center;
     float a = dot(r.dir, r.dir);
@@ -44,7 +99,7 @@ bool rayIntersectSphere(Ray r, Sphere s, float t0, float t1, out RayIntersectSph
     float discriminant = (b * b) - (4.0 * a * c);
     if (discriminant > 0.0) {
         float aa = 1.0 / (2.0 * a);
-        float sq = sqrt(discriminant); 
+        float sq = sqrt(discriminant);
         float t;
 
         t = (-b - sq) * aa;
@@ -52,6 +107,7 @@ bool rayIntersectSphere(Ray r, Sphere s, float t0, float t1, out RayIntersectSph
             res.t = t;
             res.pos = r.origin + (r.dir * t);
             res.nrm = normalize(res.pos - s.center);
+            res.mat = s.mat;
             return true;
         }
         t = (-b + sq) * aa;
@@ -59,6 +115,7 @@ bool rayIntersectSphere(Ray r, Sphere s, float t0, float t1, out RayIntersectSph
             res.t = t;
             res.pos = r.origin + (r.dir * t);
             res.nrm = normalize(res.pos - s.center);
+            res.mat = s.mat;
             return true;
         }
     }
@@ -80,58 +137,33 @@ bool rayIntersectNearestSphere(Ray ray, float t0, float t1, out RayIntersectSphe
     return contact;
 }
 
-uint hash(uint x) {
-    // A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
-    x += ( x << 10u );
-    x ^= ( x >>  6u );
-    x += ( x <<  3u );
-    x ^= ( x >> 11u );
-    x += ( x << 15u );
-    return x;
-}
-
-float floatConstruct(uint m) {
-    // Construct a float with half-open range [0:1] using low 23 bits.
-    // All zeroes yields 0.0, all ones yields the next smallest representable value below 1.0.
-    const uint ieeeMantissa = 0x007FFFFFu; // binary32 mantissa bitmask
-    const uint ieeeOne      = 0x3F800000u; // 1.0 in IEEE binary32
-    m &= ieeeMantissa;                     // Keep only mantissa bits (fractional part)
-    m |= ieeeOne;                          // Add fractional part to 1.0
-    float  f = uintBitsToFloat( m );       // Range [1:2]
-    return f - 1.0;                        // Range [0:1]
-} 
-
-float rand() { 
-    // Pseudo-random value in half-open range [0:1]. 
-    g_random_v = floatConstruct(hash(floatBitsToUint(g_random_v))); 
-    return g_random_v;
-}
-
-vec3 randomPosInUnitSphere() {
-    vec3 p;
-    do { 
-        p = vec3(rand(), rand(), rand()) * 2.0 + vec3(-1.0, -1.0, -1.0); 
-    } while (dot(p, p) > 0.999);
-
-    return p;
+// ----------------------------------------------------------------------------
+//
+//
+vec3 reflect(vec3 v, vec3 n) {
+    return v -  2.0 * dot(v, n) * n;
 }
 
 vec3 getPixelColor(Ray r, float t0, float t1) {
     RayIntersectSphereResult res;
-    vec3 p;
-    int  i;
-    int  j;
+    vec3 color[MAX_BOUNCES];
+    uint i;
+    uint j;
 
     for (i = 0; i < MAX_BOUNCES; ++i) {
         if (!rayIntersectNearestSphere(r, t0, t1, res)) {
             break;
         }
-        p = res.pos + res.nrm + randomPosInUnitSphere();
-        r = Ray(res.pos, p - res.pos);
+        r = Ray(res.pos, res.pos + res.nrm + randomPosInUnitSphere() - res.pos);
+        switch (res.materialTypeOf) {
+        case MATERIAL_MATTE:
+            float t = (1.0 + normalize(r.dir).z) * 0.5;
+            color[i] = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
+            break;
+        case MATERIAL_METAL:
+            break;
+        }
     }
-
-    float t = (1.0 + normalize(r.dir).z) * 0.5;
-    vec3  c = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
 
     for (j = 0; j < MAX_BOUNCES; ++j) {
         if (j == i) {
