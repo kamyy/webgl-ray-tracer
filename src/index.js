@@ -1,9 +1,11 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import App from './App';
 import * as serviceWorker from './serviceWorker';
+import ReactDOM from 'react-dom';
+import React from 'react';
+import App from './App';
 
-ReactDOM.render(<App wd={800} ht={600}/>, document.getElementById('root'));
+ReactDOM.render(
+    <App wd={800} ht={600}/>, document.getElementById('root')
+);
 
 if (module.hot) {
     module.hot.accept();

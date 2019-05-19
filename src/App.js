@@ -1,10 +1,10 @@
-import * as React from 'react';
-
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
 import Shader from './Shader';
 
 export let GL = null;
 
-class App extends React.Component {
+class App extends Component {
     constructor(props) {
         super(props);
 
@@ -99,5 +99,3 @@ class App extends React.Component {
         }
     }
 }
-
-export default App;

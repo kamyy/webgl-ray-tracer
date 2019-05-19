@@ -1,16 +1,30 @@
 #version 300 es
 
-uniform float uni_half_wd;
-uniform float uni_half_ht;
-in vec3  att_vert_data;
-out float var_eye_to_x;
-out float var_eye_to_z;
-out float var_random_n;
+// ----------------------------------------------------------------------------
+// uniforms
+//
+uniform float u_half_wd;
+uniform float u_half_ht;
 
+// ----------------------------------------------------------------------------
+// attributes
+//
+in vec3 a_vert_data;
+
+// ----------------------------------------------------------------------------
+// varyings
+//
+out float v_eye_to_x;
+out float v_eye_to_z;
+out float v_random_n;
+
+// ----------------------------------------------------------------------------
+// main
+//
 void main() {
-   var_eye_to_x = att_vert_data.x * uni_half_wd;
-   var_eye_to_z = att_vert_data.y * uni_half_ht;
-   var_random_n = att_vert_data.z;
+   v_eye_to_x = a_vert_data.x * u_half_wd;
+   v_eye_to_z = a_vert_data.y * u_half_ht;
+   v_random_n = a_vert_data.z;
    
-   gl_Position =  vec4(att_vert_data.xy, 0.0, 1.0);
+   gl_Position =  vec4(a_vert_data.xy, 0.0, 1.0);
 }

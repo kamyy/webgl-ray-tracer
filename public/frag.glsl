@@ -2,6 +2,9 @@
 
 precision highp float;
 
+// ----------------------------------------------------------------------------
+// structures
+//
 struct Ray {
     vec3 origin;
     vec3 dir;
@@ -11,46 +14,58 @@ struct Sphere {
     vec3  center;
     float radius;
     float radiusSquared;
-    uint  mat;
+    uint  materialTypeOf;
+    vec3  materialAlbedo;
 };
-
-struct Material {
-    uint typeOf;
-    vec3 albedo;
-}
 
 struct RayIntersectSphereResult {
     float t;
     vec3  pos;
     vec3  nrm;
     uint  mat;
+    uint  materialTypeOf;
+    vec3  materialAlbedo;
 };
+
+// ----------------------------------------------------------------------------
+// constants
+//
+const float MAX_FLT = intBitsToFloat(2139095039);
+const float EPSILON = 0.001;
 
 const uint MATERIAL_MATTE = 0;
 const uint MATERIAL_METAL = 1;
-const uint MATERIAL_MAX   = 2;
 
-const uint MAX_SPHERES = 2;
-const uint MAX_BOUNCES = 8;
-const uint MAX_PRIMARY_RAYS = 100;
+const uint MAX_SPHERES = 32;
 
-const float MAX_FLOAT = intBitsToFloat(2139095039);
+// ----------------------------------------------------------------------------
+// uniforms
+//
+uniform Sphere u_spheres[MAX_SPHERES];
 
-float g_random_v;
+uniform uint u_num_primary_rays;
+uniform uint u_num_bounces;
+uniform uint u_num_spheres;
 
-uniform float    uni_eye_to_y;
-uniform Sphere   uni_spheres[MAX_SPHERES];
-uniform Material uni_materials[MAX_MATERIALS]
+uniform float u_eye_to_y;
 
-in float var_eye_to_x;
-in float var_eye_to_z;
-in float var_random_n;
+// ----------------------------------------------------------------------------
+// varyings
+//
+in float v_eye_to_x;
+in float v_eye_to_z;
+in float v_random_n;
 
-out vec4 out_color;
+// ----------------------------------------------------------------------------
+// outputs
+//
+out vec4 o_color;
 
 // ----------------------------------------------------------------------------
 // randomness functions
 //
+float g_random_v;
+
 uint hash(uint x) {
     // A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
     x += ( x << 10u );
@@ -82,7 +97,7 @@ vec3 randomPosInUnitSphere() {
     vec3 p;
     do {
         p = vec3(rand(), rand(), rand()) * 2.0 + vec3(-1.0, -1.0, -1.0);
-    } while (dot(p, p) > 0.999);
+    } while (dot(p, p) > 1.0);
 
     return p;
 }
@@ -107,7 +122,8 @@ bool rayIntersectSphere(Ray r, Sphere s, float t0, float t1, out RayIntersectSph
             res.t = t;
             res.pos = r.origin + (r.dir * t);
             res.nrm = normalize(res.pos - s.center);
-            res.mat = s.mat;
+            res.materialTypeOf = s.materialTypeOf;
+            res.materialAlbedo = s.materialAlbedo;
             return true;
         }
         t = (-b + sq) * aa;
@@ -115,7 +131,8 @@ bool rayIntersectSphere(Ray r, Sphere s, float t0, float t1, out RayIntersectSph
             res.t = t;
             res.pos = r.origin + (r.dir * t);
             res.nrm = normalize(res.pos - s.center);
-            res.mat = s.mat;
+            res.materialTypeOf = s.materialTypeOf;
+            res.materialAlbedo = s.materialAlbedo;
             return true;
         }
     }
@@ -126,8 +143,8 @@ bool rayIntersectNearestSphere(Ray ray, float t0, float t1, out RayIntersectSphe
     RayIntersectSphereResult current;
     bool contact = false;
 
-    for (int i = 0; i < MAX_SPHERES; ++i) {
-        if (rayIntersectSphere(ray, uni_spheres[i], t0, t1, current)) {
+    for (int i = 0; i < u_num_spheres; ++i) {
+        if (rayIntersectSphere(ray, u_spheres[i], t0, t1, current)) {
             if (!contact || current.t < nearest.t) {
                 nearest = current;
                 contact = true;
@@ -138,61 +155,60 @@ bool rayIntersectNearestSphere(Ray ray, float t0, float t1, out RayIntersectSphe
 }
 
 // ----------------------------------------------------------------------------
-//
+// reflection vector function
 //
 vec3 reflect(vec3 v, vec3 n) {
     return v -  2.0 * dot(v, n) * n;
 }
 
-vec3 getPixelColor(Ray r, float t0, float t1) {
+// ----------------------------------------------------------------------------
+// cast ray from eye through pixel function
+//
+vec3 pixelRayCast(Ray ray, float a, float b) {
     RayIntersectSphereResult res;
-    vec3 color[MAX_BOUNCES];
-    uint i;
-    uint j;
+    vec3 color(1.0, 1.0, 1.0);
 
-    for (i = 0; i < MAX_BOUNCES; ++i) {
-        if (!rayIntersectNearestSphere(r, t0, t1, res)) {
-            break;
-        }
-        r = Ray(res.pos, res.pos + res.nrm + randomPosInUnitSphere() - res.pos);
-        switch (res.materialTypeOf) {
-        case MATERIAL_MATTE:
+    for (uint i = 0; i < u_num_bounces; ++i) {
+        if (rayIntersectNearestSphere(ray, a, b, res)) {
+            switch (res.materialTypeOf) {
+            case MATERIAL_MATTE:
+                ray = Ray(res.pos, normalize(res.pos + res.nrm + randomPosInUnitSphere() - res.pos);
+                color *= res.albedo;
+                break;
+            case MATERIAL_METAL:
+                ray = Ray(res.pos, normalize(reflect(ray.dir, res.normal));
+                color *= res.albedo;
+                break;
+            }
+        } else {
             float t = (1.0 + normalize(r.dir).z) * 0.5;
-            color[i] = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
-            break;
-        case MATERIAL_METAL:
+            color *= (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
             break;
         }
-    }
-
-    for (j = 0; j < MAX_BOUNCES; ++j) {
-        if (j == i) {
-            break;
-        }
-        c *= 0.5;
     }
 
     return c;
 }
 
+// ----------------------------------------------------------------------------
+// main
+//
 void main() {
-    g_random_v = var_random_n;
+    g_random_v = v_random_n;
 
     Ray r;
     r.origin.x = 0.0;
     r.origin.y = 0.0;
     r.origin.z = 0.0;
-    r.dir.x = 0.0;
-    r.dir.y = uni_eye_to_y;
-    r.dir.z = 0.0;
+    r.dir.y = u_eye_to_y;
 
     vec3 sum = vec3(0.0, 0.0, 0.0);
 
-    for (int i = 0; i < MAX_PRIMARY_RAYS; ++i) {
-        r.dir.x = var_eye_to_x + rand();
-        r.dir.z = var_eye_to_z + rand();
-        sum += getPixelColor(r, 0.001, MAX_FLOAT);
+    for (int i = 0; i < u_num_primary_rays; ++i) {
+        r.dir.x = v_eye_to_x + rand();
+        r.dir.z = v_eye_to_z + rand();
+        sum += pixelRayCast(r, EPSILON, MAX_FLT);
     }
 
-    out_color = vec4(sum / float(MAX_PRIMARY_RAYS), 1.0);
+    o_color = vec4(sum / float(u_num_primary_rays), 1.0);
 }
