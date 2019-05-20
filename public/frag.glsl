@@ -14,7 +14,7 @@ struct Sphere {
     vec3  center;
     float radius;
     float radiusSquared;
-    uint  materialTypeOf;
+    int   materialTypeOf;
     vec3  materialAlbedo;
 };
 
@@ -22,8 +22,8 @@ struct RayIntersectSphereResult {
     float t;
     vec3  pos;
     vec3  nrm;
-    uint  mat;
-    uint  materialTypeOf;
+    int   mat;
+    int   materialTypeOf;
     vec3  materialAlbedo;
 };
 
@@ -33,19 +33,19 @@ struct RayIntersectSphereResult {
 const float MAX_FLT = intBitsToFloat(2139095039);
 const float EPSILON = 0.001;
 
-const uint MATERIAL_MATTE = 0;
-const uint MATERIAL_METAL = 1;
+const int MATERIAL_MATTE = 0;
+const int MATERIAL_METAL = 1;
 
-const uint MAX_SPHERES = 32;
+const int MAX_SPHERES = 32;
 
 // ----------------------------------------------------------------------------
 // uniforms
 //
 uniform Sphere u_spheres[MAX_SPHERES];
 
-uniform uint u_num_primary_rays;
-uniform uint u_num_bounces;
-uniform uint u_num_spheres;
+uniform int u_num_primary_rays;
+uniform int u_num_bounces;
+uniform int u_num_spheres;
 
 uniform float u_eye_to_y;
 
@@ -118,7 +118,7 @@ bool rayIntersectSphere(Ray r, Sphere s, float t0, float t1, out RayIntersectSph
         float t;
 
         t = (-b - sq) * aa;
-        if (t0 < t) {
+        if (t > t0) {
             res.t = t;
             res.pos = r.origin + (r.dir * t);
             res.nrm = normalize(res.pos - s.center);
@@ -127,7 +127,7 @@ bool rayIntersectSphere(Ray r, Sphere s, float t0, float t1, out RayIntersectSph
             return true;
         }
         t = (-b + sq) * aa;
-        if (t0 < t) {
+        if (t > t0) {
             res.t = t;
             res.pos = r.origin + (r.dir * t);
             res.nrm = normalize(res.pos - s.center);
@@ -155,39 +155,32 @@ bool rayIntersectNearestSphere(Ray ray, float t0, float t1, out RayIntersectSphe
 }
 
 // ----------------------------------------------------------------------------
-// reflection vector function
-//
-vec3 reflect(vec3 v, vec3 n) {
-    return v -  2.0 * dot(v, n) * n;
-}
-
-// ----------------------------------------------------------------------------
 // cast ray from eye through pixel function
 //
 vec3 pixelRayCast(Ray ray, float a, float b) {
+    vec3 color = vec3(1.0, 1.0, 1.0);
     RayIntersectSphereResult res;
-    vec3 color(1.0, 1.0, 1.0);
 
-    for (uint i = 0; i < u_num_bounces; ++i) {
+    for (int i = 0; i < u_num_bounces; ++i) {
         if (rayIntersectNearestSphere(ray, a, b, res)) {
             switch (res.materialTypeOf) {
             case MATERIAL_MATTE:
-                ray = Ray(res.pos, normalize(res.pos + res.nrm + randomPosInUnitSphere() - res.pos);
-                color *= res.albedo;
+                ray = Ray(res.pos, normalize(res.pos + res.nrm + randomPosInUnitSphere() - res.pos));
+                color *= res.materialAlbedo;
                 break;
             case MATERIAL_METAL:
-                ray = Ray(res.pos, normalize(reflect(ray.dir, res.normal));
-                color *= res.albedo;
+                ray = Ray(res.pos, normalize(reflect(ray.dir, res.nrm)));
+                color *= res.materialAlbedo;
                 break;
             }
         } else {
-            float t = (1.0 + normalize(r.dir).z) * 0.5;
+            float t = (1.0 + normalize(ray.dir).z) * 0.5;
             color *= (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
             break;
         }
     }
 
-    return c;
+    return color;
 }
 
 // ----------------------------------------------------------------------------

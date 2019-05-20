@@ -4,7 +4,7 @@ import Shader from './Shader';
 
 export let GL = null;
 
-class App extends Component {
+export default class App extends Component {
     constructor(props) {
         super(props);
 

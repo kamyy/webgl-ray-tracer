@@ -50,10 +50,10 @@ export default class Shader {
 
             if (!GL.getShaderParameter(this.vs, GL.COMPILE_STATUS)) {
                 throw new Error(`Error compiling ${vertShaderURL} !\n ${GL.getShaderInfoLog(this.vs)}`);
-            } 
+            }
             if (!GL.getShaderParameter(this.fs, GL.COMPILE_STATUS)) {
                 throw new Error(`Error compiling ${fragShaderURL} !\n ${GL.getShaderInfoLog(this.fs)}`);
-            } 
+            }
 
             this.program = GL.createProgram();
             GL.attachShader(this.program, this.vs);
@@ -65,17 +65,17 @@ export default class Shader {
 
             this.vtxBuff = GL.createBuffer();
             GL.bindBuffer(GL.ARRAY_BUFFER, this.vtxBuff);
-            GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([ 
+            GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([
                     -1, -1, Math.random(),
-                    +1, -1, Math.random(), 
-                    +1, +1, Math.random(), 
-                    -1, +1, Math.random() 
+                    +1, -1, Math.random(),
+                    +1, +1, Math.random(),
+                    -1, +1, Math.random()
                 ]), GL.STATIC_DRAW
             );
 
             return true;
         })
-        .catch(e => { 
+        .catch(e => {
             GL.bindBuffer(GL.ARRAY_BUFFER, null);
 
             if (this.vtxBuff) {
@@ -101,21 +101,25 @@ export default class Shader {
     drawScene() {
         const spheres = [
             new Sphere(
-                new Vector1x4(0.0, 1200.0, 0.0), 200.0
+                new Vector1x4(-200.0, 1200.0, 300.0), 200.0
             ),
             new Sphere(
-                new Vector1x4(0.0, 1300.0, -700.0), 400.0
+                new Vector1x4(400.0, 1200.0, 100.0), 260.0
+            ),
+            new Sphere(
+                new Vector1x4(0.0, 1300.0, -1000.0), 900.0
             ),
         ];
 
         const materials = [
-            new Material(MATERIAL_TYPE.MATTE, new Vector1x4(0.5, 0, 0)),
-            new Material(MATERIAL_TYPE.METAL, new Vector1x4(0.5, 0, 0))
+            new Material(MATERIAL_TYPE.METAL, new Vector1x4(0.6, 0.6, 0.9)),
+            new Material(MATERIAL_TYPE.METAL, new Vector1x4(0.2, 0.4, 0.8)),
+            new Material(MATERIAL_TYPE.MATTE, new Vector1x4(0.5, 0.1, 0.1))
         ];
 
         if (this.program && this.vtxBuff) {
             GL.useProgram(this.program);
-            
+
             // vertex shader attributes
             const desc = {
                 attrib: 'a_vert_data',
@@ -125,11 +129,11 @@ export default class Shader {
             };
             const loc = GL.getAttribLocation(this.program, desc.attrib);
             GL.vertexAttribPointer(
-                loc, 
-                desc.length, 
-                GL.FLOAT, 
-                false, 
-                desc.stride, 
+                loc,
+                desc.length,
+                GL.FLOAT,
+                false,
+                desc.stride,
                 desc.offset
             );
             GL.enableVertexAttribArray(loc);
@@ -141,22 +145,44 @@ export default class Shader {
             // fragment shader uniforms
             spheres.forEach((sphere, i) => {
                 GL.uniform3f(
-                    GL.getUniformLocation(this.program, `u_spheres[${i}].center`), 
-                    sphere.center.x, 
-                    sphere.center.y, 
-                    sphere.center.z 
+                    GL.getUniformLocation(this.program, `u_spheres[${i}].center`),
+                    sphere.center.x,
+                    sphere.center.y,
+                    sphere.center.z
                 );
                 GL.uniform1f(
-                    GL.getUniformLocation(this.program, `u_spheres[${i}].radius`), 
+                    GL.getUniformLocation(this.program, `u_spheres[${i}].radius`),
                     sphere.radius
                 );
                 GL.uniform1f(
-                    GL.getUniformLocation(this.program, `u_spheres[${i}].radiusSquared`), 
+                    GL.getUniformLocation(this.program, `u_spheres[${i}].radiusSquared`),
                     sphere.radiusSquared
                 );
+                GL.uniform1i(
+                    GL.getUniformLocation(this.program, `u_spheres[${i}].materialTypeOf`),
+                    materials[i].typeOf
+                );
+                GL.uniform3f(
+                    GL.getUniformLocation(this.program, `u_spheres[${i}].materialAlbedo`),
+                    materials[i].albedo.x,
+                    materials[i].albedo.y,
+                    materials[i].albedo.z
+                );
             });
+            GL.uniform1i(
+                GL.getUniformLocation(this.program, 'u_num_primary_rays'),
+                64
+            );
+            GL.uniform1i(
+                GL.getUniformLocation(this.program, 'u_num_bounces'),
+                16
+            );
+            GL.uniform1i(
+                GL.getUniformLocation(this.program, 'u_num_spheres'),
+                3
+            );
             GL.uniform1f(
-                GL.getUniformLocation(this.program, 'u_eye_to_y'), 
+                GL.getUniformLocation(this.program, 'u_eye_to_y'),
                 this.halfHt / (Math.tan(30 * Math.PI / 180))
             );
 
