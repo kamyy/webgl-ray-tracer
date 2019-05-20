@@ -175,7 +175,7 @@ vec3 pixelRayCast(Ray ray, float a, float b) {
             }
         } else {
             float t = (1.0 + normalize(ray.dir).z) * 0.5;
-            color *= (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
+            color *= t * vec3(1.0, 1.0, 1.0) + (1.0 - t) * vec3(0.5, 0.7, 1.0);
             break;
         }
     }

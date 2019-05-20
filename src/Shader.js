@@ -112,8 +112,8 @@ export default class Shader {
         ];
 
         const materials = [
-            new Material(MATERIAL_TYPE.METAL, new Vector1x4(0.6, 0.6, 0.9)),
-            new Material(MATERIAL_TYPE.METAL, new Vector1x4(0.2, 0.4, 0.8)),
+            new Material(MATERIAL_TYPE.METAL, new Vector1x4(0.9, 0.9, 0.9)),
+            new Material(MATERIAL_TYPE.MATTE, new Vector1x4(0.2, 0.4, 0.8)),
             new Material(MATERIAL_TYPE.MATTE, new Vector1x4(0.5, 0.1, 0.1))
         ];
 
@@ -171,11 +171,11 @@ export default class Shader {
             });
             GL.uniform1i(
                 GL.getUniformLocation(this.program, 'u_num_primary_rays'),
-                64
+                512
             );
             GL.uniform1i(
                 GL.getUniformLocation(this.program, 'u_num_bounces'),
-                16
+                32
             );
             GL.uniform1i(
                 GL.getUniformLocation(this.program, 'u_num_spheres'),
