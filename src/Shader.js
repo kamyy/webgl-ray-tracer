@@ -101,23 +101,17 @@ export default class Shader {
     }
 
     drawScene() {
-        const spheres = [
-            new Sphere(
-                new Vector1x4(-200.0, 1200.0, 300.0), 200.0
-            ),
-            new Sphere(
-                new Vector1x4(400.0, 1200.0, 100.0), 260.0
-            ),
-            new Sphere(
-                new Vector1x4(0.0, 1300.0, -1000.0), 900.0
-            ),
-        ];
+        const materialClass = {
+            METALLIC_MATERIAL:   0,
+            LAMBERTIAN_MATERIAL: 1,
+            DIELECTRIC_MATERIAL: 2,
+        };
 
         const metallicMaterials = [
             new MetallicMaterial(
                 new Vector1x4(0.9, 0.9, 0.9), 
                 0.15,
-            )
+            ),
         ];
 
         const lambertianMaterials = [
@@ -126,16 +120,40 @@ export default class Shader {
             ),
             new LambertianMaterial(
                 new Vector1x4(0.5, 0.1, 0.1)
-            )
+            ),
         ];
 
         const dielectricMaterials = [
+        ];
 
+        const spheres = [
+            {
+                sphere: new Sphere(
+                    new Vector1x4(-200.0, 1200.0, 300.0), 200.0
+                ),
+                materialClass: materialClass.METALLIC_MATERIAL,
+                materialIndex: 0
+            },
+            {
+                sphere: new Sphere(
+                    new Vector1x4(400.0, 1200.0, 100.0), 260.0
+                ),
+                materialClass: materialClass.LAMBERTIAN_MATERIAL,
+                materialIndex: 0
+            },
+            {
+                sphere: new Sphere(
+                    new Vector1x4(0.0, 1300.0, -1000.0), 900.0
+                ),
+                materialClass: materialClass.LAMBERTIAN_MATERIAL,
+                materialIndex: 1
+            },
         ];
 
         if (this.program && this.vtxBuff) {
             GL.useProgram(this.program);
 
+            // ----------------------------------------------------------------
             // vertex shader attributes
             const desc = {
                 attrib: 'a_vert_data',
@@ -150,48 +168,43 @@ export default class Shader {
                 GL.FLOAT,
                 false,
                 desc.stride,
-                desc.offset
+                desc.offset,
             );
             GL.enableVertexAttribArray(loc);
 
+            // ----------------------------------------------------------------
             // vertex shader uniforms
             GL.uniform1f(GL.getUniformLocation(this.program, 'u_half_wd'), this.halfWd);
             GL.uniform1f(GL.getUniformLocation(this.program, 'u_half_ht'), this.halfHt);
 
+            // ----------------------------------------------------------------
             // fragment shader uniforms
-            spheres.forEach((sphere, i) => {
-                GL.uniform3f(
+            spheres.forEach((s, i) => {
+                GL.uniform3fv(
                     GL.getUniformLocation(this.program, `u_spheres[${i}].center`),
-                    sphere.center.x,
-                    sphere.center.y,
-                    sphere.center.z
+                    s.sphere.center.xyz,
                 );
                 GL.uniform1f(
                     GL.getUniformLocation(this.program, `u_spheres[${i}].radius`),
-                    sphere.radius
+                    s.sphere.radius
                 );
                 GL.uniform1f(
                     GL.getUniformLocation(this.program, `u_spheres[${i}].radiusSquared`),
-                    sphere.radiusSquared
+                    s.sphere.radiusSquared
                 );
                 GL.uniform1i(
-                    GL.getUniformLocation(this.program, `u_spheres[${i}].materialTypeOf`),
-                    materials[i].typeOf
+                    GL.getUniformLocation(this.program, `u_spheres[${i}].materialClass`),
+                    s.materialClass
                 );
-                GL.uniform3f(
-                    GL.getUniformLocation(this.program, `u_spheres[${i}].materialAlbedo`),
-                    materials[i].albedo.x,
-                    materials[i].albedo.y,
-                    materials[i].albedo.z
-                );
-                GL.uniform1f(
-                    GL.getUniformLocation(this.program, `u_spheres[${i}].materialRandom`),
-                    materials[i].random
+                GL.uniform1i(
+                    GL.getUniformLocation(this.program, `u_spheres[${i}].materialIndex`),
+                    s.materialIndex
                 );
             });
+
             GL.uniform1i(
                 GL.getUniformLocation(this.program, 'u_num_samples'),
-                512
+                256
             );
             GL.uniform1i(
                 GL.getUniformLocation(this.program, 'u_num_bounces'),
@@ -206,7 +219,29 @@ export default class Shader {
                 this.halfHt / (Math.tan(30 * Math.PI / 180))
             );
 
-            // cover entire canvas in rectangle
+            metallicMaterials.forEach((m, i) => {
+                GL.uniform3fv(
+                    GL.getUniformLocation(this.program, `u_metallic_materials[${i}].albedo`),
+                    m.albedo.rgb
+                );
+                GL.uniform1f(
+                    GL.getUniformLocation(this.program, `u_metallic_materials[${i}].fuzziness`),
+                    m.fuzziness
+                );
+            });
+
+            lambertianMaterials.forEach((m, i) => {
+                GL.uniform3fv(
+                    GL.getUniformLocation(this.program, `u_lambertian_materials[${i}].albedo`),
+                    m.albedo.rgb
+                );
+            });
+
+            dielectricMaterials.forEach((m, i) => {
+            });
+
+            // ----------------------------------------------------------------
+            // cover entire canvas in a clip-space rectangle
             GL.drawArrays(GL.TRIANGLE_FAN, 0, 4);
         }
     }

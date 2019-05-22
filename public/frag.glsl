@@ -29,8 +29,7 @@ struct LambertianMaterial {
 
 struct DielectricMaterial {
     vec3  albedo;
-}
-
+};
 
 struct RayIntersectSphereResult {
     float t;
@@ -59,7 +58,7 @@ const int MAX_MATERIALS = 8;
 uniform Sphere u_spheres[MAX_SPHERES];
 uniform MetallicMaterial u_metallic_materials[MAX_MATERIALS];
 uniform LambertianMaterial u_lambertian_materials[MAX_MATERIALS];
-uniform DiElectricMaterial u_dielectric_materials[MAX_MATERIALS];
+uniform DielectricMaterial u_dielectric_materials[MAX_MATERIALS];
 
 uniform int u_num_spheres;
 uniform int u_num_samples;
@@ -189,7 +188,10 @@ vec3 pixelRayCast(Ray ray, float a, float b) {
             switch (res.materialClass) {
             case METALLIC_MATERIAL:
                 metallic = u_metallic_materials[res.materialIndex];
-                ray = Ray(res.pos, normalize(reflect(ray.dir, res.nrm)) + metallic.fuzziness * randPosInUnitSphere());
+                ray = Ray(
+                    res.pos, normalize(reflect(ray.dir, res.nrm)) + 
+                    metallic.fuzziness * randPosInUnitSphere()
+                );
                 if (dot(ray.dir, res.nrm) > 0.0) {
                     color *= metallic.albedo;
                 } else {
