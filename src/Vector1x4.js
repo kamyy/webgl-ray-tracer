@@ -20,6 +20,16 @@ export default class Vector1x4 {
         this.w = w;
     }
 
+    get r(): number { return this.x; }
+    get g(): number { return this.y; }
+    get b(): number { return this.z; }
+    get a(): number { return this.w; }
+
+    set r(r: number) { this.x = r; }
+    set g(g: number) { this.y = g; }
+    set b(b: number) { this.z = b; }
+    set a(a: number) { this.w = a; }
+
     add(rhs: Vector1x4): Vector1x4 {
         return new Vector1x4(this.x + rhs.x, this.y + rhs.y, this.z + rhs.z);
     }

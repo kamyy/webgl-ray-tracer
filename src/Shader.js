@@ -1,8 +1,10 @@
 // @flow
 import { GL } from './App';
 import Sphere from './Sphere';
-import Material, { MATERIAL_TYPE } from './Material';
 import Vector1x4 from './Vector1x4';
+import MetallicMaterial from './materials/MetallicMaterial.js';
+import LambertianMaterial from './materials/LambertianMaterial.js';
+import DielectricMaterial from './materials/DielectricMaterial.js';
 
 //const g_up     = new Vector1x4(0.0, 0.0, 1.0, 0.0);
 //const g_origin = new Vector1x4(0.0, 0.0, 0.0, 1.0);
@@ -111,10 +113,24 @@ export default class Shader {
             ),
         ];
 
-        const materials = [
-            new Material(MATERIAL_TYPE.METAL, new Vector1x4(0.9, 0.9, 0.9)),
-            new Material(MATERIAL_TYPE.MATTE, new Vector1x4(0.2, 0.4, 0.8)),
-            new Material(MATERIAL_TYPE.MATTE, new Vector1x4(0.5, 0.1, 0.1))
+        const metallicMaterials = [
+            new MetallicMaterial(
+                new Vector1x4(0.9, 0.9, 0.9), 
+                0.15,
+            )
+        ];
+
+        const lambertianMaterials = [
+            new LambertianMaterial(
+                new Vector1x4(0.4, 0.4, 0.8)
+            ),
+            new LambertianMaterial(
+                new Vector1x4(0.5, 0.1, 0.1)
+            )
+        ];
+
+        const dielectricMaterials = [
+
         ];
 
         if (this.program && this.vtxBuff) {
@@ -168,9 +184,13 @@ export default class Shader {
                     materials[i].albedo.y,
                     materials[i].albedo.z
                 );
+                GL.uniform1f(
+                    GL.getUniformLocation(this.program, `u_spheres[${i}].materialRandom`),
+                    materials[i].random
+                );
             });
             GL.uniform1i(
-                GL.getUniformLocation(this.program, 'u_num_primary_rays'),
+                GL.getUniformLocation(this.program, 'u_num_samples'),
                 512
             );
             GL.uniform1i(
