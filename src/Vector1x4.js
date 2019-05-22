@@ -8,27 +8,36 @@ import Matrix4x4, {
 from './Matrix4x4.js';
 
 export default class Vector1x4 {
-    x: number;
-    y: number;
-    z: number;
-    w: number;
+    elements: number[];
 
     constructor(x: number = 0.0, y: number = 0.0, z: number = 0.0, w: number = 1.0) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
-        this.w = w;
+        this.elements = [ x, y, z, w];
     }
 
-    get r(): number { return this.x; }
-    get g(): number { return this.y; }
-    get b(): number { return this.z; }
-    get a(): number { return this.w; }
+    get xyzw(): number[] { return this.elements; } 
+    get rgba(): number[] { return this.elements; }
+    get xyz(): number[] { return this.elements.slice(0, 3); } 
+    get rgb(): number[] { return this.elements.slice(0, 3); }
 
-    set r(r: number) { this.x = r; }
-    set g(g: number) { this.y = g; }
-    set b(b: number) { this.z = b; }
-    set a(a: number) { this.w = a; }
+    get x(): number { return this.elements[0]; }
+    get y(): number { return this.elements[1]; }
+    get z(): number { return this.elements[2]; }
+    get w(): number { return this.elements[3]; }
+
+    set x(x: number) { this.elements[0] = x; }
+    set y(y: number) { this.elements[1] = y; }
+    set z(z: number) { this.elements[2] = z; }
+    set w(w: number) { this.elements[3] = w; }
+
+    get r(): number { return this.elements[0]; }
+    get g(): number { return this.elements[1]; }
+    get b(): number { return this.elements[2]; }
+    get a(): number { return this.elements[3]; }
+
+    set r(r: number) { this.elements[0] = r; }
+    set g(g: number) { this.elements[1] = g; }
+    set b(b: number) { this.elements[2] = b; }
+    set a(a: number) { this.elements[3] = a; }
 
     add(rhs: Vector1x4): Vector1x4 {
         return new Vector1x4(this.x + rhs.x, this.y + rhs.y, this.z + rhs.z);
