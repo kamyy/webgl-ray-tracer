@@ -19,16 +19,17 @@ struct Sphere {
 };
 
 struct MetallicMaterial {
-    vec3  albedo;
-    float fuzziness;
+    vec3  attenuation;
+    float shininess;
 };
 
 struct LambertianMaterial {
-    vec3  albedo;
+    vec3  attenuation;
 };
 
 struct DielectricMaterial {
-    vec3  albedo;
+    vec3  attenuation;
+    float refractionIndex;
 };
 
 struct RayIntersectSphereResult {
@@ -173,44 +174,96 @@ bool rayIntersectNearestSphere(Ray ray, float t0, float t1, out RayIntersectSphe
 }
 
 // ----------------------------------------------------------------------------
-// cast ray from eye through pixel
+// ray cast from eye through pixel
 //
-vec3 pixelRayCast(Ray ray, float a, float b) {
+float schlick(float cosine, float rindex) {
+    float r0 = (1.0 - rindex) / (1.0 + rindex);
+    r0 *= r0;
+    
+    return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
+}
+
+void rayHitMetallicSurface(RayIntersectSphereResult res, inout Ray ray, inout vec3 color) {
+    MetallicMaterial metallic = u_metallic_materials[res.materialIndex];
+
+    vec3 reflection = reflect(ray.dir, res.nrm);
+    ray = Ray(  res.pos, 
+                normalize(reflection + (1.0 - metallic.shininess) * randPosInUnitSphere())
+                );
+
+    if (dot(ray.dir, res.nrm) > 0.0) {
+        color *= metallic.attenuation;
+    } else {
+        color = vec3(0.0, 0.0, 0.0);
+    }
+}
+
+void rayHitLambertianSurface(RayIntersectSphereResult res, inout Ray ray, inout vec3 color) {
+    LambertianMaterial lambertian = u_lambertian_materials[res.materialIndex];
+    ray = Ray(  res.pos, 
+                normalize(res.nrm + randPosInUnitSphere())
+                );
+    color *= lambertian.attenuation;
+}
+
+void rayHitDielectricSurface(RayIntersectSphereResult res, inout Ray ray, inout vec3 color) {
+    DielectricMaterial dielectric = u_dielectric_materials[res.materialIndex];
+    float cosine;
+    float rindex;
+    float reflectionProbability;
+    vec3  refraction;
+    vec3  normal;
+    vec3  dir;
+
+    dir = normalize(ray.dir);
+
+    if (dot(dir, res.nrm) > 0.0) { // from sphere into air
+        rindex = dielectric.refractionIndex;
+        cosine = rindex * dot(dir, res.nrm);
+        normal = -res.nrm;
+    } else { // into sphere from air
+        rindex = 1.0 / dielectric.refractionIndex;
+        cosine = -dot(dir, res.nrm);
+        normal = +res.nrm;
+    }
+
+    refraction = refract(dir, normal, rindex);
+    if (dot(refraction, refraction) > 0.0) {
+        reflectionProbability = schlick(cosine, rindex);
+    } else {
+        reflectionProbability = 1.0;
+    }
+
+    if (rand() < reflectionProbability) {
+        ray = Ray(res.pos, reflect(dir, res.nrm));
+    } else {
+        ray = Ray(res.pos, refraction);
+    } 
+
+    color *= dielectric.attenuation;
+}
+
+vec3 castPrimaryRay(Ray ray, float t0, float t1) {
     vec3 color = vec3(1.0, 1.0, 1.0);
     RayIntersectSphereResult res;
 
-    MetallicMaterial   metallic;
-    LambertianMaterial lambertian;
-    DielectricMaterial dielectric;
-
     for (int i = 0; i < u_num_bounces; ++i) {
-        if (rayIntersectNearestSphere(ray, a, b, res)) {
+        if (rayIntersectNearestSphere(ray, t0, t1, res)) {
             switch (res.materialClass) {
             case METALLIC_MATERIAL:
-                metallic = u_metallic_materials[res.materialIndex];
-                ray = Ray(
-                    res.pos, normalize(reflect(ray.dir, res.nrm)) + 
-                    metallic.fuzziness * randPosInUnitSphere()
-                );
-                if (dot(ray.dir, res.nrm) > 0.0) {
-                    color *= metallic.albedo;
-                } else {
-                    return vec3(0.0, 0.0, 0.0);
-                }
+                rayHitMetallicSurface(res, ray, color);
                 break;
             case LAMBERTIAN_MATERIAL:
-                lambertian = u_lambertian_materials[res.materialIndex];
-                ray = Ray(res.pos, res.nrm + randPosInUnitSphere());
-                color *= lambertian.albedo;
+                rayHitLambertianSurface(res, ray, color);
                 break;
             case DIELECTRIC_MATERIAL:
-                dielectric = u_dielectric_materials[res.materialIndex];
+                rayHitDielectricSurface(res, ray, color);
                 break;
             }
         } else {
             float t = (1.0 + normalize(ray.dir).z) * 0.5;
             color *= t * vec3(1.0, 1.0, 1.0) + (1.0 - t) * vec3(0.5, 0.7, 1.0);
-            break;
+            break; // out of for loop
         }
     }
 
@@ -224,17 +277,17 @@ void main() {
     g_random_v = v_random_n;
 
     Ray r;
-    r.origin.x = 0.0;
-    r.origin.y = 0.0;
-    r.origin.z = 0.0;
-    r.dir.y = u_eye_to_y;
-
+    r.origin = vec3(0.0, 0.0, 0.0);
     vec3 sum = vec3(0.0, 0.0, 0.0);
 
     for (int i = 0; i < u_num_samples; ++i) {
-        r.dir.x = v_eye_to_x + rand();
-        r.dir.z = v_eye_to_z + rand();
-        sum += pixelRayCast(r, EPSILON, MAX_FLT);
+        r.dir = vec3(v_eye_to_x + rand(), 
+                     u_eye_to_y, 
+                     v_eye_to_z + rand()
+                     );
+        r.dir = normalize(r.dir);
+
+        sum += castPrimaryRay(r, EPSILON, MAX_FLT);
     }
 
     o_color = vec4(sum / float(u_num_samples), 1.0);

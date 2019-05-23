@@ -109,8 +109,7 @@ export default class Shader {
 
         const metallicMaterials = [
             new MetallicMaterial(
-                new Vector1x4(0.9, 0.9, 0.9), 
-                0.15,
+                new Vector1x4(0.9, 0.9, 0.9), 0.95,
             ),
         ];
 
@@ -124,26 +123,43 @@ export default class Shader {
         ];
 
         const dielectricMaterials = [
+            new DielectricMaterial(
+                new Vector1x4(1.0, 1.0, 1.0), 1.33
+            ),
         ];
 
         const spheres = [
             {
                 sphere: new Sphere(
-                    new Vector1x4(-200.0, 1200.0, 300.0), 200.0
+                    new Vector1x4(-20.0, 1000.0, 30.0), 80.0
+                ),
+                materialClass: materialClass.LAMBERTIAN_MATERIAL,
+                materialIndex: 1
+            },
+            {
+                sphere: new Sphere(
+                    new Vector1x4(-200.0, 800.0, -80.0), 60.0
                 ),
                 materialClass: materialClass.METALLIC_MATERIAL,
                 materialIndex: 0
             },
             {
                 sphere: new Sphere(
-                    new Vector1x4(400.0, 1200.0, 100.0), 260.0
+                    new Vector1x4(30.0, 400.0, 0.0), 40.0
+                ),
+                materialClass: materialClass.DIELECTRIC_MATERIAL,
+                materialIndex: 0
+            },
+            {
+                sphere: new Sphere(
+                    new Vector1x4(300.0, 900.0, 10.0), 90.0
                 ),
                 materialClass: materialClass.LAMBERTIAN_MATERIAL,
                 materialIndex: 0
             },
             {
                 sphere: new Sphere(
-                    new Vector1x4(0.0, 1300.0, -1000.0), 900.0
+                    new Vector1x4(0.0, 1300.0, -900.0), 900.0
                 ),
                 materialClass: materialClass.LAMBERTIAN_MATERIAL,
                 materialIndex: 1
@@ -204,40 +220,48 @@ export default class Shader {
 
             GL.uniform1i(
                 GL.getUniformLocation(this.program, 'u_num_samples'),
-                256
+                128
             );
             GL.uniform1i(
                 GL.getUniformLocation(this.program, 'u_num_bounces'),
-                32
+                4
             );
             GL.uniform1i(
                 GL.getUniformLocation(this.program, 'u_num_spheres'),
-                3
+                spheres.length
             );
             GL.uniform1f(
                 GL.getUniformLocation(this.program, 'u_eye_to_y'),
-                this.halfHt / (Math.tan(30 * Math.PI / 180))
+                this.halfHt / (Math.tan(15 * Math.PI / 180))
             );
 
             metallicMaterials.forEach((m, i) => {
                 GL.uniform3fv(
-                    GL.getUniformLocation(this.program, `u_metallic_materials[${i}].albedo`),
-                    m.albedo.rgb
+                    GL.getUniformLocation(this.program, `u_metallic_materials[${i}].attenuation`),
+                    m.attenuation.rgb
                 );
                 GL.uniform1f(
-                    GL.getUniformLocation(this.program, `u_metallic_materials[${i}].fuzziness`),
-                    m.fuzziness
+                    GL.getUniformLocation(this.program, `u_metallic_materials[${i}].shininess`),
+                    m.shininess
                 );
             });
 
             lambertianMaterials.forEach((m, i) => {
                 GL.uniform3fv(
-                    GL.getUniformLocation(this.program, `u_lambertian_materials[${i}].albedo`),
-                    m.albedo.rgb
+                    GL.getUniformLocation(this.program, `u_lambertian_materials[${i}].attenuation`),
+                    m.attenuation.rgb
                 );
             });
 
             dielectricMaterials.forEach((m, i) => {
+                GL.uniform3fv(
+                    GL.getUniformLocation(this.program, `u_dielectric_materials[${i}].attenuation`),
+                    m.attenuation.rgb
+                );
+                GL.uniform1f(
+                    GL.getUniformLocation(this.program, `u_dielectric_materials[${i}].refractionIndex`),
+                    m.refractionIndex
+                );
             });
 
             // ----------------------------------------------------------------

@@ -1,12 +1,12 @@
 // @flow
 import Vector1x4 from '../Vector1x4.js';
-import Material from './Material.js';
 
-export default class MetallicMaterial extends Material {
-    fuzziness: number;
+export default class MetallicMateriall {
+    attenuation: Vector1x4;
+    shininess:   number;
 
-    constructor(albedo: Vector1x4, fuzziness: number) {
-        super(albedo);
-        this.fuzziness = fuzziness;
+    constructor(attenuation: Vector1x4, shininess: number) {
+        this.attenuation = attenuation;
+        this.shininess   = shininess;
     }
 }
