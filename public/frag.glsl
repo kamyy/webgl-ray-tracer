@@ -1,6 +1,6 @@
 #version 300 es
 
-precision highp float;
+precision mediump float;
 
 // ----------------------------------------------------------------------------
 // structures
@@ -72,7 +72,6 @@ uniform float u_eye_to_y;
 //
 in float v_eye_to_x;
 in float v_eye_to_z;
-in float v_random_n;
 
 // ----------------------------------------------------------------------------
 // outputs
@@ -82,40 +81,18 @@ out vec4 o_color;
 // ----------------------------------------------------------------------------
 // randomness
 //
-float g_random_v;
-
-uint hash(uint x) {
-    // A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
-    x += ( x << 10u );
-    x ^= ( x >>  6u );
-    x += ( x <<  3u );
-    x ^= ( x >> 11u );
-    x += ( x << 15u );
-    return x;
-}
-
-float floatConstruct(uint m) {
-    // Construct a float with half-open range [0:1] using low 23 bits.
-    // All zeroes yields 0.0, all ones yields the next smallest representable value below 1.0.
-    const uint ieeeMantissa = 0x007FFFFFu; // binary32 mantissa bitmask
-    const uint ieeeOne      = 0x3F800000u; // 1.0 in IEEE binary32
-    m &= ieeeMantissa;                     // Keep only mantissa bits (fractional part)
-    m |= ieeeOne;                          // Add fractional part to 1.0
-    float  f = uintBitsToFloat( m );       // Range [1:2]
-    return f - 1.0;                        // Range [0:1]
-}
+vec2 g_rand_c = vec2(+0.1, -0.1);
+vec2 g_rand_s;
 
 float rand() {
-    // Pseudo-random value in half-open range [0:1].
-    g_random_v = floatConstruct(hash(floatBitsToUint(g_random_v)));
-    return g_random_v;
+    g_rand_s += g_rand_c;
+    return fract(sin(dot(g_rand_s, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
 vec3 randPosInUnitSphere() {
     vec3 p;
-
-    do {
-        p = 2.0 * vec3(rand(), rand(), rand()) + vec3(-1.0, -1.0, -1.0);
+    do 
+    { p = 2.0 * vec3(rand(), rand(), rand()) + vec3(-1.0, -1.0, -1.0);
     } while (dot(p, p) > 1.0);
 
     return p;
@@ -262,7 +239,7 @@ vec3 castPrimaryRay(Ray ray, float t0, float t1) {
             }
         } else {
             float t = (1.0 + normalize(ray.dir).z) * 0.5;
-            color *= t * vec3(1.0, 1.0, 1.0) + (1.0 - t) * vec3(0.5, 0.7, 1.0);
+            color *=  (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
             break; // out of for loop
         }
     }
@@ -274,7 +251,7 @@ vec3 castPrimaryRay(Ray ray, float t0, float t1) {
 // main
 //
 void main() {
-    g_random_v = v_random_n;
+    g_rand_s = vec2(v_eye_to_x, v_eye_to_z);
 
     Ray r;
     r.origin = vec3(0.0, 0.0, 0.0);

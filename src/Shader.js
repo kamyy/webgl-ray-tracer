@@ -68,10 +68,10 @@ export default class Shader {
             this.vtxBuff = GL.createBuffer();
             GL.bindBuffer(GL.ARRAY_BUFFER, this.vtxBuff);
             GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([
-                    -1, -1, Math.random(),
-                    +1, -1, Math.random(),
-                    +1, +1, Math.random(),
-                    -1, +1, Math.random()
+                    -1, -1,
+                    +1, -1,
+                    +1, +1,
+                    -1, +1,
                 ]), GL.STATIC_DRAW
             );
 
@@ -173,8 +173,8 @@ export default class Shader {
             // vertex shader attributes
             const desc = {
                 attrib: 'a_vert_data',
-                length: 3,
-                stride: 12,
+                length: 2,
+                stride: 8,
                 offset: 0
             };
             const loc = GL.getAttribLocation(this.program, desc.attrib);
