@@ -1,7 +1,24 @@
 // @flow
-import Vector1x4 from './Vector1x4';
-import Sphere from './Sphere';
-import Ray from './Ray';
+import Vector1x4 from './Vector1x4.js';
+import Ray from './Ray.js';
+
+export default class Sphere {
+    id:         string;
+    center:     Vector1x4;
+    radius:     number;
+    materialId: string;
+
+    constructor(id: string, center: Vector1x4, radius: number, materialId: string) {
+        this.id     = id;
+        this.center = center;
+        this.radius = radius;
+        this.materialId = materialId;
+    }
+
+    get radiusSquared(): number {
+        return this.radius * this.radius;
+    }
+}
 
 export class RayIntersectSphereResult {
     t0: number;

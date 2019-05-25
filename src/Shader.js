@@ -1,7 +1,12 @@
 // @flow
-import { GL } from './App';
-import Sphere from './Sphere';
-import Vector1x4 from './Vector1x4';
+import {
+    store
+}   from './redux/reducers.js';
+
+import { 
+    GL 
+}   from './components/Canvas.js';
+
 import MetallicMaterial from './materials/MetallicMaterial.js';
 import LambertianMaterial from './materials/LambertianMaterial.js';
 import DielectricMaterial from './materials/DielectricMaterial.js';
@@ -13,6 +18,7 @@ const vertShaderURL = '/vert.glsl';
 const fragShaderURL = '/frag.glsl';
 
 export default class Shader {
+    initialized: boolean;
     halfWd: number;
     halfHt: number;
     vs: WebGLShader | null;
@@ -21,6 +27,7 @@ export default class Shader {
     vtxBuff: WebGLBuffer  | null;
 
     constructor(halfWd: number, halfHt: number) {
+        this.initialized = false;
         this.halfWd = halfWd;
         this.halfHt = halfHt;
         this.vs = null;
@@ -37,12 +44,16 @@ export default class Shader {
         return response.text();
     }
 
-    init(): Promise<boolean> {
-        return Promise.all([
-            this.fetchShader(vertShaderURL),
-            this.fetchShader(fragShaderURL),
-        ])
-        .then(responses => {
+    async init(): Promise<void> {
+        try {
+            // ----------------------------------------------------------------
+            // shader program compile/link
+            //
+            const responses = await Promise.all([
+                this.fetchShader(vertShaderURL),
+                this.fetchShader(fragShaderURL),
+            ]);
+
             this.vs = GL.createShader(GL.VERTEX_SHADER);
             this.fs = GL.createShader(GL.FRAGMENT_SHADER);
             GL.shaderSource(this.vs, responses[0]);
@@ -63,21 +74,46 @@ export default class Shader {
             GL.linkProgram(this.program);
             if (!GL.getProgramParameter(this.program, GL.LINK_STATUS)) {
                 throw new Error('Error linking shader program!\n');
+            } else {
+                GL.useProgram(this.program);
             }
 
+            // ----------------------------------------------------------------
+            // vertex buffer for clip space rectangle
             this.vtxBuff = GL.createBuffer();
             GL.bindBuffer(GL.ARRAY_BUFFER, this.vtxBuff);
-            GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([
-                    -1, -1,
-                    +1, -1,
-                    +1, +1,
-                    -1, +1,
-                ]), GL.STATIC_DRAW
+            GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([ -1, -1, +1, -1, +1, +1, -1, +1, ]), 
+                GL.STATIC_DRAW
             );
 
-            return true;
-        })
-        .catch(e => {
+            // ----------------------------------------------------------------
+            // vertex shader attributes
+            const desc = {
+                length: 2,
+                stride: 8,
+                offset: 0
+            };
+            const loc = GL.getAttribLocation(this.program, 'a_vert_data');
+            GL.vertexAttribPointer(
+                loc,
+                desc.length,
+                GL.FLOAT,
+                false,
+                desc.stride,
+                desc.offset,
+            );
+            GL.enableVertexAttribArray(loc);
+
+            // ----------------------------------------------------------------
+            // vertex shader uniforms
+            GL.uniform1f(GL.getUniformLocation(this.program, 'u_half_wd'), this.halfWd);
+            GL.uniform1f(GL.getUniformLocation(this.program, 'u_half_ht'), this.halfHt);
+
+            // ----------------------------------------------------------------
+            // promise resolved
+            this.initialized = true;
+        } 
+        catch(e) {
             GL.bindBuffer(GL.ARRAY_BUFFER, null);
 
             if (this.vtxBuff) {
@@ -96,178 +132,131 @@ export default class Shader {
                 GL.deleteShader(this.vs);
                 this.vs = null;
             }
+
             throw e;
-        });
+        }
     }
 
     drawScene() {
-        const materialClass = {
-            METALLIC_MATERIAL:   0,
-            LAMBERTIAN_MATERIAL: 1,
-            DIELECTRIC_MATERIAL: 2,
+        const {
+            numSamples,
+            numBounces,
+            cameraFov,
+            materials,
+            spheres,
+        } = store.getState();
+
+        const sortAscending = (a, b) => {
+            if (a.id < b.id) return -1;
+            if (a.id > b.id) return +1;
+            return 0;
         };
 
-        const metallicMaterials = [
-            new MetallicMaterial(
-                new Vector1x4(0.9, 0.9, 0.9), 0.95,
-            ),
-        ];
+        const sortedMaterials = [...materials].sort(sortAscending);
+        sortedMaterials.forEach((m, i) => {
+            if (m instanceof MetallicMaterial) {
+                GL.uniform1i(GL.getUniformLocation(this.program, `u_materials[${i}].materialClass`), 0);
+            } else if (m instanceof LambertianMaterial) {
+                GL.uniform1i(GL.getUniformLocation(this.program, `u_materials[${i}].materialClass`), 1);
+            } else if (m instanceof DielectricMaterial) {
+                GL.uniform1i(GL.getUniformLocation(this.program, `u_materials[${i}].materialClass`), 2);
+            }
 
-        const lambertianMaterials = [
-            new LambertianMaterial(
-                new Vector1x4(0.4, 0.4, 0.8)
-            ),
-            new LambertianMaterial(
-                new Vector1x4(0.5, 0.1, 0.1)
-            ),
-        ];
-
-        const dielectricMaterials = [
-            new DielectricMaterial(
-                new Vector1x4(1.0, 1.0, 1.0), 1.33
-            ),
-        ];
-
-        const spheres = [
-            {
-                sphere: new Sphere(
-                    new Vector1x4(-20.0, 1000.0, 30.0), 80.0
-                ),
-                materialClass: materialClass.LAMBERTIAN_MATERIAL,
-                materialIndex: 1
-            },
-            {
-                sphere: new Sphere(
-                    new Vector1x4(-200.0, 800.0, -80.0), 60.0
-                ),
-                materialClass: materialClass.METALLIC_MATERIAL,
-                materialIndex: 0
-            },
-            {
-                sphere: new Sphere(
-                    new Vector1x4(30.0, 400.0, 0.0), 40.0
-                ),
-                materialClass: materialClass.DIELECTRIC_MATERIAL,
-                materialIndex: 0
-            },
-            {
-                sphere: new Sphere(
-                    new Vector1x4(300.0, 900.0, 10.0), 90.0
-                ),
-                materialClass: materialClass.LAMBERTIAN_MATERIAL,
-                materialIndex: 0
-            },
-            {
-                sphere: new Sphere(
-                    new Vector1x4(0.0, 1300.0, -900.0), 900.0
-                ),
-                materialClass: materialClass.LAMBERTIAN_MATERIAL,
-                materialIndex: 1
-            },
-        ];
-
-        if (this.program && this.vtxBuff) {
-            GL.useProgram(this.program);
-
-            // ----------------------------------------------------------------
-            // vertex shader attributes
-            const desc = {
-                attrib: 'a_vert_data',
-                length: 2,
-                stride: 8,
-                offset: 0
-            };
-            const loc = GL.getAttribLocation(this.program, desc.attrib);
-            GL.vertexAttribPointer(
-                loc,
-                desc.length,
-                GL.FLOAT,
-                false,
-                desc.stride,
-                desc.offset,
-            );
-            GL.enableVertexAttribArray(loc);
-
-            // ----------------------------------------------------------------
-            // vertex shader uniforms
-            GL.uniform1f(GL.getUniformLocation(this.program, 'u_half_wd'), this.halfWd);
-            GL.uniform1f(GL.getUniformLocation(this.program, 'u_half_ht'), this.halfHt);
-
-            // ----------------------------------------------------------------
-            // fragment shader uniforms
-            spheres.forEach((s, i) => {
+            if (typeof m.albedo !== 'undefined') {
                 GL.uniform3fv(
-                    GL.getUniformLocation(this.program, `u_spheres[${i}].center`),
-                    s.sphere.center.xyz,
+                    GL.getUniformLocation(this.program, `u_materials[${i}].albedo`),
+                    m.albedo.rgb
                 );
+            }
+            if (typeof m.shininess !== 'undefined') {
                 GL.uniform1f(
-                    GL.getUniformLocation(this.program, `u_spheres[${i}].radius`),
-                    s.sphere.radius
-                );
-                GL.uniform1f(
-                    GL.getUniformLocation(this.program, `u_spheres[${i}].radiusSquared`),
-                    s.sphere.radiusSquared
-                );
-                GL.uniform1i(
-                    GL.getUniformLocation(this.program, `u_spheres[${i}].materialClass`),
-                    s.materialClass
-                );
-                GL.uniform1i(
-                    GL.getUniformLocation(this.program, `u_spheres[${i}].materialIndex`),
-                    s.materialIndex
-                );
-            });
-
-            GL.uniform1i(
-                GL.getUniformLocation(this.program, 'u_num_samples'),
-                128
-            );
-            GL.uniform1i(
-                GL.getUniformLocation(this.program, 'u_num_bounces'),
-                4
-            );
-            GL.uniform1i(
-                GL.getUniformLocation(this.program, 'u_num_spheres'),
-                spheres.length
-            );
-            GL.uniform1f(
-                GL.getUniformLocation(this.program, 'u_eye_to_y'),
-                this.halfHt / (Math.tan(15 * Math.PI / 180))
-            );
-
-            metallicMaterials.forEach((m, i) => {
-                GL.uniform3fv(
-                    GL.getUniformLocation(this.program, `u_metallic_materials[${i}].attenuation`),
-                    m.attenuation.rgb
-                );
-                GL.uniform1f(
-                    GL.getUniformLocation(this.program, `u_metallic_materials[${i}].shininess`),
+                    GL.getUniformLocation(this.program, `u_materials[${i}].shininess`),
                     m.shininess
                 );
-            });
-
-            lambertianMaterials.forEach((m, i) => {
-                GL.uniform3fv(
-                    GL.getUniformLocation(this.program, `u_lambertian_materials[${i}].attenuation`),
-                    m.attenuation.rgb
-                );
-            });
-
-            dielectricMaterials.forEach((m, i) => {
-                GL.uniform3fv(
-                    GL.getUniformLocation(this.program, `u_dielectric_materials[${i}].attenuation`),
-                    m.attenuation.rgb
-                );
+            }
+            if (typeof m.refractionIndex !== 'undefined') {
                 GL.uniform1f(
-                    GL.getUniformLocation(this.program, `u_dielectric_materials[${i}].refractionIndex`),
+                    GL.getUniformLocation(this.program, `u_materials[${i}].refractionIndex`),
                     m.refractionIndex
                 );
-            });
+            }
+        });
 
-            // ----------------------------------------------------------------
-            // cover entire canvas in a clip-space rectangle
-            GL.drawArrays(GL.TRIANGLE_FAN, 0, 4);
-        }
+        const sortedSpheres = [...spheres].sort(sortAscending);
+        sortedSpheres.forEach((s, i) => {
+            GL.uniform3fv(
+                GL.getUniformLocation(this.program, `u_spheres[${i}].center`),
+                s.center.xyz,
+            );
+            GL.uniform1f(
+                GL.getUniformLocation(this.program, `u_spheres[${i}].radius`),
+                s.radius
+            );
+            GL.uniform1f(
+                GL.getUniformLocation(this.program, `u_spheres[${i}].radiusSquared`),
+                s.radiusSquared
+            );
+            GL.uniform1i(
+                GL.getUniformLocation(this.program, `u_spheres[${i}].materialIndex`),
+                sortedMaterials.findIndex(m => m.id === s.materialId)
+            );
+
+        });
+
+        // ----------------------------------------------------------------
+        // fragment shader uniforms
+
+        GL.uniform1i(
+            GL.getUniformLocation(this.program, 'u_num_samples'),
+            numSamples
+        );
+        GL.uniform1i(
+            GL.getUniformLocation(this.program, 'u_num_bounces'),
+            numBounces
+        );
+        GL.uniform1i(
+            GL.getUniformLocation(this.program, 'u_num_spheres'),
+            spheres.length
+        );
+        GL.uniform1f(
+            GL.getUniformLocation(this.program, 'u_eye_to_y'),
+            this.halfHt / (Math.tan(cameraFov * Math.PI / 180))
+        );
+
+        /*
+        metallicMaterials.forEach((m, i) => {
+            GL.uniform3fv(
+                GL.getUniformLocation(this.program, `u_metallic_materials[${i}].attenuation`),
+                m.attenuation.rgb
+            );
+            GL.uniform1f(
+                GL.getUniformLocation(this.program, `u_metallic_materials[${i}].shininess`),
+                m.shininess
+            );
+        });
+
+        lambertianMaterials.forEach((m, i) => {
+            GL.uniform3fv(
+                GL.getUniformLocation(this.program, `u_lambertian_materials[${i}].attenuation`),
+                m.attenuation.rgb
+            );
+        });
+
+        dielectricMaterials.forEach((m, i) => {
+            GL.uniform3fv(
+                GL.getUniformLocation(this.program, `u_dielectric_materials[${i}].attenuation`),
+                m.attenuation.rgb
+            );
+            GL.uniform1f(
+                GL.getUniformLocation(this.program, `u_dielectric_materials[${i}].refractionIndex`),
+                m.refractionIndex
+            );
+        });
+        */
+
+        // ----------------------------------------------------------------
+        // cover entire canvas in a clip-space rectangle
+        GL.drawArrays(GL.TRIANGLE_FAN, 0, 4);
     }
 }
 

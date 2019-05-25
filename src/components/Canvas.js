@@ -1,10 +1,15 @@
-import React, { Component } from 'react';
-import { connect } from 'react-redux';
-import Shader from './Shader';
+import React from 'react';
+import { 
+    connect 
+}   from 'react-redux';
 
+import Shader from '../Shader';
+
+export const canvasWd = 800;
+export const canvasHt = 600;
 export let GL = null;
 
-export default class App extends Component {
+class Canvas extends React.Component {
     constructor(props) {
         super(props);
 
@@ -19,37 +24,24 @@ export default class App extends Component {
         this.onMouseMove = this.onMouseMove.bind(this);
         this.onMouseDown = this.onMouseDown.bind(this);
 
-        this.rootNode = null;
-        this.state = {};
+        this.shader = null;
+    }
+
+    renderScene() {
+        if (this.shader.initialized) {
+            window.requestAnimationFrame(() => this.shader.drawScene());
+        }
     }
 
     render() {
-        const appStyle = {
-            fontFamily: 'sans-serif',
-            backgroundColor: '#f5f5f5',
-            position: 'relative',
-            padding: 16,
-            width: this.props.wd + 4,
-            margin: 'auto',
-        }
-
-        const projectInfoStyle = {
-            margin: 6,
-            fontSize: 14,
-            textAlign: 'center',
-        }
-
-        return <div style={appStyle}>
-            <canvas id='Canvas' width={this.props.wd} height={this.props.ht}>Please use a browser that supports WebGL 2</canvas>
-            <hr/>
-            <p style={projectInfoStyle}>MIT License</p>
-            <p style={projectInfoStyle}><a href='https://github.com/kamyy/webgl-ray-tracer'>Project @ GitHub</a></p>
-            <p style={projectInfoStyle}>Copyright &copy; 2019 <a href='mailto:kam.yin.yip@gmail.com'>Kam Y Yip</a></p>
-        </div>
+        return <canvas id='Canvas' width={canvasWd} height={canvasHt}>
+            Please use a browser that supports WebGL 2
+        </canvas>
     }
 
     componentDidMount() {
         this.canvas = document.getElementById('Canvas');
+
         GL = this.canvas.getContext('webgl2', {
             depth: false,
             alpha: false,
@@ -61,13 +53,14 @@ export default class App extends Component {
             window.onmousemove = this.onMouseMove;
             window.onmouseup = this.onMouseUp;
 
-            const shader = new Shader(this.props.wd / 2, this.props.ht / 2);
-            shader.init().then(ok => {
-                if (ok) {
-                    shader.drawScene();
-                }
-            });
+            this.shader = new Shader(canvasWd * 0.5, canvasHt * 0.5);
+            this.shader.init().then(() => this.renderScene());
         }
+    }
+
+    shouldComponentUpdate() {
+        this.renderScene();
+        return false;
     }
 
     onMouseUp(event) {
@@ -99,3 +92,13 @@ export default class App extends Component {
         }
     }
 }
+
+function mapStateToProps(state) {
+    return {
+        numSamples: state.numSamples,
+        numBounces: state.numBounces,
+        cameraFov: state.cameraFov,
+    };
+}
+
+export default connect(mapStateToProps, null)(Canvas);

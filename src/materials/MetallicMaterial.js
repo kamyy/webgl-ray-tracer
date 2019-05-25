@@ -1,12 +1,14 @@
 // @flow
-import Vector1x4 from '../Vector1x4.js';
+import Vector1x4 from '../math/Vector1x4.js';
 
-export default class MetallicMateriall {
-    attenuation: Vector1x4;
-    shininess:   number;
+export default class MetallicMaterial {
+    id: string;
+    albedo: Vector1x4;
+    shininess: number;
 
-    constructor(attenuation: Vector1x4, shininess: number) {
-        this.attenuation = attenuation;
-        this.shininess   = shininess;
+    constructor(id: string, albedo: Vector1x4, shininess: number) {
+        this.id = id;
+        this.albedo = albedo;
+        this.shininess = shininess;
     }
 }

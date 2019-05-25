@@ -1,10 +1,18 @@
 import * as serviceWorker from './serviceWorker';
 import ReactDOM from 'react-dom';
 import React from 'react';
-import App from './App';
+import { 
+    Provider 
+}   from 'react-redux';
+import { 
+    store 
+}   from './redux/reducers.js';
+
+import App from './components/App.js';
 
 ReactDOM.render(
-    <App wd={800} ht={600}/>, document.getElementById('root')
+    <Provider store={store}><App/></Provider>, 
+    document.getElementById('root')
 );
 
 if (module.hot) {

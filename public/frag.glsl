@@ -14,21 +14,13 @@ struct Sphere {
     vec3  center;
     float radius;
     float radiusSquared;
-    int   materialClass;
     int   materialIndex;
 };
 
-struct MetallicMaterial {
-    vec3  attenuation;
+struct Material {
+    int   materialClass;
+    vec3  albedo;
     float shininess;
-};
-
-struct LambertianMaterial {
-    vec3  attenuation;
-};
-
-struct DielectricMaterial {
-    vec3  attenuation;
     float refractionIndex;
 };
 
@@ -36,7 +28,6 @@ struct RayIntersectSphereResult {
     float t;
     vec3  pos;
     vec3  nrm;
-    int   materialClass;
     int   materialIndex;
 };
 
@@ -50,16 +41,14 @@ const int METALLIC_MATERIAL   = 0;
 const int LAMBERTIAN_MATERIAL = 1;
 const int DIELECTRIC_MATERIAL = 2;
 
+const int MAX_MATERIALS = 32;
 const int MAX_SPHERES   = 32;
-const int MAX_MATERIALS = 8;
 
 // ----------------------------------------------------------------------------
 // uniforms
 //
-uniform Sphere u_spheres[MAX_SPHERES];
-uniform MetallicMaterial u_metallic_materials[MAX_MATERIALS];
-uniform LambertianMaterial u_lambertian_materials[MAX_MATERIALS];
-uniform DielectricMaterial u_dielectric_materials[MAX_MATERIALS];
+uniform Material u_materials[MAX_MATERIALS];
+uniform Sphere   u_spheres[MAX_SPHERES];
 
 uniform int u_num_spheres;
 uniform int u_num_samples;
@@ -118,7 +107,6 @@ bool rayIntersectSphere(Ray r, Sphere s, float t0, float t1, out RayIntersectSph
             res.t = t;
             res.pos = r.origin + (r.dir * t);
             res.nrm = normalize(res.pos - s.center);
-            res.materialClass = s.materialClass;
             res.materialIndex = s.materialIndex;
             return true;
         }
@@ -127,7 +115,6 @@ bool rayIntersectSphere(Ray r, Sphere s, float t0, float t1, out RayIntersectSph
             res.t = t;
             res.pos = r.origin + (r.dir * t);
             res.nrm = normalize(res.pos - s.center);
-            res.materialClass = s.materialClass;
             res.materialIndex = s.materialIndex;
             return true;
         }
@@ -161,7 +148,7 @@ float schlick(float cosine, float rindex) {
 }
 
 void rayHitMetallicSurface(RayIntersectSphereResult res, inout Ray ray, inout vec3 color) {
-    MetallicMaterial metallic = u_metallic_materials[res.materialIndex];
+    Material metallic = u_materials[res.materialIndex];
 
     vec3 reflection = reflect(ray.dir, res.nrm);
     ray = Ray(  res.pos, 
@@ -169,22 +156,22 @@ void rayHitMetallicSurface(RayIntersectSphereResult res, inout Ray ray, inout ve
                 );
 
     if (dot(ray.dir, res.nrm) > 0.0) {
-        color *= metallic.attenuation;
+        color *= metallic.albedo;
     } else {
         color = vec3(0.0, 0.0, 0.0);
     }
 }
 
 void rayHitLambertianSurface(RayIntersectSphereResult res, inout Ray ray, inout vec3 color) {
-    LambertianMaterial lambertian = u_lambertian_materials[res.materialIndex];
+    Material lambertian = u_materials[res.materialIndex];
     ray = Ray(  res.pos, 
                 normalize(res.nrm + randPosInUnitSphere())
                 );
-    color *= lambertian.attenuation;
+    color *= lambertian.albedo;
 }
 
 void rayHitDielectricSurface(RayIntersectSphereResult res, inout Ray ray, inout vec3 color) {
-    DielectricMaterial dielectric = u_dielectric_materials[res.materialIndex];
+    Material dielectric = u_materials[res.materialIndex];
     float cosine;
     float rindex;
     float reflectionProbability;
@@ -217,7 +204,7 @@ void rayHitDielectricSurface(RayIntersectSphereResult res, inout Ray ray, inout 
         ray = Ray(res.pos, refraction);
     } 
 
-    color *= dielectric.attenuation;
+    color *= dielectric.albedo;
 }
 
 vec3 castPrimaryRay(Ray ray, float t0, float t1) {
@@ -226,7 +213,7 @@ vec3 castPrimaryRay(Ray ray, float t0, float t1) {
 
     for (int i = 0; i < u_num_bounces; ++i) {
         if (rayIntersectNearestSphere(ray, t0, t1, res)) {
-            switch (res.materialClass) {
+            switch (u_materials[res.materialIndex].materialClass) {
             case METALLIC_MATERIAL:
                 rayHitMetallicSurface(res, ray, color);
                 break;
