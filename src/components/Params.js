@@ -8,23 +8,28 @@ import {
 import {
     setNumSamples,
     setNumBounces,
+    setCameraFov,
 }   from '../redux/actions.js';
 
 const minSamples = 1;
 const maxSamples = 1000;
 const minBounces = 1;
 const maxBounces = 32;
+const minCameraFov = 5;
+const maxCameraFov = 90;
 
 function Params(props) {
     const { 
         numSamples,
         numBounces,
+        cameraFov,
         setNumSamples,
         setNumBounces,
+        setCameraFov,
     } = props;
 
-    return <fieldset><legend>Ray Trace Parameters</legend>
-        <span>Number of Rays Per Pixel</span>
+    return <fieldset><legend>Parameters</legend>
+        <span># of Rays Per Pixel</span>
         <span>
             <input
                 type='number' 
@@ -34,7 +39,7 @@ function Params(props) {
                 onChange={event => setNumSamples(event.target.value)}
             />
         </span>
-        <span>Number of Ray Bounces</span>
+        <span># of Ray Bounces</span>
         <span>
             <input
                 type='number'
@@ -42,6 +47,16 @@ function Params(props) {
                 max={maxBounces}
                 value={numBounces}
                 onChange={event => setNumBounces(event.target.value)}
+            />
+        </span>
+        <span>Camera Field of View</span>
+        <span>
+            <input
+                type='number'
+                min={minCameraFov}
+                max={maxCameraFov}
+                value={cameraFov}
+                onChange={event => setCameraFov(event.target.value)}
             />
         </span>
         <span>
@@ -58,6 +73,7 @@ function mapStateToProps(state) {
     return {
         numSamples: state.numSamples,
         numBounces: state.numBounces,
+        cameraFov:  state.cameraFov,
     };
 }
 
@@ -65,6 +81,7 @@ function mapDispatchToProps(dispatch) {
     return bindActionCreators({ 
         setNumSamples,
         setNumBounces,
+        setCameraFov,
     }, dispatch);
 }
 
