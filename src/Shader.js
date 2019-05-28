@@ -1,15 +1,18 @@
 // @flow
 import {
-    store
+    reduxStore
 }   from './redux/reducers.js';
 
 import { 
-    GL 
+    GL, camera
 }   from './components/Canvas.js';
 
 import MetallicMaterial from './materials/MetallicMaterial.js';
 import LambertianMaterial from './materials/LambertianMaterial.js';
 import DielectricMaterial from './materials/DielectricMaterial.js';
+
+import Vector1x4 from './math/Vector1x4.js';
+import Matrix4x4 from './math/Matrix4x4.js';
 
 //const g_up     = new Vector1x4(0.0, 0.0, 1.0, 0.0);
 //const g_origin = new Vector1x4(0.0, 0.0, 0.0, 1.0);
@@ -144,7 +147,9 @@ export default class Shader {
             cameraFov,
             materials,
             spheres,
-        } = store.getState();
+        } = reduxStore.getState();
+
+        const viewMatrix: Matrix4x4 = camera.modelMatrix.inverse();
 
         const sortAscending = (a, b) => {
             if (a.id < b.id) return -1;
@@ -186,7 +191,7 @@ export default class Shader {
         sortedSpheres.forEach((s, i) => {
             GL.uniform3fv(
                 GL.getUniformLocation(this.program, `u_spheres[${i}].center`),
-                s.center.xyz,
+                s.center.mul(viewMatrix).xyz,
             );
             GL.uniform1f(
                 GL.getUniformLocation(this.program, `u_spheres[${i}].radius`),
@@ -222,38 +227,7 @@ export default class Shader {
             GL.getUniformLocation(this.program, 'u_eye_to_y'),
             this.halfHt / (Math.tan(cameraFov * Math.PI / 180))
         );
-
-        /*
-        metallicMaterials.forEach((m, i) => {
-            GL.uniform3fv(
-                GL.getUniformLocation(this.program, `u_metallic_materials[${i}].attenuation`),
-                m.attenuation.rgb
-            );
-            GL.uniform1f(
-                GL.getUniformLocation(this.program, `u_metallic_materials[${i}].shininess`),
-                m.shininess
-            );
-        });
-
-        lambertianMaterials.forEach((m, i) => {
-            GL.uniform3fv(
-                GL.getUniformLocation(this.program, `u_lambertian_materials[${i}].attenuation`),
-                m.attenuation.rgb
-            );
-        });
-
-        dielectricMaterials.forEach((m, i) => {
-            GL.uniform3fv(
-                GL.getUniformLocation(this.program, `u_dielectric_materials[${i}].attenuation`),
-                m.attenuation.rgb
-            );
-            GL.uniform1f(
-                GL.getUniformLocation(this.program, `u_dielectric_materials[${i}].refractionIndex`),
-                m.refractionIndex
-            );
-        });
-        */
-
+ 
         // ----------------------------------------------------------------
         // cover entire canvas in a clip-space rectangle
         GL.drawArrays(GL.TRIANGLE_FAN, 0, 4);

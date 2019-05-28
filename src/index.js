@@ -5,13 +5,13 @@ import {
     Provider 
 }   from 'react-redux';
 import { 
-    store 
+    reduxStore 
 }   from './redux/reducers.js';
 
 import App from './components/App.js';
 
 ReactDOM.render(
-    <Provider store={store}><App/></Provider>, 
+    <Provider store={reduxStore}><App/></Provider>, 
     document.getElementById('root')
 );
 

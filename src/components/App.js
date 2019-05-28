@@ -1,9 +1,9 @@
 import React from 'react';
-import Canvas from './Canvas.js';
-import Params from './Params.js';
 import {
     canvasWd,
 }   from './Canvas.js';
+import Canvas from './Canvas.js';
+import Params from './Params.js';
 
 export default function App(props) {
     const appStyle = {

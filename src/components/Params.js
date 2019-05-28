@@ -59,9 +59,6 @@ function Params(props) {
                 onChange={event => setCameraFov(event.target.value)}
             />
         </span>
-        <span>
-            <button>Apply</button>
-        </span>
 
         {/*
         <span id='Clear' onClick={event => onChangeMaterialFilter(curSceneId, '')}>&times;</span>

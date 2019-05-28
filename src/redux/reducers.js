@@ -132,6 +132,6 @@ function spheres(state = defaultSpheres, action) {
 // ----------------------------------------------------------------
 // redux store
 //
-export const store = createStore(
+export const reduxStore = createStore(
     combineReducers({ numSamples, numBounces, cameraFov, materials, spheres })
 );
