@@ -1,9 +1,9 @@
 import Sphere from '../math/Sphere.js';
 import Vector1x4 from '../math/Vector1x4.js';
 
-import MetallicMaterial from '../materials/MetallicMaterial.js';
-import LambertianMaterial from '../materials/LambertianMaterial.js';
-import DielectricMaterial from '../materials/DielectricMaterial.js';
+import MetallicMaterial from '../rendering/MetallicMaterial.js';
+import LambertianMaterial from '../rendering/LambertianMaterial.js';
+import DielectricMaterial from '../rendering/DielectricMaterial.js';
 
 import { 
     createStore,
@@ -25,7 +25,7 @@ import {
 //
 const defaultNumSamples = 100;
 const defaultNumBounces = 4;
-const defaultCameraFov  = 15;
+const defaultCameraFov  = 30;
 
 const defaultMaterials = [
     new MetallicMaterial(

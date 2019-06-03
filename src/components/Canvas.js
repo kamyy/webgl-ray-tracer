@@ -6,7 +6,8 @@ import {
 
 import Vector1x4 from '../math/Vector1x4.js';
 import RefFrame from '../math/RefFrame.js';
-import Shader from '../Shader';
+
+import Shader from '../rendering/Shader.js';
 
 export const canvasWd = 800;
 export const canvasHt = 600;
@@ -60,7 +61,7 @@ class Canvas extends React.Component {
             window.onmousemove = this.onMouseMove;
             window.onmouseup = this.onMouseUp;
 
-            this.shader = new Shader(canvasWd * 0.5, canvasHt * 0.5);
+            this.shader = new Shader(canvasWd, canvasHt);
             this.shader.init().then(() => this.renderScene());
         }
     }
@@ -126,7 +127,6 @@ class Canvas extends React.Component {
                 this.lx = x;
                 this.ly = y;
                 this.renderScene();
-
             }
         }
     }

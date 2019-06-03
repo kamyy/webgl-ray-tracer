@@ -1,42 +1,36 @@
 // @flow
 import {
     reduxStore
-}   from './redux/reducers.js';
+}   from '../redux/reducers.js';
 
 import { 
     GL, camera
-}   from './components/Canvas.js';
+}   from '../components/Canvas.js';
 
-import MetallicMaterial from './materials/MetallicMaterial.js';
-import LambertianMaterial from './materials/LambertianMaterial.js';
-import DielectricMaterial from './materials/DielectricMaterial.js';
+import Matrix4x4 from '../math/Matrix4x4.js';
 
-import Vector1x4 from './math/Vector1x4.js';
-import Matrix4x4 from './math/Matrix4x4.js';
-
-//const g_up     = new Vector1x4(0.0, 0.0, 1.0, 0.0);
-//const g_origin = new Vector1x4(0.0, 0.0, 0.0, 1.0);
+import NoiseTexture from './NoiseTexture.js';
+import MetallicMaterial from './MetallicMaterial.js';
+import LambertianMaterial from './LambertianMaterial.js';
+import DielectricMaterial from './DielectricMaterial.js';
 
 const vertShaderURL = '/vert.glsl';
 const fragShaderURL = '/frag.glsl';
 
 export default class Shader {
     initialized: boolean;
-    halfWd: number;
-    halfHt: number;
-    vs: WebGLShader | null;
-    fs: WebGLShader | null;
-    program: WebGLProgram | null;
-    vtxBuff: WebGLBuffer  | null;
+    wd: number;
+    ht: number;
+    vs: WebGLShader;
+    fs: WebGLShader;
+    program: WebGLProgram;
+    vtxBuff: WebGLBuffer;
+    noiseTexture: NoiseTexture;
 
-    constructor(halfWd: number, halfHt: number) {
+    constructor(wd: number, ht: number) {
         this.initialized = false;
-        this.halfWd = halfWd;
-        this.halfHt = halfHt;
-        this.vs = null;
-        this.fs = null;
-        this.program = null;
-        this.vtxBuff = null;
+        this.wd = wd;
+        this.ht = ht;
     }
 
     async fetchShader(url: string): Promise<string> {
@@ -83,17 +77,24 @@ export default class Shader {
 
             // ----------------------------------------------------------------
             // vertex buffer for clip space rectangle
+            //
             this.vtxBuff = GL.createBuffer();
             GL.bindBuffer(GL.ARRAY_BUFFER, this.vtxBuff);
-            GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([ -1, -1, +1, -1, +1, +1, -1, +1, ]), 
+            GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([
+                -1, -1, 0, 0, 
+                +1, -1, 1, 0,
+                +1, +1, 1, 1, 
+                -1, +1, 0, 1
+                ]), 
                 GL.STATIC_DRAW
             );
 
             // ----------------------------------------------------------------
             // vertex shader attributes
+            //
             const desc = {
-                length: 2,
-                stride: 8,
+                length: 4,
+                stride: 16,
                 offset: 0
             };
             const loc = GL.getAttribLocation(this.program, 'a_vert_data');
@@ -109,11 +110,18 @@ export default class Shader {
 
             // ----------------------------------------------------------------
             // vertex shader uniforms
-            GL.uniform1f(GL.getUniformLocation(this.program, 'u_half_wd'), this.halfWd);
-            GL.uniform1f(GL.getUniformLocation(this.program, 'u_half_ht'), this.halfHt);
+            //
+            GL.uniform1f(GL.getUniformLocation(this.program, 'u_half_wd'), this.wd * 0.5);
+            GL.uniform1f(GL.getUniformLocation(this.program, 'u_half_ht'), this.ht * 0.5);
+
+            // ----------------------------------------------------------------
+            // noise texture for seeding PRNG in fragment shader
+            //
+            this.noiseTexture = new NoiseTexture(this.wd, this.ht);
 
             // ----------------------------------------------------------------
             // promise resolved
+            //
             this.initialized = true;
         } 
         catch(e) {
@@ -121,19 +129,19 @@ export default class Shader {
 
             if (this.vtxBuff) {
                 GL.deleteBuffer(this.vtxBuff);
-                this.vtxBuff = null;
+                delete this.vtxBuff;
             }
             if (this.program) {
                 GL.deleteProgram(this.program);
-                this.program = null;
+                delete this.program;
             }
             if (this.fs) {
                 GL.deleteShader(this.fs);
-                this.fs = null;
+                delete this.fs;
             }
             if (this.vs) {
                 GL.deleteShader(this.vs);
-                this.vs = null;
+                delete this.vs;
             }
 
             throw e;
@@ -205,12 +213,11 @@ export default class Shader {
                 GL.getUniformLocation(this.program, `u_spheres[${i}].materialIndex`),
                 sortedMaterials.findIndex(m => m.id === s.materialId)
             );
-
         });
 
         // ----------------------------------------------------------------
         // fragment shader uniforms
-
+        //
         GL.uniform1i(
             GL.getUniformLocation(this.program, 'u_num_samples'),
             numSamples
@@ -225,12 +232,14 @@ export default class Shader {
         );
         GL.uniform1f(
             GL.getUniformLocation(this.program, 'u_eye_to_y'),
-            this.halfHt / (Math.tan(cameraFov * Math.PI / 180))
+            this.ht * 0.5 / (Math.tan(cameraFov * 0.5 * Math.PI / 180))
         );
+
+        this.noiseTexture.activate(this.program);
  
         // ----------------------------------------------------------------
-        // cover entire canvas in a clip-space rectangle
+        // draw clip-space rectangle over entire canvas
+        //
         GL.drawArrays(GL.TRIANGLE_FAN, 0, 4);
     }
 }
-
