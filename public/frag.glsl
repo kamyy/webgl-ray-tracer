@@ -7,8 +7,14 @@ precision highp int;
 // structures
 //
 struct Ray {
-    vec3 origin;
-    vec3 dir;
+    vec3 origin; // ray origin
+    vec3 dir;    // ray direction
+    vec3 inv;    // inverse ray direction
+};
+
+struct AABB {
+    vec3 p0; // min corner
+    vec3 p1; // max corner
 };
 
 struct Sphere {
@@ -73,10 +79,13 @@ in vec2  v_tuv;
 out vec4 o_color;
 
 // ----------------------------------------------------------------------------
-// randomness
+// globals
 //
 uvec4 g_generatorState;
 
+// ----------------------------------------------------------------------------
+// randomness
+//
 uint tauswortheGenerator(uint z, int S1, int S2, int S3, uint M) {
     return ((z & M) << S3) ^ (((z << S1) ^ z) >> S2);
 }
@@ -105,8 +114,20 @@ vec3 randPosInUnitSphere() {
 }
 
 // ----------------------------------------------------------------------------
-// ray sphere intersections
+// ray intersect objects
 //
+bool rayIntersectAABB(Ray r, AABB b) {
+    vec3 t0 = (b.p0 - r.origin) * r.inv;
+    vec3 t1 = (b.p1 - r.origin) * r.inv;
+    vec3 tmin = min(t0, t1);
+    vec3 tmax = max(t0, t1);
+
+    float max_tmin = max(tmin.x, max(tmin.y, tmin.z));
+    float min_tmax = min(tmax.x, min(tmax.y, tmax.z));
+
+    return max_tmin < min_tmax && max_tmin > 0.0;
+}
+
 bool rayIntersectSphere(Ray r, Sphere s, out RayHitResult res) {
     vec3  l = r.origin - s.center;
     float a = dot(r.dir, r.dir);
@@ -168,6 +189,7 @@ void rayHitMetallicSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
 
     ray.origin = res.p + res.n * EPSILON;
     ray.dir    = normalize(reflect(ray.dir, res.n) + (1.0 - metallic.shininess) * randPosInUnitSphere());
+    ray.inv    = 1.0 / ray.dir;
 
     if (dot(ray.dir, res.n) > 0.0) {
         color *= metallic.albedo;
@@ -181,31 +203,34 @@ void rayHitLambertianSurface(RayHitResult res, inout Ray ray, inout vec3 color) 
 
     ray.origin = res.p + res.n * EPSILON;
     ray.dir    = normalize(ray.origin + res.n + randPosInUnitSphere() - res.p);
+    ray.inv    = 1.0 / ray.dir;
 
     color *= lambertian.albedo;
 }
 
 void rayHitDielectricSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
     Material dielectric = u_materials[res.materialIndex];
-    float rindex;
+    float refractiveRatio;
     vec3  refraction;
     vec3  normal;
 
-    if (dot(ray.dir, res.n) > 0.0) { // from sphere into air
-        rindex = dielectric.refractionIndex;
-        normal = -res.n;
-    } else { // into sphere from air
-        rindex = 1.0 / dielectric.refractionIndex;
+    if (dot(ray.dir, res.n) < 0.0) { // into sphere from air
+        refractiveRatio = 1.0 / dielectric.refractionIndex;
         normal = +res.n;
+    } else { // from sphere into air
+        refractiveRatio = dielectric.refractionIndex;
+        normal = -res.n;
     }
 
-    refraction = refract(ray.dir, normal, rindex);
+    refraction = refract(ray.dir, normal, refractiveRatio);
     if (dot(refraction, refraction) > 0.0) {
-        ray.origin = res.p - normal * EPSILON;
+        ray.origin = res.p - EPSILON * normal;
         ray.dir    = refraction;
+        ray.inv    = 1.0 / ray.dir;
     } else {
-        ray.origin = res.p + res.n * EPSILON;
+        ray.origin = res.p + EPSILON * res.n;
         ray.dir    = reflect(ray.dir, res.n);
+        ray.inv    = 1.0 / ray.dir;
     }
 
     color *= dielectric.albedo;
@@ -215,7 +240,7 @@ vec3 castPrimaryRay(Ray ray) {
     vec3 color = vec3(1.0, 1.0, 1.0);
     RayHitResult res;
 
-    for (int i = 0; i < u_num_bounces + 1; ++i) {
+    for (int i = 0; i <= u_num_bounces; ++i) {
         if (rayIntersectNearestSphere(ray, res)) {
             switch (u_materials[res.materialIndex].materialClass) {
             case METALLIC_MATERIAL:
@@ -255,6 +280,8 @@ void main() {
             v_eye_to_z + rand()
         );
         r.dir = normalize(r.dir);
+        r.inv = 1.0 / r.dir;
+
         sum += castPrimaryRay(r);
     }
 
