@@ -10,9 +10,9 @@ export default class NoiseTexture {
 
         const data = new Uint32Array(wd * ht * 4);
         for (let i = 0; i < data.length; ++i) {
-            let n = Math.random() * 2147483647;
+            let n = Math.random() * 4294967295;
             while (n < 129) {
-                n = Math.random() * 2147483647;
+                n = Math.random() * 4294967295;
             }
             data[i] = n;
         }

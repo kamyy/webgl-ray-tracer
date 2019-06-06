@@ -48,8 +48,8 @@ const int METALLIC_MATERIAL   = 0;
 const int LAMBERTIAN_MATERIAL = 1;
 const int DIELECTRIC_MATERIAL = 2;
 
-const int MAX_MATERIALS = 32;
-const int MAX_SPHERES   = 32;
+const int MAX_MATERIALS = 8;
+const int MAX_SPHERES   = 8;
 
 // ----------------------------------------------------------------------------
 // uniforms
@@ -70,8 +70,6 @@ uniform float u_eye_to_y;
 //
 in float v_eye_to_x;
 in float v_eye_to_z;
-
-in vec2  v_tuv;
 
 // ----------------------------------------------------------------------------
 // outputs
@@ -267,7 +265,7 @@ vec3 castPrimaryRay(Ray ray) {
 // main
 //
 void main() {
-    g_generatorState = texture(u_rndSampler, v_tuv);
+    g_generatorState = texelFetch(u_rndSampler, ivec2(gl_FragCoord.xy), 0);
 
     Ray r;
     r.origin = vec3(0.0, 0.0, 0.0);
