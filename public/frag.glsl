@@ -38,6 +38,12 @@ struct RayHitResult {
     int   materialIndex;
 };
 
+struct Triangle {
+    int p0;
+    int p1;
+    int p2;
+};
+
 // ----------------------------------------------------------------------------
 // constants
 //
@@ -96,7 +102,7 @@ float rand() {
     g_generatorState.x = tauswortheGenerator(g_generatorState.x, 13, 19, 12, 4294967294u); // p1=2^31-1
     g_generatorState.y = tauswortheGenerator(g_generatorState.y, 2,  25, 4,  4294967288u); // p2=2^30-1
     g_generatorState.z = tauswortheGenerator(g_generatorState.z, 3,  11, 17, 4294967280u); // p3=2^28-1
-    g_generatorState.w = linearCongruentialGenerator(g_generatorState.w, 1664525u, 1013904223u);  // p4=2^32
+    g_generatorState.w = linearCongruentialGenerator(g_generatorState.w, 1664525u, 1013904223u); // p4=2^32
 
     // Combined period is lcm(p1,p2,p3,p4) ~ 2^121
     return 2.3283064365387e-10 * float(g_generatorState.x ^ g_generatorState.y ^ g_generatorState.z ^ g_generatorState.w);
@@ -124,6 +130,25 @@ bool rayIntersectAABB(Ray r, AABB b) {
     float min_tmax = min(tmax.x, min(tmax.y, tmax.z));
 
     return max_tmin < min_tmax && max_tmin > 0.0;
+}
+
+bool rayIntersectTriangle(Ray r, vec3 p0, vec3 p1, vec3 p2, vec3 n, out RayHitResult res) {
+    vec3 p0_p1 = p1 - p0;
+    vec3 p0_p2 = p2 - p0;
+
+    float area_parallelogram_p0_p1_p2 = length(n);
+    float n_dot_ray_dir = dot(n, r.dir);
+    
+    if (abs(n_dot_ray_dir) < EPSILON) { // normal and ray direction perpendicular
+        return false; 
+    }
+
+    float d = dot(n, p0); // ax + by + cz - d = 0 (solve for d)
+    float t = (d - dot(n, r.origin)) / n_dot_ray_dir; // a(ox + t*dx) + b(oy + t*dy) + c(oz + t*dz) - d = 0 (solve for t)
+
+    vec3 p = r.origin + t * r.dir; // contact point on plane 
+
+    return false;
 }
 
 bool rayIntersectSphere(Ray r, Sphere s, out RayHitResult res) {
