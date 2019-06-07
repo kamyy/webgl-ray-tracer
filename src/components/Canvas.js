@@ -47,6 +47,13 @@ class Canvas extends React.Component {
         </canvas>
     }
 
+    reportGLStats() {
+        console.log(`MAX_UNIFORM_BLOCK_SIZE=${GL.getParameter(GL.MAX_UNIFORM_BLOCK_SIZE)}`);
+        console.log(`MAX_FRAGMENT_UNIFORM_BLOCKS=${GL.getParameter(GL.MAX_FRAGMENT_UNIFORM_BLOCKS)}`);
+        console.log(`MAX_UNIFORM_BUFFER_BINDINGS=${GL.getParameter(GL.MAX_UNIFORM_BUFFER_BINDINGS)}`);
+        console.log(`MAX_FRAGMENT_UNIFORM_VECTORS=${GL.getParameter(GL.MAX_FRAGMENT_UNIFORM_VECTORS)}`);
+    }
+
     componentDidMount() {
         this.canvas = document.getElementById('Canvas');
 
@@ -56,6 +63,8 @@ class Canvas extends React.Component {
         });
 
         if (GL) {
+            this.reportGLStats();
+
             this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
             this.canvas.onmousedown = this.onMouseDown;
             window.onmousemove = this.onMouseMove;
