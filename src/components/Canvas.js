@@ -9,6 +9,8 @@ import RefFrame from '../math/RefFrame.js';
 
 import Shader from '../rendering/Shader.js';
 
+import Scene from '../rendering/Scene.js';
+
 export const canvasWd = 800;
 export const canvasHt = 600;
 export let GL = null;
@@ -16,6 +18,8 @@ export let GL = null;
 const        root = new RefFrame(null);
 const        parent = new RefFrame(root);
 export const camera = new RefFrame(parent);
+
+camera.translate(new Vector1x4(0.0, -4.0, 0.0));
 
 class Canvas extends React.Component {
     constructor(props) {
@@ -33,12 +37,7 @@ class Canvas extends React.Component {
         this.onMouseDown = this.onMouseDown.bind(this);
 
         this.shader = null;
-    }
 
-    renderScene() {
-        if (this.shader.initialized) {
-            window.requestAnimationFrame(() => this.shader.drawScene());
-        }
     }
 
     render() {
@@ -47,11 +46,16 @@ class Canvas extends React.Component {
         </canvas>
     }
 
-    reportGLStats() {
+    renderScene() {
+        if (this.shader.initialized) {
+            window.requestAnimationFrame(() => this.shader.drawScene());
+        }
+    }
+
+    reportStats() {
         console.log(`MAX_UNIFORM_BLOCK_SIZE=${GL.getParameter(GL.MAX_UNIFORM_BLOCK_SIZE)}`);
         console.log(`MAX_FRAGMENT_UNIFORM_BLOCKS=${GL.getParameter(GL.MAX_FRAGMENT_UNIFORM_BLOCKS)}`);
         console.log(`MAX_UNIFORM_BUFFER_BINDINGS=${GL.getParameter(GL.MAX_UNIFORM_BUFFER_BINDINGS)}`);
-        console.log(`MAX_FRAGMENT_UNIFORM_VECTORS=${GL.getParameter(GL.MAX_FRAGMENT_UNIFORM_VECTORS)}`);
     }
 
     componentDidMount() {
@@ -63,7 +67,7 @@ class Canvas extends React.Component {
         });
 
         if (GL) {
-            this.reportGLStats();
+            this.reportStats();
 
             this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
             this.canvas.onmousedown = this.onMouseDown;
@@ -71,7 +75,11 @@ class Canvas extends React.Component {
             window.onmouseup = this.onMouseUp;
 
             this.shader = new Shader(canvasWd, canvasHt);
-            this.shader.init().then(() => this.renderScene());
+            this.scene = new Scene('/webgl.obj');
+
+            this.scene.init()
+                .then(() => this.shader.init(this.scene))
+                .then(() => this.renderScene());
         }
     }
 

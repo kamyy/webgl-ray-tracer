@@ -18,13 +18,15 @@ import {
     REMOVE_MATERIAL,
     CREATE_SPHERE,
     REMOVE_SPHERE,
+    INSERT_SCENE,
+    CHANGE_SCENE,
 }   from './actions.js'
 
 // ----------------------------------------------------------------
 // default states
 //
-const defaultNumSamples = 100;
-const defaultNumBounces = 4;
+const defaultNumSamples = 2;
+const defaultNumBounces = 2;
 const defaultCameraFov  = 30;
 
 const defaultMaterials = [
@@ -85,6 +87,9 @@ const defaultSpheres = [
     ),
 ];
 
+const defaultScenes = [ 
+];
+
 // ----------------------------------------------------------------
 // reducers
 //
@@ -129,9 +134,20 @@ function spheres(state = defaultSpheres, action) {
     }
 }
 
+function scenes(state = defaultScenes, action) {
+    switch(action.type) {
+    case INSERT_SCENE:
+        return state;
+    case CHANGE_SCENE:
+        return state;
+    default:
+        return state;
+    }
+};
+
 // ----------------------------------------------------------------
 // redux store
 //
 export const reduxStore = createStore(
-    combineReducers({ numSamples, numBounces, cameraFov, materials, spheres })
+    combineReducers({ numSamples, numBounces, cameraFov, materials, spheres, scenes })
 );

@@ -1,4 +1,6 @@
 #version 300 es
+precision highp int;
+precision highp float;
 
 // ----------------------------------------------------------------------------
 // uniforms
