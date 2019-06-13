@@ -11,9 +11,13 @@ struct Ray {
     vec3 inv;    // inverse ray direction
 };
 
-struct AABB {
+struct BV { // AABB bounding volume
     vec3 p0; // min corner
     vec3 p1; // max corner
+    int  lt; // l BV node
+    int  rt; // r BV node
+    int  f0; // face index
+    int  f1; // face index
 };
 
 struct Sphere {
@@ -61,6 +65,9 @@ const int DIELECTRIC_MATERIAL = 2;
 const int MAX_MATERIALS = 8;
 const int MAX_SPHERES   = 8;
 
+const int MAX_BV_COUNT      = 64;
+const int MAX_BV_STACK_SIZE = 16;
+
 const int MAX_TRI_COUNT = 1024;
 const int MAX_POS_COUNT = MAX_TRI_COUNT * 3;
 const int MAX_NRM_COUNT = MAX_TRI_COUNT * 3 + MAX_TRI_COUNT;
@@ -73,12 +80,15 @@ uniform Sphere   u_spheres[MAX_SPHERES];
 
 uniform highp usampler2D u_rndSampler;
 
-uniform int u_num_tris;
 uniform int u_num_spheres;
 uniform int u_num_samples;
 uniform int u_num_bounces;
 
 uniform float u_eye_to_y;
+
+layout (std140) uniform uniform_block_bvh {
+    BV u_bv[MAX_BV_COUNT];
+};
 
 layout (std140) uniform uniform_block_tri {
     Tri u_tri[MAX_TRI_COUNT];
@@ -141,18 +151,6 @@ vec3 randPosInUnitSphere() {
 // ----------------------------------------------------------------------------
 // ray intersect objects
 //
-bool rayIntersectAABB(Ray r, AABB b) { // slabs method using intrinsics
-    vec3 t0 = (b.p0 - r.origin) * r.inv;
-    vec3 t1 = (b.p1 - r.origin) * r.inv;
-    vec3 tmin = min(t0, t1);
-    vec3 tmax = max(t0, t1);
-
-    float max_tmin = max(tmin.x, max(tmin.y, tmin.z));
-    float min_tmax = min(tmax.x, min(tmax.y, tmax.z));
-
-    return max_tmin < min_tmax && max_tmin > 0.0;
-}
-
 bool rayIntersectTri(Ray r, Tri f, out RayHitResult res) {
     vec3 n = u_nrm[f.fn];
 
@@ -186,19 +184,44 @@ bool rayIntersectTri(Ray r, Tri f, out RayHitResult res) {
     return true;
 }
 
-bool rayIntersectNearestTri(Ray r, out RayHitResult nearest) {
-    RayHitResult current;
-    bool contact = false;
+bool rayIntersectBV(Ray r, BV bv) { // slabs method using intrinsics
+    vec3 t0 = (bv.p0 - r.origin) * r.inv;
+    vec3 t1 = (bv.p1 - r.origin) * r.inv;
+    vec3 tmin = min(t0, t1);
+    vec3 tmax = max(t0, t1);
 
-    for (int i = 0; i < u_num_tris; ++i) {
-        if (rayIntersectTri(r, u_tri[i], current)) {
-            if (!contact || current.t < nearest.t) {
+    float max_tmin = max(tmin.x, max(tmin.y, tmin.z));
+    float min_tmax = min(tmax.x, min(tmax.y, tmax.z));
+
+    return max_tmin < min_tmax && max_tmin > 0.0;
+}
+
+bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
+    int stack[MAX_BV_STACK_SIZE];
+    int i = 0;
+
+    RayHitResult current;
+    BV bv;
+
+    nearest.t = MAX_FLT;
+    stack[0]  = 0; // push root BV on to stack
+    while (i > -1) {
+        bv = u_bv[stack[i--]]; // pop BV off top of stack
+
+        if (rayIntersectBV(r, bv)) {
+            if (bv.lt != -1) { stack[++i] = bv.lt; } // push l BV node on to stack
+            if (bv.rt != -1) { stack[++i] = bv.rt; } // push r BV node on to stack
+
+            if (bv.f0 != -1 && rayIntersectTri(r, u_tri[bv.f0], current) && current.t < nearest.t) {
                 nearest = current;
-                contact = true;
+            }
+            if (bv.f1 != -1 && rayIntersectTri(r, u_tri[bv.f1], current) && current.t < nearest.t) {
+                nearest = current;
             }
         }
     }
-    return contact;
+
+    return nearest.t != MAX_FLT;
 }
 
 bool rayIntersectSphere(Ray r, Sphere s, out RayHitResult res) {
@@ -314,7 +337,7 @@ vec3 castPrimaryRay(Ray ray) {
     RayHitResult res;
 
     for (int i = 0; i <= u_num_bounces; ++i) {
-        if (rayIntersectNearestTri(ray, res)) {
+        if (rayIntersectBVH(ray, res)) {
             switch (u_materials[res.m].materialClass) {
             case METALLIC_MATERIAL:
                 rayHitMetallicSurface(res, ray, color);
