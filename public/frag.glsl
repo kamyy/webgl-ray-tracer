@@ -15,7 +15,7 @@ struct RayHitResult {
     float t; // contact point ray scalar
     vec3  p; // contact point
     vec3  n; // contact normal
-    vec3  f; // face normal
+    int   f; // face normal index
     int   m; // contact material index
 };
 
@@ -157,7 +157,9 @@ bool rayIntersectTri(Ray r, Tri f, out RayHitResult res) {
     vec3 n = u_nrm[f.fn];
 
     float n_dot_ray_dir = dot(n, r.dir);
-    if (abs(n_dot_ray_dir) < EPSILON) return false; // face normal and ray direction perpendicular
+    if (abs(n_dot_ray_dir) < EPSILON) {
+        return false; // face normal and ray direction almost perpendicular
+    }
 
     float d = dot(n, u_pos[f.p0]); // ax + by + cz - d = 0 (solve for d)
     float t = (d - dot(n, r.origin)) / n_dot_ray_dir; // a(ox + t*dx) + b(oy + t*dy) + c(oz + t*dz) - d = 0 (solve for t)
@@ -165,19 +167,23 @@ bool rayIntersectTri(Ray r, Tri f, out RayHitResult res) {
     if (t < EPSILON) return false; // contact point behind ray
     vec3 p = r.origin + t * r.dir; // contact point on plane 
 
-    float b0 = length(cross(u_pos[f.p2] - u_pos[f.p1], p - u_pos[f.p1])) * 0.5;
-    if (b0 < 0.0 || b0 > 1.0) return false;
+    float u = dot(n, cross(u_pos[f.p2] - u_pos[f.p1], p - u_pos[f.p1]));
+    if (u < 0.0) return false; // contact point on right hand side of p1 -> p2
 
-    float b2 = length(cross(u_pos[f.p1] - u_pos[f.p0], p - u_pos[f.p0])) * 0.5; 
-    if (b2 < 0.0 || b2 > 1.0) return false; 
+    float v = dot(n, cross(u_pos[f.p0] - u_pos[f.p2], p - u_pos[f.p2]));
+    if (v < 0.0) return false; // contact point on right hand side of p2 -> p0
 
-    float b1 = length(cross(u_pos[f.p0] - u_pos[f.p2], p - u_pos[f.p2])) * 0.5;
-    if (b1 < 0.0 || b1 > 1.0) return false;
+    float w = dot(n, cross(u_pos[f.p1] - u_pos[f.p0], p - u_pos[f.p0])); 
+    if (w < 0.0) return false; // contact point on right hand side of p0 -> p1
+
+    float inv_n_dot_n = 1.0 / dot(n, n);
+    u *= inv_n_dot_n;
+    v *= inv_n_dot_n;
 
     res.t = t;
     res.p = p;
-    res.n = normalize((b0 * u_nrm[f.n0]) + (b1 * u_nrm[f.n1]) + (b2 * u_nrm[f.n2])); // interpolate using barycentric coordinates
-    res.f = n;
+    res.n = normalize((u * u_nrm[f.n0]) + (v * u_nrm[f.n1]) + ((1.0 - u - v) * u_nrm[f.n2])); // interpolate using barycentric coordinates
+    res.f = f.fn;
     res.m = f.mi;
 
     return true;
@@ -196,6 +202,7 @@ bool rayIntersectBV(Ray r, BV bv) { // slabs method using intrinsics
 }
 
 bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
+    /*
     int stack[MAX_BV_STACK_SIZE];
     int i = 0;
 
@@ -222,6 +229,20 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     }
 
     return nearest.t != MAX_FLT;
+    */
+
+    RayHitResult current;
+    bool contact = false;
+
+    for (int i = 0; i < 100; ++i) {
+        if (rayIntersectTri(r, u_tri[i], current)) {
+            if (!contact || current.t < nearest.t) {
+                nearest = current;
+                contact = true;
+            }
+        }
+    }
+    return contact;
 }
 
 /*
@@ -285,7 +306,7 @@ float schlick(float cosine, float rindex) {
 void rayHitMetallicSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
     Mat metallic = u_mat[res.m];
 
-    ray.origin = res.p + res.f * EPSILON;
+    ray.origin = res.p + u_nrm[res.f] * EPSILON;
     ray.dir    = normalize(reflect(ray.dir, res.n) + (1.0 - metallic.shininess) * randPosInUnitSphere());
     ray.inv    = 1.0 / ray.dir;
 
@@ -299,7 +320,7 @@ void rayHitMetallicSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
 void rayHitLambertianSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
     Mat lambertian = u_mat[res.m];
 
-    ray.origin = res.p + res.f * EPSILON;
+    ray.origin = res.p + u_nrm[res.f] * EPSILON;
     ray.dir    = normalize(ray.origin + res.n + randPosInUnitSphere() - res.p);
     ray.inv    = 1.0 / ray.dir;
 
@@ -316,11 +337,11 @@ void rayHitDielectricSurface(RayHitResult res, inout Ray ray, inout vec3 color) 
     if (dot(ray.dir, res.n) < 0.0) { // into object from air
         refractiveRatio = 1.0 / dielectric.refractionIndex;
         normal = +res.n;
-        face_n = +res.f;
+        face_n = +u_nrm[res.f];
     } else { // from object into air
         refractiveRatio = dielectric.refractionIndex;
         normal = -res.n;
-        face_n = -res.f;
+        face_n = -u_nrm[res.f];
     }
 
     refraction = refract(ray.dir, normal, refractiveRatio);
@@ -329,7 +350,7 @@ void rayHitDielectricSurface(RayHitResult res, inout Ray ray, inout vec3 color) 
         ray.dir    = refraction;
         ray.inv    = 1.0 / ray.dir;
     } else {
-        ray.origin = res.p + EPSILON * res.f;
+        ray.origin = res.p + EPSILON * u_nrm[res.f];
         ray.dir    = reflect(ray.dir, res.n);
         ray.inv    = 1.0 / ray.dir;
     }
@@ -385,4 +406,10 @@ void main() {
     }
 
     o_color = vec4(sum / float(u_num_samples), 1.0);
+    /*
+    if (u_mat[0].albedo.x > 0.8 && u_mat[0].albedo.x < 1.0)
+        o_color = vec4(0.0, 1.0, 0.0, 1.0);
+    else
+        o_color = vec4(1.0, 0.0, 0.0, 1.0);
+    */
 }

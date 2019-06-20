@@ -166,6 +166,12 @@ export default class Scene {
         return response.text();
     }
 
+    isLittleEndian() {
+        const arrayA = new Uint32Array([0x11223344]);
+        const arrayB = new Uint8Array(arrayA.buffer);
+        return (arrayB[0] === 0x44);
+    }
+
     initTri(obj: Object) {
         const numVertexNormals = obj.vertexNormals.length / 3;
         let f = 0;
@@ -287,23 +293,26 @@ export default class Scene {
             ),
         ];
 
+        const littleEndian = this.isLittleEndian();
+
         this.matArrayBuffer = new ArrayBuffer(matArray.length * SIZEOF_MAT);
         matArray.forEach((mat, i) => {
             const dv = new DataView(this.matArrayBuffer, i * SIZEOF_MAT, SIZEOF_MAT);
-            dv.setFloat32( 0, mat.albedo.x);
-            dv.setFloat32( 4, mat.albedo.y);
-            dv.setFloat32( 8, mat.albedo.z);
-            dv.setFloat32(12, 1.0);
+            dv.setFloat32( 0, mat.albedo.x, littleEndian);
+            dv.setFloat32( 4, mat.albedo.y, littleEndian);
+            dv.setFloat32( 8, mat.albedo.z, littleEndian);
+            dv.setFloat32(12, 1.0, littleEndian);
 
-            dv.setFloat32(16, mat.shininess);
-            dv.setFloat32(20, mat.refractionIndex);
-            dv.setInt32(24, mat.materialClass);
+            dv.setFloat32(16, mat.shininess, littleEndian);
+            dv.setFloat32(20, mat.refractionIndex, littleEndian);
+            dv.setInt32(24, mat.materialClass, littleEndian);
         });
 
         console.log(`# of mat ${matArray.length}`);
     }
 
     initBVH() {
+        const littleEndian = this.isLittleEndian();
         const bvhArray = [];
 
         const min = new Vector1x4(Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE);
@@ -322,21 +331,21 @@ export default class Scene {
         this.bvhArrayBuffer = new ArrayBuffer(bvhArray.length * SIZEOF_BV);
         bvhArray.forEach((bv, i) => {
             const dv = new DataView(this.bvhArrayBuffer, i * SIZEOF_BV, SIZEOF_BV);
-            dv.setFloat32( 0, bv.min.x);
-            dv.setFloat32( 4, bv.min.y);
-            dv.setFloat32( 8, bv.min.z);
-            dv.setFloat32(12, 1.0);
+            dv.setFloat32( 0, bv.min.x, littleEndian);
+            dv.setFloat32( 4, bv.min.y, littleEndian);
+            dv.setFloat32( 8, bv.min.z, littleEndian);
+            dv.setFloat32(12, 1.0, littleEndian);
 
-            dv.setFloat32(16, bv.max.x);
-            dv.setFloat32(20, bv.max.y);
-            dv.setFloat32(24, bv.max.z);
-            dv.setFloat32(28, 1.0);
+            dv.setFloat32(16, bv.max.x, littleEndian);
+            dv.setFloat32(20, bv.max.y, littleEndian);
+            dv.setFloat32(24, bv.max.z, littleEndian);
+            dv.setFloat32(28, 1.0, littleEndian);
 
-            dv.setInt32(32, bv.lt);
-            dv.setInt32(36, bv.rt);
+            dv.setInt32(32, bv.lt, littleEndian);
+            dv.setInt32(36, bv.rt, littleEndian);
 
-            dv.setInt32(40, bv.fi[0]);
-            dv.setInt32(44, bv.fi[1]);
+            dv.setInt32(40, bv.fi[0], littleEndian);
+            dv.setInt32(44, bv.fi[1], littleEndian);
         });
 
         console.log(`# of BV ${bvhArray.length}`);
