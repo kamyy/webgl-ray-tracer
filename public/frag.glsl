@@ -8,7 +8,6 @@ precision highp float;
 struct Ray {
     vec3 origin; // ray origin
     vec3 dir;    // ray direction
-    vec3 inv;    // inverse ray direction
 };
 
 struct RayHitResult {
@@ -31,15 +30,15 @@ struct Tri { // sizeof = 32 bytes
 };
 
 struct Mat {
-    vec3  albedo;
+    vec4  albedo;
     float shininess;
     float refractionIndex;
     int   materialClass;
 };
 
 struct BV { // AABB bounding volume
-    vec3 min; // min corner
-    vec3 max; // max corner
+    vec4 min; // min corner
+    vec4 max; // max corner
     int  lt; // l BV node
     int  rt; // r BV node
     int  f0; // face index
@@ -190,8 +189,8 @@ bool rayIntersectTri(Ray r, Tri f, out RayHitResult res) {
 }
 
 bool rayIntersectBV(Ray r, BV bv) { // slabs method using intrinsics
-    vec3 t0 = (bv.min - r.origin) * r.inv;
-    vec3 t1 = (bv.max - r.origin) * r.inv;
+    vec3 t0 = (bv.min.xyz - r.origin) / r.dir;
+    vec3 t1 = (bv.max.xyz - r.origin) / r.dir;
     vec3 tmin = min(t0, t1);
     vec3 tmax = max(t0, t1);
 
@@ -202,7 +201,6 @@ bool rayIntersectBV(Ray r, BV bv) { // slabs method using intrinsics
 }
 
 bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
-    /*
     int stack[MAX_BV_STACK_SIZE];
     int i = 0;
 
@@ -229,20 +227,6 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     }
 
     return nearest.t != MAX_FLT;
-    */
-
-    RayHitResult current;
-    bool contact = false;
-
-    for (int i = 0; i < 100; ++i) {
-        if (rayIntersectTri(r, u_tri[i], current)) {
-            if (!contact || current.t < nearest.t) {
-                nearest = current;
-                contact = true;
-            }
-        }
-    }
-    return contact;
 }
 
 /*
@@ -308,10 +292,9 @@ void rayHitMetallicSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
 
     ray.origin = res.p + u_nrm[res.f] * EPSILON;
     ray.dir    = normalize(reflect(ray.dir, res.n) + (1.0 - metallic.shininess) * randPosInUnitSphere());
-    ray.inv    = 1.0 / ray.dir;
 
     if (dot(ray.dir, res.n) > 0.0) {
-        color *= metallic.albedo;
+        color *= metallic.albedo.rgb;
     } else {
         color = vec3(0.0, 0.0, 0.0);
     }
@@ -322,9 +305,8 @@ void rayHitLambertianSurface(RayHitResult res, inout Ray ray, inout vec3 color) 
 
     ray.origin = res.p + u_nrm[res.f] * EPSILON;
     ray.dir    = normalize(ray.origin + res.n + randPosInUnitSphere() - res.p);
-    ray.inv    = 1.0 / ray.dir;
 
-    color *= lambertian.albedo;
+    color *= lambertian.albedo.rgb;
 }
 
 void rayHitDielectricSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
@@ -348,14 +330,12 @@ void rayHitDielectricSurface(RayHitResult res, inout Ray ray, inout vec3 color) 
     if (dot(refraction, refraction) > 0.0) {
         ray.origin = res.p - EPSILON * face_n;
         ray.dir    = refraction;
-        ray.inv    = 1.0 / ray.dir;
     } else {
         ray.origin = res.p + EPSILON * u_nrm[res.f];
         ray.dir    = reflect(ray.dir, res.n);
-        ray.inv    = 1.0 / ray.dir;
     }
 
-    color *= dielectric.albedo;
+    color *= dielectric.albedo.rgb;
 }
 
 vec3 castPrimaryRay(Ray ray) {
@@ -400,14 +380,13 @@ void main() {
     for (int i = 0; i < u_num_samples; ++i) {
         p = u_eye_to_world * vec4(v_eye_to_x + rand(), u_eye_to_image, v_eye_to_z + rand(), 1.0);
         r.dir = normalize(p.xyz - u_eye_position);
-        r.inv = 1.0 / r.dir;
 
         sum += castPrimaryRay(r);
     }
 
     o_color = vec4(sum / float(u_num_samples), 1.0);
     /*
-    if (u_mat[0].albedo.x > 0.8 && u_mat[0].albedo.x < 1.0)
+    if (u_mat[0].albedo.x == 0.9 && u_mat[0].albedo.y == 0.9 && u_mat[0].albedo.z == 0.9 && u_mat[0].shininess == 0.95)
         o_color = vec4(0.0, 1.0, 0.0, 1.0);
     else
         o_color = vec4(1.0, 0.0, 0.0, 1.0);
