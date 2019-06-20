@@ -41,21 +41,21 @@ class BV { // AABB bounding volume
     rt: number; // rt child bounding volume index
     fi: number[]; // face indices
 
-    constructor(min: Vector1x4, max: Vector1x4, triArray: Object[], posArray: Vector1x4[], bvhArray: BV[]) {
-        bvhArray.push(this);
-
+    constructor(min: Vector1x4, max: Vector1x4) {
         this.min = min;
         this.max = max;
         this.lt = -1;
         this.rt = -1;
         this.fi = [ -1, -1 ];
+    }
 
+    subDivide(triArray: Tri[], posArray: Vector1x4[], bvhArray: BV[]) {
         if (triArray.length <= this.fi.length) { // all the faces fit in this node
             triArray.forEach((tri, i) => this.fi[i] = tri.fi);
         } else { // split the AABB into two across the longest AABB axis
-            const dx = Math.abs(max.x - min.x);
-            const dy = Math.abs(max.y - min.y);
-            const dz = Math.abs(max.z - min.z);
+            const dx = Math.abs(this.max.x - this.min.x);
+            const dy = Math.abs(this.max.y - this.min.y);
+            const dz = Math.abs(this.max.z - this.min.z);
             const largestDelta = Math.max(dx, dy, dz);
 
             if (largestDelta === dx) {
@@ -80,13 +80,15 @@ class BV { // AABB bounding volume
             let b1 = posArray[b.p1].xyzw[axis];
             let b2 = posArray[b.p2].xyzw[axis];
 
-            return Math.min(a0, a1, a2) - Math.min(b0, b1, b2);
+            return ((a0 + a1 + a2) / 3.0) - ((b0 + b1 + b2) / 3.0);
         });
 
         const h = Math.floor(sorted.length / 2);
         const l = sorted.length;
         const ltTriArray = sorted.slice(0, h);
         const rtTriArray = sorted.slice(h, l);
+        let ltBV = null;
+        let rtBV = null;
 
         if (ltTriArray.length > 0) {
             const min = new Vector1x4(Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE);
@@ -103,7 +105,8 @@ class BV { // AABB bounding volume
                 max.z = Math.max(max.z, p0.z, p1.z, p2.z);
             });
             this.lt = bvhArray.length;
-            new BV(min, max, ltTriArray, posArray, bvhArray);
+            ltBV = new BV(min, max);
+            bvhArray.push(ltBV);
         }
 
         if (rtTriArray.length > 0) {
@@ -121,8 +124,12 @@ class BV { // AABB bounding volume
                 max.z = Math.max(max.z, p0.z, p1.z, p2.z);
             });
             this.rt = bvhArray.length;
-            new BV(min, max, rtTriArray, posArray, bvhArray);
+            rtBV = new BV(min, max);
+            bvhArray.push(rtBV);
         }
+
+        if (ltBV) { ltBV.subDivide(ltTriArray, posArray, bvhArray); }
+        if (rtBV) { rtBV.subDivide(rtTriArray, posArray, bvhArray); }
     }
 }
 
@@ -303,8 +310,11 @@ export default class Scene {
             dv.setFloat32( 8, mat.albedo.z, littleEndian);
             dv.setFloat32(12, 1.0, littleEndian);
 
-            dv.setFloat32(16, mat.shininess, littleEndian);
-            dv.setFloat32(20, mat.refractionIndex, littleEndian);
+            if (mat.shininess !== undefined) 
+                dv.setFloat32(16, mat.shininess, littleEndian);
+            if (mat.refractionIndex !== undefined) 
+                dv.setFloat32(20, mat.refractionIndex, littleEndian);
+
             dv.setInt32(24, mat.materialClass, littleEndian);
         });
 
@@ -326,7 +336,9 @@ export default class Scene {
             max.z = Math.max(max.z, p.z);
         });
 
-        new BV(min, max, this.triArray, this.posArray, bvhArray);
+        const bv = new BV(min, max);
+        bvhArray.push(bv);
+        bv.subDivide(this.triArray, this.posArray, bvhArray);
 
         this.bvhArrayBuffer = new ArrayBuffer(bvhArray.length * SIZEOF_BV);
         bvhArray.forEach((bv, i) => {
