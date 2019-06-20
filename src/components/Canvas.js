@@ -1,3 +1,5 @@
+// @flow
+
 import React from 'react';
 
 import { 
@@ -15,11 +17,10 @@ export const canvasWd = 800;
 export const canvasHt = 600;
 export let GL = null;
 
-const        root = new RefFrame(null);
-const        parent = new RefFrame(root);
-export const camera = new RefFrame(parent);
-
-camera.translate(new Vector1x4(0.0, -4.0, 0.0));
+export const rootNode = new RefFrame(null);
+export const parentNode = new RefFrame(rootNode);
+export const cameraNode = new RefFrame(parentNode);
+cameraNode.translate(new Vector1x4(0.0, -5.0, 0.0));
 
 class Canvas extends React.Component {
     constructor(props) {
@@ -37,7 +38,6 @@ class Canvas extends React.Component {
         this.onMouseDown = this.onMouseDown.bind(this);
 
         this.shader = null;
-
     }
 
     render() {
@@ -48,14 +48,14 @@ class Canvas extends React.Component {
 
     renderScene() {
         if (this.shader.initialized) {
-            window.requestAnimationFrame(() => this.shader.drawScene());
+            requestAnimationFrame(() => this.shader.draw(this.scene, cameraNode.modelMatrix));
         }
     }
 
     reportStats() {
-        console.log(`MAX_UNIFORM_BLOCK_SIZE=${GL.getParameter(GL.MAX_UNIFORM_BLOCK_SIZE)}`);
-        console.log(`MAX_FRAGMENT_UNIFORM_BLOCKS=${GL.getParameter(GL.MAX_FRAGMENT_UNIFORM_BLOCKS)}`);
         console.log(`MAX_UNIFORM_BUFFER_BINDINGS=${GL.getParameter(GL.MAX_UNIFORM_BUFFER_BINDINGS)}`);
+        console.log(`MAX_FRAGMENT_UNIFORM_BLOCKS=${GL.getParameter(GL.MAX_FRAGMENT_UNIFORM_BLOCKS)}`);
+        console.log(`MAX_UNIFORM_BLOCK_SIZE=${GL.getParameter(GL.MAX_UNIFORM_BLOCK_SIZE)}`);
     }
 
     componentDidMount() {
@@ -124,26 +124,30 @@ class Canvas extends React.Component {
             const y = event.clientY;
 
             if ((this.lButtonDown && this.rButtonDown) || (this.lButtonDown && event.shiftKey)) { // dolly
-                camera.translate(new Vector1x4(0, (x - this.lx) * this.TXYZ_SCALAR, 0));
-                this.lx = x;
-                this.ly = y;
-                this.renderScene();
-
+                if (x !== this.lx) {
+                    cameraNode.translate(new Vector1x4(0, (x - this.lx) * this.TXYZ_SCALAR, 0));
+                    this.lx = x;
+                    this.ly = y;
+                    this.renderScene();
+                }
             } else if ((this.lButtonDown && event.ctrlKey) || this.rButtonDown) { // move
-                const dx = (this.lx - x) * this.TXYZ_SCALAR;
-                const dz = (y - this.ly) * this.TXYZ_SCALAR;
-                const dv = camera.mapPos(new Vector1x4(dx, 0, dz, 0), parent);
-                parent.translate(dv) // move parent in camera space
-                this.lx = x;
-                this.ly = y;
-                this.renderScene();
-
+                if (x !== this.lx || y !== this.ly) {
+                    const dx = (this.lx - x) * this.TXYZ_SCALAR;
+                    const dz = (y - this.ly) * this.TXYZ_SCALAR;
+                    const dv = cameraNode.mapPos(new Vector1x4(dx, 0, dz, 0), parentNode);
+                    parentNode.translate(dv) // move parent in camera space
+                    this.lx = x;
+                    this.ly = y;
+                    this.renderScene();
+                }
             } else if (this.lButtonDown) { // rotate
-                parent.rotateZ(this.degreesToRadians(this.lx - x) * this.RXYZ_SCALAR); // yaw camera target around it's own z-axis
-                camera.rotateX(this.degreesToRadians(this.ly - y) * this.RXYZ_SCALAR, parent); // pitch around camera's parent x-axis
-                this.lx = x;
-                this.ly = y;
-                this.renderScene();
+                if (x !== this.lx || y !== this.ly) {
+                    parentNode.rotateZ(this.degreesToRadians(this.lx - x) * this.RXYZ_SCALAR); // yaw camera target around it's own z-axis
+                    cameraNode.rotateX(this.degreesToRadians(this.ly - y) * this.RXYZ_SCALAR, parentNode); // pitch around camera's parent x-axis
+                    this.lx = x;
+                    this.ly = y;
+                    this.renderScene();
+                }
             }
         }
     }

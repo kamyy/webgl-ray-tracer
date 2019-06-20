@@ -1,49 +1,48 @@
 // @flow
+
 import {
     reduxStore
 }   from '../redux/reducers.js';
 
 import {
-    GL, camera
+    GL
 }   from '../components/Canvas.js';
 
-import Scene from './Scene.js';
-import Matrix4x4 from '../math/Matrix4x4.js';
+import Vector1x4 from '../math/Vector1x4.js'
 
+import {
+    SIZEOF_TRI,
+    SIZEOF_POS,
+    SIZEOF_NRM,
+    SIZEOF_MAT,
+    SIZEOF_BV,
+}   from './Scene.js';
+
+import Scene from './Scene.js';
 import NoiseTexture from './NoiseTexture.js';
-import MetallicMaterial from './MetallicMaterial.js';
-import LambertianMaterial from './LambertianMaterial.js';
-import DielectricMaterial from './DielectricMaterial.js';
 
 const vertShaderURL = '/vert.glsl';
 const fragShaderURL = '/frag.glsl';
 
-const SIZEOF_I32 = 4;
-const SIZEOF_F32 = 4;
-const SIZEOF_TRI = 32;
-const SIZEOF_POS = 16;
-const SIZEOF_NRM = 16;
 const MAX_TRI_COUNT = 1024;
 const MAX_POS_COUNT = MAX_TRI_COUNT * 3;
-const MAX_NRM_COUNT = MAX_TRI_COUNT * 3 + MAX_TRI_COUNT;
+const MAX_NRM_COUNT = MAX_TRI_COUNT * 3 + MAX_TRI_COUNT; // 1 normal and 3 vertex normals per face
+const MAX_MAT_COUNT = 8;
+const MAX_BV_COUNT  = MAX_TRI_COUNT + 1;
 
 export default class Shader {
     initialized: boolean;
     wd: number;
     ht: number;
 
-    scene: Scene;
-    typedArrayF: Int32Array;
-    typedArrayP: Float32Array;
-    typedArrayN: Float32Array;
-
     vs: WebGLShader;
     fs: WebGLShader;
     program: WebGLProgram;
-    vtxBuff: WebGLBuffer;
-    bufferF: WebGLBuffer;
-    bufferP: WebGLBuffer;
-    bufferN: WebGLBuffer;
+
+    vtxBuf: WebGLBuffer;
+    triBuf: WebGLBuffer;
+    posBuf: WebGLBuffer;
+    nrmBuf: WebGLBuffer;
 
     noiseTexture: NoiseTexture;
 
@@ -61,59 +60,11 @@ export default class Shader {
         return response.text();
     }
 
-    updateBufferF() {
-        let i = 0;
-
-        this.scene.tri.forEach(tri => {
-            this.typedArrayF[i] = tri.p0; ++i;
-            this.typedArrayF[i] = tri.p1; ++i;
-            this.typedArrayF[i] = tri.p2; ++i;
-            this.typedArrayF[i] = tri.n0; ++i;
-            this.typedArrayF[i] = tri.n1; ++i;
-            this.typedArrayF[i] = tri.n2; ++i;
-            this.typedArrayF[i] = tri.fn; ++i;
-            this.typedArrayF[i] = tri.mi; ++i;
-        });
-
-        GL.bindBuffer(GL.UNIFORM_BUFFER, this.bufferF);
-        GL.bufferSubData(GL.UNIFORM_BUFFER, 0, this.typedArrayF); // upload to GPU
-    }
-
-    updateBufferP(viewMatrix: Matrix4x4) {
-        let i = 0;
-
-        this.scene.pos.forEach(pos => {
-            const p = pos.mul(viewMatrix);
-            this.typedArrayP[i] = p.x; ++i;
-            this.typedArrayP[i] = p.y; ++i;
-            this.typedArrayP[i] = p.z; ++i;
-            ++i; // padding
-        });
-
-        GL.bindBuffer(GL.UNIFORM_BUFFER, this.bufferP);
-        GL.bufferSubData(GL.UNIFORM_BUFFER, 0, this.typedArrayP); // upload to GPU
-    }
-
-    updateBufferN(viewMatrix: Matrix4x4) {
-        let i = 0;
-
-        this.scene.nrm.forEach(nrm => {
-            const n = nrm.mul(viewMatrix);
-            this.typedArrayN[i] = n.x; ++i;
-            this.typedArrayN[i] = n.y; ++i;
-            this.typedArrayN[i] = n.z; ++i;
-            ++i; // padding
-        });
-
-        GL.bindBuffer(GL.UNIFORM_BUFFER, this.bufferN);
-        GL.bufferSubData(GL.UNIFORM_BUFFER, 0, this.typedArrayN); // upload to GPU
-    }
-
     initVSData() {
-        // vertex buffer for clip space rectangle
-        this.vtxBuff = GL.createBuffer();
-        GL.bindBuffer(GL.ARRAY_BUFFER, this.vtxBuff);
+        this.vtxBuf = GL.createBuffer();
+        GL.bindBuffer(GL.ARRAY_BUFFER, this.vtxBuf);
         GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([
+            // vertices for for clip space rectangle covering entire canvas
             -1, -1, 
             +1, -1,
             +1, +1, 
@@ -144,34 +95,51 @@ export default class Shader {
         GL.uniform1f(GL.getUniformLocation(this.program, 'u_half_ht'), this.ht * 0.5);
     }
 
-    initFSData() {
-        this.bufferF = GL.createBuffer();
-        GL.bindBuffer(GL.UNIFORM_BUFFER, this.bufferF);
+    initFSData(scene: Scene) {
+        this.triBuf = GL.createBuffer();
+        GL.bindBuffer(GL.UNIFORM_BUFFER, this.triBuf);
         GL.bufferData(GL.UNIFORM_BUFFER, MAX_TRI_COUNT * SIZEOF_TRI, GL.STATIC_DRAW);
+        GL.bufferSubData(GL.UNIFORM_BUFFER, 0, scene.triTypedArray); // upload to GPU once only, the data doesn't change
+
         GL.uniformBlockBinding(this.program, GL.getUniformBlockIndex(this.program, 'uniform_block_tri'), 0);
-        GL.bindBufferBase(GL.UNIFORM_BUFFER, 0, this.bufferF);
+        GL.bindBufferBase(GL.UNIFORM_BUFFER, 0, this.triBuf);
 
-        this.bufferP = GL.createBuffer();
-        GL.bindBuffer(GL.UNIFORM_BUFFER, this.bufferP);
-        GL.bufferData(GL.UNIFORM_BUFFER, MAX_POS_COUNT * SIZEOF_POS, GL.DYNAMIC_DRAW);
+        this.posBuf = GL.createBuffer();
+        GL.bindBuffer(GL.UNIFORM_BUFFER, this.posBuf);
+        GL.bufferData(GL.UNIFORM_BUFFER, MAX_POS_COUNT * SIZEOF_POS, GL.STATIC_DRAW);
+        GL.bufferSubData(GL.UNIFORM_BUFFER, 0, scene.posTypedArray); // upload to GPU
+
         GL.uniformBlockBinding(this.program, GL.getUniformBlockIndex(this.program, 'uniform_block_pos'), 1);
-        GL.bindBufferBase(GL.UNIFORM_BUFFER, 1, this.bufferP);
+        GL.bindBufferBase(GL.UNIFORM_BUFFER, 1, this.posBuf);
 
-        this.bufferN = GL.createBuffer();
-        GL.bindBuffer(GL.UNIFORM_BUFFER, this.bufferN);
-        GL.bufferData(GL.UNIFORM_BUFFER, MAX_NRM_COUNT * SIZEOF_NRM, GL.DYNAMIC_DRAW);
+        this.nrmBuf = GL.createBuffer();
+        GL.bindBuffer(GL.UNIFORM_BUFFER, this.nrmBuf);
+        GL.bufferData(GL.UNIFORM_BUFFER, MAX_NRM_COUNT * SIZEOF_NRM, GL.STATIC_DRAW);
+        GL.bufferSubData(GL.UNIFORM_BUFFER, 0, scene.nrmTypedArray); // upload to GPU
+
         GL.uniformBlockBinding(this.program, GL.getUniformBlockIndex(this.program, 'uniform_block_nrm'), 2);
-        GL.bindBufferBase(GL.UNIFORM_BUFFER, 2, this.bufferN);
+        GL.bindBufferBase(GL.UNIFORM_BUFFER, 2, this.nrmBuf);
 
-        this.noiseTexture = new NoiseTexture(this.wd, this.ht);
+        this.matBuf = GL.createBuffer();
+        GL.bindBuffer(GL.UNIFORM_BUFFER, this.matBuf);
+        GL.bufferData(GL.UNIFORM_BUFFER, MAX_MAT_COUNT * SIZEOF_MAT, GL.STATIC_DRAW);
+        GL.bufferSubData(GL.UNIFORM_BUFFER, 0, scene.matArrayBuffer); // upload to GPU
+
+        GL.uniformBlockBinding(this.program, GL.getUniformBlockIndex(this.program, 'uniform_block_mat'), 3);
+        GL.bindBufferBase(GL.UNIFORM_BUFFER, 3, this.matBuf);
+
+        this.bvhBuf = GL.createBuffer();
+        GL.bindBuffer(GL.UNIFORM_BUFFER, this.bvhBuf);
+        GL.bufferData(GL.UNIFORM_BUFFER, MAX_BV_COUNT * SIZEOF_BV, GL.STATIC_DRAW);
+        GL.bufferSubData(GL.UNIFORM_BUFFER, 0, scene.bvhArrayBuffer); // upload to GPU
+
+        GL.uniformBlockBinding(this.program, GL.getUniformBlockIndex(this.program, 'uniform_block_bvh'), 4);
+        GL.bindBufferBase(GL.UNIFORM_BUFFER, 4, this.bvhBuf);
+
+        this.noiseTexture = new NoiseTexture(GL, this.program, this.wd, this.ht);
     }
 
     async init(scene: Scene): Promise<void> {
-        this.typedArrayF = new Int32Array(scene.tri.length * SIZEOF_TRI / SIZEOF_I32);
-        this.typedArrayP = new Float32Array(scene.pos.length * SIZEOF_POS / SIZEOF_F32);
-        this.typedArrayN = new Float32Array(scene.nrm.length * SIZEOF_NRM / SIZEOF_F32);
-        this.scene = scene;
-
         try {
             const responses = await Promise.all([
                 this.fetchShader(vertShaderURL),
@@ -204,8 +172,7 @@ export default class Shader {
             }
 
             this.initVSData();
-            this.initFSData();
-            this.updateBufferF();
+            this.initFSData(scene);
             this.initialized = true;
         } 
         catch(e) {
@@ -213,80 +180,16 @@ export default class Shader {
         }
     }
 
-    drawScene() {
+    draw(scene: Scene, invViewMatrix: Matrix4x4) {
         const {
             numSamples,
             numBounces,
             cameraFov,
-            materials,
-            spheres,
         } = reduxStore.getState();
 
-        const viewMatrix: Matrix4x4 = camera.modelMatrix.inverse();
+        const origin = new Vector1x4(0.0, 0.0, 0.0);
+        const eyePos = origin.mul(invViewMatrix);
 
-        const sortAscending = (a, b) => {
-            if (a.id < b.id) return -1;
-            if (a.id > b.id) return +1;
-            return 0;
-        };
-
-        const sortedMaterials = [...materials].sort(sortAscending);
-        sortedMaterials.forEach((m, i) => {
-            if (m instanceof MetallicMaterial) {
-                GL.uniform1i(GL.getUniformLocation(this.program, `u_materials[${i}].materialClass`), 0);
-            } else if (m instanceof LambertianMaterial) {
-                GL.uniform1i(GL.getUniformLocation(this.program, `u_materials[${i}].materialClass`), 1);
-            } else if (m instanceof DielectricMaterial) {
-                GL.uniform1i(GL.getUniformLocation(this.program, `u_materials[${i}].materialClass`), 2);
-            }
-
-            if (typeof m.albedo !== 'undefined') {
-                GL.uniform3fv(
-                    GL.getUniformLocation(this.program, `u_materials[${i}].albedo`),
-                    m.albedo.rgb
-                );
-            }
-            if (typeof m.shininess !== 'undefined') {
-                GL.uniform1f(
-                    GL.getUniformLocation(this.program, `u_materials[${i}].shininess`),
-                    m.shininess
-                );
-            }
-            if (typeof m.refractionIndex !== 'undefined') {
-                GL.uniform1f(
-                    GL.getUniformLocation(this.program, `u_materials[${i}].refractionIndex`),
-                    m.refractionIndex
-                );
-            }
-        });
-
-        const sortedSpheres = [...spheres].sort(sortAscending);
-        sortedSpheres.forEach((s, i) => {
-            GL.uniform3fv(
-                GL.getUniformLocation(this.program, `u_spheres[${i}].center`),
-                s.center.mul(viewMatrix).xyz,
-            );
-            GL.uniform1f(
-                GL.getUniformLocation(this.program, `u_spheres[${i}].radius`),
-                s.radius
-            );
-            GL.uniform1f(
-                GL.getUniformLocation(this.program, `u_spheres[${i}].radiusSquared`),
-                s.radiusSquared
-            );
-            GL.uniform1i(
-                GL.getUniformLocation(this.program, `u_spheres[${i}].materialIndex`),
-                sortedMaterials.findIndex(m => m.id === s.materialId)
-            );
-        });
-
-        // ----------------------------------------------------------------
-        // fragment shader uniforms
-        //
-        GL.uniform1i(
-            GL.getUniformLocation(this.program, 'u_num_tris'),
-            this.scene.tri.length
-        );
         GL.uniform1i(
             GL.getUniformLocation(this.program, 'u_num_samples'),
             numSamples
@@ -295,22 +198,21 @@ export default class Shader {
             GL.getUniformLocation(this.program, 'u_num_bounces'),
             numBounces
         );
-        GL.uniform1i(
-            GL.getUniformLocation(this.program, 'u_num_spheres'),
-            spheres.length
+        GL.uniformMatrix4fv(
+            GL.getUniformLocation(this.program, 'u_eye_to_world'), false,
+            invViewMatrix.toFloat32Array()
         );
         GL.uniform1f(
-            GL.getUniformLocation(this.program, 'u_eye_to_y'),
-            this.ht * 0.5 / (Math.tan(cameraFov * 0.5 * Math.PI / 180))
+            GL.getUniformLocation(this.program, 'u_eye_to_image'),
+            (this.ht * 0.5) / (Math.tan(cameraFov * 0.5 * (Math.PI / 180.0)))
+        );
+        GL.uniform3f(
+            GL.getUniformLocation(this.program, 'u_eye_position'),
+            eyePos.x,
+            eyePos.y,
+            eyePos.z
         );
 
-        this.updateBufferP(viewMatrix);
-        this.updateBufferN(viewMatrix);
-        this.noiseTexture.activate(this.program);
- 
-        // ----------------------------------------------------------------
-        // draw clip-space rectangle over entire canvas
-        //
         GL.drawArrays(GL.TRIANGLE_FAN, 0, 4);
     }
 }

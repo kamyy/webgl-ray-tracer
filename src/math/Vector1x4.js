@@ -11,7 +11,7 @@ export default class Vector1x4 {
     elements: number[];
 
     constructor(x: number = 0.0, y: number = 0.0, z: number = 0.0, w: number = 1.0) {
-        this.elements = [ x, y, z, w];
+        this.elements = [x, y, z, w];
     }
 
     get xyzw(): number[] { return this.elements; } 

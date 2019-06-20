@@ -11,33 +11,11 @@ struct Ray {
     vec3 inv;    // inverse ray direction
 };
 
-struct BV { // AABB bounding volume
-    vec3 p0; // min corner
-    vec3 p1; // max corner
-    int  lt; // l BV node
-    int  rt; // r BV node
-    int  f0; // face index
-    int  f1; // face index
-};
-
-struct Sphere {
-    vec3  center;
-    float radius;
-    float radiusSquared;
-    int   materialIndex;
-};
-
-struct Material {
-    int   materialClass;
-    vec3  albedo;
-    float shininess;
-    float refractionIndex;
-};
-
 struct RayHitResult {
     float t; // contact point ray scalar
     vec3  p; // contact point
     vec3  n; // contact normal
+    vec3  f; // face normal
     int   m; // contact material index
 };
 
@@ -52,54 +30,78 @@ struct Tri { // sizeof = 32 bytes
     int mi; // material index (base 4, alignment 28)
 };
 
+struct Mat {
+    vec3  albedo;
+    float shininess;
+    float refractionIndex;
+    int   materialClass;
+};
+
+struct BV { // AABB bounding volume
+    vec3 min; // min corner
+    vec3 max; // max corner
+    int  lt; // l BV node
+    int  rt; // r BV node
+    int  f0; // face index
+    int  f1; // face index
+};
+
+/*
+struct Sphere {
+    vec3  center;
+    float radius;
+    float radiusSquared;
+    int   materialIndex;
+};
+*/
+
 // ----------------------------------------------------------------------------
 // constants
 //
 const float MAX_FLT = intBitsToFloat(2139095039);
 const float EPSILON = 0.01;
 
+const int MAX_MAT_COUNT = 8;
 const int METALLIC_MATERIAL   = 0;
 const int LAMBERTIAN_MATERIAL = 1;
 const int DIELECTRIC_MATERIAL = 2;
-
-const int MAX_MATERIALS = 8;
-const int MAX_SPHERES   = 8;
-
-const int MAX_BV_COUNT      = 64;
-const int MAX_BV_STACK_SIZE = 16;
 
 const int MAX_TRI_COUNT = 1024;
 const int MAX_POS_COUNT = MAX_TRI_COUNT * 3;
 const int MAX_NRM_COUNT = MAX_TRI_COUNT * 3 + MAX_TRI_COUNT;
 
+const int MAX_BV_COUNT      = MAX_TRI_COUNT + 1;
+const int MAX_BV_STACK_SIZE = 16;
+
 // ----------------------------------------------------------------------------
 // uniforms
 //
-uniform Material u_materials[MAX_MATERIALS];
-uniform Sphere   u_spheres[MAX_SPHERES];
-
 uniform highp usampler2D u_rndSampler;
-
-uniform int u_num_spheres;
 uniform int u_num_samples;
 uniform int u_num_bounces;
 
-uniform float u_eye_to_y;
-
-layout (std140) uniform uniform_block_bvh {
-    BV u_bv[MAX_BV_COUNT];
-};
+uniform mat4  u_eye_to_world; // eye to world space matrix (BVH, rays and triangles are all in world space)
+uniform float u_eye_to_image; // distance to image plane from eye
+uniform vec3  u_eye_position; // eye position in world space
 
 layout (std140) uniform uniform_block_tri {
-    Tri u_tri[MAX_TRI_COUNT];
+    Tri u_tri[MAX_TRI_COUNT]; // indices into u_pos and u_nrm
 };
 
 layout (std140) uniform uniform_block_pos {
-    vec3 u_pos[MAX_POS_COUNT];
+    vec3 u_pos[MAX_POS_COUNT]; // in world space
 };
 
 layout (std140) uniform uniform_block_nrm {
-    vec3 u_nrm[MAX_NRM_COUNT];
+    vec3 u_nrm[MAX_NRM_COUNT]; // in world space
+};
+
+layout (std140) uniform uniform_block_mat {
+    Mat u_mat[MAX_MAT_COUNT];
+};
+
+layout (std140) uniform uniform_block_bvh {
+    BV u_bv[MAX_BV_COUNT];
 };
 
 // ----------------------------------------------------------------------------
@@ -163,37 +165,34 @@ bool rayIntersectTri(Ray r, Tri f, out RayHitResult res) {
     if (t < EPSILON) return false; // contact point behind ray
     vec3 p = r.origin + t * r.dir; // contact point on plane 
 
-    float k = dot(n, cross(u_pos[f.p1] - u_pos[f.p0], p - u_pos[f.p0])); 
-    if (k < 0.0) return false; // contact point on right hand side of edge 0
+    float b0 = length(cross(u_pos[f.p2] - u_pos[f.p1], p - u_pos[f.p1])) * 0.5;
+    if (b0 < 0.0 || b0 > 1.0) return false;
 
-    float i = dot(n, cross(u_pos[f.p2] - u_pos[f.p1], p - u_pos[f.p1]));
-    if (i < 0.0) return false; // contact point on right hand side of edge 1
+    float b2 = length(cross(u_pos[f.p1] - u_pos[f.p0], p - u_pos[f.p0])) * 0.5; 
+    if (b2 < 0.0 || b2 > 1.0) return false; 
 
-    float j = dot(n, cross(u_pos[f.p0] - u_pos[f.p2], p - u_pos[f.p2]));
-    if (j < 0.0) return false; // contact point on right hand side of edge 2
-
-    float inv_n_dot_n = 1.0 / dot(n, n);
-    i *= inv_n_dot_n;
-    j *= inv_n_dot_n;
+    float b1 = length(cross(u_pos[f.p0] - u_pos[f.p2], p - u_pos[f.p2])) * 0.5;
+    if (b1 < 0.0 || b1 > 1.0) return false;
 
     res.t = t;
     res.p = p;
-    res.n = normalize((i * u_nrm[f.n0]) + (j * u_nrm[f.n1]) + ((1.0 - i - j) * u_nrm[f.n2])); // interpolate using barycentric coordinates
+    res.n = normalize((b0 * u_nrm[f.n0]) + (b1 * u_nrm[f.n1]) + (b2 * u_nrm[f.n2])); // interpolate using barycentric coordinates
+    res.f = n;
     res.m = f.mi;
 
     return true;
 }
 
 bool rayIntersectBV(Ray r, BV bv) { // slabs method using intrinsics
-    vec3 t0 = (bv.p0 - r.origin) * r.inv;
-    vec3 t1 = (bv.p1 - r.origin) * r.inv;
+    vec3 t0 = (bv.min - r.origin) * r.inv;
+    vec3 t1 = (bv.max - r.origin) * r.inv;
     vec3 tmin = min(t0, t1);
     vec3 tmax = max(t0, t1);
 
     float max_tmin = max(tmin.x, max(tmin.y, tmin.z));
     float min_tmax = min(tmax.x, min(tmax.y, tmax.z));
 
-    return max_tmin < min_tmax && max_tmin > 0.0;
+    return max_tmin < min_tmax && max_tmin > 0.0; // no intersection if behind ray origin
 }
 
 bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
@@ -205,6 +204,7 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
 
     nearest.t = MAX_FLT;
     stack[0]  = 0; // push root BV on to stack
+
     while (i > -1) {
         bv = u_bv[stack[i--]]; // pop BV off top of stack
 
@@ -224,6 +224,7 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     return nearest.t != MAX_FLT;
 }
 
+/*
 bool rayIntersectSphere(Ray r, Sphere s, out RayHitResult res) {
     vec3  l = r.origin - s.center;
     float a = dot(r.dir, r.dir);
@@ -269,6 +270,7 @@ bool rayIntersectNearestSphere(Ray r, out RayHitResult nearest) {
     }
     return contact;
 }
+*/
 
 // ----------------------------------------------------------------------------
 // ray cast from eye through pixel
@@ -281,9 +283,9 @@ float schlick(float cosine, float rindex) {
 }
 
 void rayHitMetallicSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
-    Material metallic = u_materials[res.m];
+    Mat metallic = u_mat[res.m];
 
-    ray.origin = res.p + res.n * EPSILON;
+    ray.origin = res.p + res.f * EPSILON;
     ray.dir    = normalize(reflect(ray.dir, res.n) + (1.0 - metallic.shininess) * randPosInUnitSphere());
     ray.inv    = 1.0 / ray.dir;
 
@@ -295,9 +297,9 @@ void rayHitMetallicSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
 }
 
 void rayHitLambertianSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
-    Material lambertian = u_materials[res.m];
+    Mat lambertian = u_mat[res.m];
 
-    ray.origin = res.p + res.n * EPSILON;
+    ray.origin = res.p + res.f * EPSILON;
     ray.dir    = normalize(ray.origin + res.n + randPosInUnitSphere() - res.p);
     ray.inv    = 1.0 / ray.dir;
 
@@ -305,26 +307,29 @@ void rayHitLambertianSurface(RayHitResult res, inout Ray ray, inout vec3 color) 
 }
 
 void rayHitDielectricSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
-    Material dielectric = u_materials[res.m];
+    Mat dielectric = u_mat[res.m];
     float refractiveRatio;
     vec3  refraction;
     vec3  normal;
+    vec3  face_n;
 
-    if (dot(ray.dir, res.n) < 0.0) { // into sphere from air
+    if (dot(ray.dir, res.n) < 0.0) { // into object from air
         refractiveRatio = 1.0 / dielectric.refractionIndex;
         normal = +res.n;
-    } else { // from sphere into air
+        face_n = +res.f;
+    } else { // from object into air
         refractiveRatio = dielectric.refractionIndex;
         normal = -res.n;
+        face_n = -res.f;
     }
 
     refraction = refract(ray.dir, normal, refractiveRatio);
     if (dot(refraction, refraction) > 0.0) {
-        ray.origin = res.p - EPSILON * normal;
+        ray.origin = res.p - EPSILON * face_n;
         ray.dir    = refraction;
         ray.inv    = 1.0 / ray.dir;
     } else {
-        ray.origin = res.p + EPSILON * res.n;
+        ray.origin = res.p + EPSILON * res.f;
         ray.dir    = reflect(ray.dir, res.n);
         ray.inv    = 1.0 / ray.dir;
     }
@@ -338,7 +343,7 @@ vec3 castPrimaryRay(Ray ray) {
 
     for (int i = 0; i <= u_num_bounces; ++i) {
         if (rayIntersectBVH(ray, res)) {
-            switch (u_materials[res.m].materialClass) {
+            switch (u_mat[res.m].materialClass) {
             case METALLIC_MATERIAL:
                 rayHitMetallicSurface(res, ray, color);
                 break;
@@ -363,20 +368,17 @@ vec3 castPrimaryRay(Ray ray) {
 // main
 //
 void main() {
-    // initialize random number generator state before using rand()
+    // must initialize random number generator state before using rand()
     g_generatorState = texelFetch(u_rndSampler, ivec2(gl_FragCoord.xy), 0);
 
     Ray r;
-    r.origin = vec3(0.0, 0.0, 0.0);
+    r.origin = u_eye_position;
     vec3 sum = vec3(0.0, 0.0, 0.0);
+    vec4 p; // world space pos
 
     for (int i = 0; i < u_num_samples; ++i) {
-        r.dir = vec3(
-            v_eye_to_x + rand(), 
-            u_eye_to_y, 
-            v_eye_to_z + rand()
-        );
-        r.dir = normalize(r.dir);
+        p = u_eye_to_world * vec4(v_eye_to_x + rand(), u_eye_to_image, v_eye_to_z + rand(), 1.0);
+        r.dir = normalize(p.xyz - u_eye_position);
         r.inv = 1.0 / r.dir;
 
         sum += castPrimaryRay(r);

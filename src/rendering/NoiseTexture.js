@@ -1,12 +1,10 @@
 // @flow
-import { GL } from '../components/Canvas.js'
 
 export default class NoiseTexture {
     texture: WebGLTexture;
 
-    constructor(wd: number, ht: number) {
+    constructor(GL: WebGL2RenderingContext, program: WebGLProgram, wd: number, ht: number) {
         this.texture = GL.createTexture();
-        GL.bindTexture(GL.TEXTURE_2D, this.texture);
 
         const data = new Uint32Array(wd * ht * 4);
         for (let i = 0; i < data.length; ++i) {
@@ -17,6 +15,7 @@ export default class NoiseTexture {
             data[i] = n;
         }
 
+        GL.bindTexture(GL.TEXTURE_2D, this.texture);
         GL.texImage2D (
             GL.TEXTURE_2D, 
             0, 
@@ -33,11 +32,8 @@ export default class NoiseTexture {
         GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
         GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST);
         GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
-    }
 
-    activate(program: WebGLProgram) {
         GL.activeTexture(GL.TEXTURE0);
-        GL.bindTexture(GL.TEXTURE_2D, this.texture);
         GL.uniform1i(
             GL.getUniformLocation(program, 'u_rndSampler'), 
             0
