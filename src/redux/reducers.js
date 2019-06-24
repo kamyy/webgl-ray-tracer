@@ -12,7 +12,7 @@ import {
 // ----------------------------------------------------------------
 // default states
 //
-const defaultNumSamples = 2;
+const defaultNumSamples = 100;
 const defaultNumBounces = 2;
 const defaultCameraFov  = 30;
 

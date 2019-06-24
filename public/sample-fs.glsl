@@ -2,7 +2,6 @@
 precision highp int;
 precision highp float;
 
-// ----------------------------------------------------------------------------
 // structures
 //
 struct Ray {
@@ -45,14 +44,12 @@ struct BV { // AABB bounding volume
     int  f1; // face index
 };
 
-/*
 struct Sphere {
     vec3  center;
     float radius;
     float radiusSquared;
     int   materialIndex;
 };
-*/
 
 // ----------------------------------------------------------------------------
 // constants
@@ -75,13 +72,15 @@ const int MAX_BV_STACK_SIZE = 16;
 // ----------------------------------------------------------------------------
 // uniforms
 //
-uniform highp usampler2D u_rndSampler;
+uniform highp sampler2D  u_colorCache;
+uniform highp usampler2D u_noiseCache;
+uniform int u_render_pass;
 uniform int u_num_samples;
 uniform int u_num_bounces;
 
-uniform mat4  u_eye_to_world; // eye to world space matrix (BVH, rays and triangles are all in world space)
 uniform float u_eye_to_image; // distance to image plane from eye
 uniform vec3  u_eye_position; // eye position in world space
+uniform mat4  u_eye_to_world; // eye to world space matrix (BVH, rays and triangles are all in world space)
 
 layout (std140) uniform uniform_block_tri {
     Tri u_tri[MAX_TRI_COUNT]; // indices into u_pos and u_nrm
@@ -112,12 +111,12 @@ in float v_eye_to_z;
 // ----------------------------------------------------------------------------
 // outputs
 //
-out vec4 o_color;
+layout (location = 0) out vec4 o_colorCache;
 
 // ----------------------------------------------------------------------------
 // globals
 //
-uvec4 g_generatorState;
+uvec4 g_randGeneratorState;
 
 // ----------------------------------------------------------------------------
 // randomness
@@ -131,13 +130,13 @@ uint linearCongruentialGenerator(uint z, uint A, uint C) {
 }
 
 float rand() {
-    g_generatorState.x = tauswortheGenerator(g_generatorState.x, 13, 19, 12, 4294967294u); // p1=2^31-1
-    g_generatorState.y = tauswortheGenerator(g_generatorState.y, 2,  25, 4,  4294967288u); // p2=2^30-1
-    g_generatorState.z = tauswortheGenerator(g_generatorState.z, 3,  11, 17, 4294967280u); // p3=2^28-1
-    g_generatorState.w = linearCongruentialGenerator(g_generatorState.w, 1664525u, 1013904223u); // p4=2^32
+    g_randGeneratorState.x = tauswortheGenerator(g_randGeneratorState.x, 13, 19, 12, 4294967294u); // p1=2^31-1
+    g_randGeneratorState.y = tauswortheGenerator(g_randGeneratorState.y, 2,  25, 4,  4294967288u); // p2=2^30-1
+    g_randGeneratorState.z = tauswortheGenerator(g_randGeneratorState.z, 3,  11, 17, 4294967280u); // p3=2^28-1
+    g_randGeneratorState.w = linearCongruentialGenerator(g_randGeneratorState.w, 1664525u, 1013904223u); // p4=2^32
 
     // Combined period is lcm(p1,p2,p3,p4) ~ 2^121
-    return 2.3283064365387e-10 * float(g_generatorState.x ^ g_generatorState.y ^ g_generatorState.z ^ g_generatorState.w);
+    return 2.3283064365387e-10 * float(g_randGeneratorState.x ^ g_randGeneratorState.y ^ g_randGeneratorState.z ^ g_randGeneratorState.w);
 }
 
 vec3 randPosInUnitSphere() {
@@ -229,7 +228,6 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     return nearest.t != MAX_FLT;
 }
 
-/*
 bool rayIntersectSphere(Ray r, Sphere s, out RayHitResult res) {
     vec3  l = r.origin - s.center;
     float a = dot(r.dir, r.dir);
@@ -261,6 +259,7 @@ bool rayIntersectSphere(Ray r, Sphere s, out RayHitResult res) {
     return false;
 }
 
+/*
 bool rayIntersectNearestSphere(Ray r, out RayHitResult nearest) {
     RayHitResult current;
     bool contact = false;
@@ -369,26 +368,25 @@ vec3 castPrimaryRay(Ray ray) {
 // main
 //
 void main() {
-    // must initialize random number generator state before using rand()
-    g_generatorState = texelFetch(u_rndSampler, ivec2(gl_FragCoord.xy), 0);
+    ivec2 fragCoord = ivec2(gl_FragCoord.xy);
 
-    Ray r;
-    r.origin = u_eye_position;
-    vec3 sum = vec3(0.0, 0.0, 0.0);
-    vec4 p; // world space pos
+    // must restore random number generator state 1st before using rand()
+    g_randGeneratorState = 
+        texelFetch(u_noiseCache, fragCoord, 0) + 
+        uvec4(u_render_pass, u_render_pass, u_render_pass, u_render_pass);
 
-    for (int i = 0; i < u_num_samples; ++i) {
-        p = u_eye_to_world * vec4(v_eye_to_x + rand(), u_eye_to_image, v_eye_to_z + rand(), 1.0);
-        r.dir = normalize(p.xyz - u_eye_position);
+    vec4 rayTarget = u_eye_to_world * vec4( // from view space to world space
+        v_eye_to_x + rand(), 
+        u_eye_to_image, 
+        v_eye_to_z + rand(), 
+        1.0
+    );
 
-        sum += castPrimaryRay(r);
+    Ray ray = Ray(u_eye_position, normalize(rayTarget.xyz - u_eye_position));
+
+    if (u_render_pass > 1) {
+        o_colorCache = vec4(castPrimaryRay(ray), 0.0) + texelFetch(u_colorCache, fragCoord, 0);
+    } else {
+        o_colorCache = vec4(castPrimaryRay(ray), 1.0);
     }
-
-    o_color = vec4(sum / float(u_num_samples), 1.0);
-    /*
-    if (u_mat[0].albedo.x == 0.9 && u_mat[0].albedo.y == 0.9 && u_mat[0].albedo.z == 0.9 && u_mat[0].shininess == 0.95)
-        o_color = vec4(0.0, 1.0, 0.0, 1.0);
-    else
-        o_color = vec4(1.0, 0.0, 0.0, 1.0);
-    */
 }

@@ -9,9 +9,13 @@ import {
 import Vector1x4 from '../math/Vector1x4.js';
 import RefFrame from '../math/RefFrame.js';
 
-import Shader from '../rendering/Shader.js';
+import SampleShader from '../shader/SampleShader.js';
+import CanvasShader from '../shader/CanvasShader.js';
+import Scene from '../scene/Scene.js';
 
-import Scene from '../rendering/Scene.js';
+import {
+    reduxStore
+}   from '../redux/reducers.js';
 
 export const canvasWd = 800;
 export const canvasHt = 600;
@@ -26,7 +30,7 @@ class Canvas extends React.Component {
     constructor(props) {
         super(props);
 
-        this.TXYZ_SCALAR = 0.20;
+        this.TXYZ_SCALAR = 0.01;
         this.RXYZ_SCALAR = 0.25;
         this.lButtonDown = false;
         this.rButtonDown = false;
@@ -37,7 +41,10 @@ class Canvas extends React.Component {
         this.onMouseMove = this.onMouseMove.bind(this);
         this.onMouseDown = this.onMouseDown.bind(this);
 
-        this.shader = null;
+        this.sampleShader = null;
+        this.canvasShader = null;
+        this.bRendering = false;
+        this.renderPass = 0;
     }
 
     render() {
@@ -46,10 +53,27 @@ class Canvas extends React.Component {
         </canvas>
     }
 
-    renderScene() {
-        if (this.shader.initialized) {
-            requestAnimationFrame(() => this.shader.draw(this.scene, cameraNode.modelMatrix));
+    restartRendering() {
+        if (this.bRendering) {
+            this.renderPass = 0;
+        } else {
+            this.renderPass = 0;
+            this.bRendering = true;
+            this.executeRenderingPass();
         }
+    }
+
+    executeRenderingPass() {
+        requestAnimationFrame(() => {
+            if (this.renderPass < reduxStore.getState().numSamples) {
+                this.renderPass++;
+                this.sampleShader.draw(this.renderPass, cameraNode.modelMatrix);
+                this.canvasShader.draw(this.renderPass, this.sampleShader.colorCache);
+                this.executeRenderingPass();
+            } else {
+                this.bRendering = false;
+            }
+        });
     }
 
     reportStats() {
@@ -60,13 +84,15 @@ class Canvas extends React.Component {
 
     componentDidMount() {
         this.canvas = document.getElementById('Canvas');
-
         GL = this.canvas.getContext('webgl2', {
             depth: false,
             alpha: false,
         });
 
         if (GL) {
+            if (!GL.getExtension("EXT_color_buffer_float")) {
+                console.error("FLOAT color buffer not available");
+            }
             this.reportStats();
 
             this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
@@ -74,17 +100,19 @@ class Canvas extends React.Component {
             window.onmousemove = this.onMouseMove;
             window.onmouseup = this.onMouseUp;
 
-            this.shader = new Shader(canvasWd, canvasHt);
             this.scene = new Scene('/webgl.obj');
+            this.sampleShader = new SampleShader(this.scene, canvasWd, canvasHt);
+            this.canvasShader = new CanvasShader();
 
             this.scene.init()
-                .then(() => this.shader.init(this.scene))
-                .then(() => this.renderScene());
+                .then(() => this.sampleShader.init('/sample-vs.glsl', '/sample-fs.glsl'))
+                .then(() => this.canvasShader.init('/canvas-vs.glsl', '/canvas-fs.glsl'))
+                .then(() => this.restartRendering());
         }
     }
 
     shouldComponentUpdate() {
-        this.renderScene();
+        this.restartRendering();
         return false;
     }
 
@@ -128,7 +156,7 @@ class Canvas extends React.Component {
                     cameraNode.translate(new Vector1x4(0, (x - this.lx) * this.TXYZ_SCALAR, 0));
                     this.lx = x;
                     this.ly = y;
-                    this.renderScene();
+                    this.restartRendering();
                 }
             } else if ((this.lButtonDown && event.ctrlKey) || this.rButtonDown) { // move
                 if (x !== this.lx || y !== this.ly) {
@@ -138,7 +166,7 @@ class Canvas extends React.Component {
                     parentNode.translate(dv) // move parent in camera space
                     this.lx = x;
                     this.ly = y;
-                    this.renderScene();
+                    this.restartRendering();
                 }
             } else if (this.lButtonDown) { // rotate
                 if (x !== this.lx || y !== this.ly) {
@@ -146,7 +174,7 @@ class Canvas extends React.Component {
                     cameraNode.rotateX(this.degreesToRadians(this.ly - y) * this.RXYZ_SCALAR, parentNode); // pitch around camera's parent x-axis
                     this.lx = x;
                     this.ly = y;
-                    this.renderScene();
+                    this.restartRendering();
                 }
             }
         }
@@ -157,8 +185,10 @@ function mapStateToProps(state) {
     return {
         numSamples: state.numSamples,
         numBounces: state.numBounces,
-        cameraFov: state.cameraFov,
+        cameraFov:  state.cameraFov,
     };
 }
 
-export default connect(mapStateToProps, null)(Canvas);
+// triggers Canvas.shouldComponentUpdate() when redux state changes
+export default connect(mapStateToProps, null)(Canvas); 
+

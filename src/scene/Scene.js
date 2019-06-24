@@ -1,11 +1,11 @@
 // @flow
 
 import objParser from 'wavefront-obj-parser';
-import Vector1x4 from '../math/Vector1x4.js';
 
-import MetallicMaterial from '../rendering/MetallicMaterial.js';
-import LambertianMaterial from '../rendering/LambertianMaterial.js';
-import DielectricMaterial from '../rendering/DielectricMaterial.js';
+import Vector1x4 from '../math/Vector1x4.js';
+import MetallicMaterial from '../material/MetallicMaterial.js';
+import LambertianMaterial from '../material/LambertianMaterial.js';
+import DielectricMaterial from '../material/DielectricMaterial.js';
 
 const SIZEOF_INT32 = 4;
 const SIZEOF_FLOAT32 = 4;

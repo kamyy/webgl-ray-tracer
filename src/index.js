@@ -8,7 +8,7 @@ import {
     reduxStore 
 }   from './redux/reducers.js';
 
-import App from './components/App.js';
+import App from './component/App.js';
 
 ReactDOM.render(
     <Provider store={reduxStore}><App/></Provider>, 
