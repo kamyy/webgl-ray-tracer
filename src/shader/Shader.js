@@ -25,7 +25,7 @@ export default class Shader {
 
         const vtxBuf = GL.createBuffer();
         GL.bindBuffer(GL.ARRAY_BUFFER, vtxBuf);
-        GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([ // vertices for for clip space rectangle covering entire canvas
+        GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([ // vertices for clip space rectangle covering entire canvas
             -1, -1, 
             +1, -1,
             +1, +1, 

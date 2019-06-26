@@ -13,6 +13,7 @@ const SIZEOF_FLOAT32 = 4;
 const X_AXIS = 0;
 const Y_AXIS = 1;
 const Z_AXIS = 2;
+const BV_MIN_DELTA = 0.01;
 
 export const SIZEOF_TRI = 32;
 export const SIZEOF_POS = 16;
@@ -83,7 +84,7 @@ class BV { // AABB bounding volume
             return ((a0 + a1 + a2) / 3.0) - ((b0 + b1 + b2) / 3.0);
         });
 
-        const h = Math.floor(sorted.length / 2);
+        const h = sorted.length / 2;
         const l = sorted.length;
         const ltTriArray = sorted.slice(0, h);
         const rtTriArray = sorted.slice(h, l);
@@ -104,6 +105,12 @@ class BV { // AABB bounding volume
                 max.y = Math.max(max.y, p0.y, p1.y, p2.y);
                 max.z = Math.max(max.z, p0.z, p1.z, p2.z);
             });
+
+            console.log(`BV id=${bvhArray.length} tris=${ltTriArray.length} dx=${max.x - min.x} dy=${max.y - min.y} dz=${max.z - min.z}`);
+            if (max.x - min.x < BV_MIN_DELTA) { max.x += BV_MIN_DELTA; }
+            if (max.y - min.y < BV_MIN_DELTA) { max.y += BV_MIN_DELTA; }
+            if (max.z - min.z < BV_MIN_DELTA) { max.z += BV_MIN_DELTA; }
+
             this.lt = bvhArray.length;
             ltBV = new BV(min, max);
             bvhArray.push(ltBV);
@@ -123,6 +130,12 @@ class BV { // AABB bounding volume
                 max.y = Math.max(max.y, p0.y, p1.y, p2.y);
                 max.z = Math.max(max.z, p0.z, p1.z, p2.z);
             });
+
+            console.log(`BV id=${bvhArray.length} tris=${rtTriArray.length} dx=${max.x - min.x} dy=${max.y - min.y} dz=${max.z - min.z}`);
+            if (max.x - min.x < BV_MIN_DELTA) { max.x += BV_MIN_DELTA; }
+            if (max.y - min.y < BV_MIN_DELTA) { max.y += BV_MIN_DELTA; }
+            if (max.z - min.z < BV_MIN_DELTA) { max.z += BV_MIN_DELTA; }
+
             this.rt = bvhArray.length;
             rtBV = new BV(min, max);
             bvhArray.push(rtBV);
@@ -335,6 +348,11 @@ export default class Scene {
             max.y = Math.max(max.y, p.y);
             max.z = Math.max(max.z, p.z);
         });
+
+        console.log(`BV id=0 tris=${this.triArray.length} dx=${max.x - min.x} dy=${max.y - min.y} dz=${max.z - min.z}`);
+        if (max.x - min.x < BV_MIN_DELTA) { max.x += BV_MIN_DELTA; }
+        if (max.y - min.y < BV_MIN_DELTA) { max.y += BV_MIN_DELTA; }
+        if (max.z - min.z < BV_MIN_DELTA) { max.z += BV_MIN_DELTA; }
 
         const bv = new BV(min, max);
         bvhArray.push(bv);
