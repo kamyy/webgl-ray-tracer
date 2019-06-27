@@ -91,7 +91,7 @@ layout (std140) uniform uniform_block_pos {
 };
 
 layout (std140) uniform uniform_block_nrm {
-    vec3 u_nrm[MAX_NRM_COUNT]; // in world space
+    vec4 u_nrm[MAX_NRM_COUNT]; // in world space (w component holds plane equation value D for face normals)
 };
 
 layout (std140) uniform uniform_block_mat {
@@ -152,15 +152,14 @@ vec3 randPosInUnitSphere() {
 // ray intersect objects
 //
 bool rayIntersectTri(Ray r, Tri f, out RayHitResult res) {
-    vec3 n = u_nrm[f.fn];
+    vec3 n = u_nrm[f.fn].xyz;
 
     float n_dot_ray_dir = dot(n, r.dir);
     if (abs(n_dot_ray_dir) < EPSILON) {
         return false; // face normal and ray direction almost perpendicular
     }
 
-    float d = dot(n, u_pos[f.p0]); // ax + by + cz - d = 0 (solve for d)
-    float t = (d - dot(n, r.origin)) / n_dot_ray_dir; // a(ox + t*dx) + b(oy + t*dy) + c(oz + t*dz) - d = 0 (solve for t)
+    float t = (u_nrm[f.fn].w - dot(n, r.origin)) / n_dot_ray_dir; // a(ox + t*dx) + b(oy + t*dy) + c(oz + t*dz) - d = 0 (solve for t)
 
     if (t < EPSILON) return false; // contact point behind ray
     vec3 p = r.origin + t * r.dir; // contact point on plane 
@@ -180,7 +179,7 @@ bool rayIntersectTri(Ray r, Tri f, out RayHitResult res) {
 
     res.t = t;
     res.p = p;
-    res.n = normalize((u * u_nrm[f.n0]) + (v * u_nrm[f.n1]) + ((1.0 - u - v) * u_nrm[f.n2])); // interpolate using barycentric coordinates
+    res.n = normalize((u * u_nrm[f.n0].xyz) + (v * u_nrm[f.n1]).xyz + ((1.0 - u - v) * u_nrm[f.n2]).xyz); // interpolate using barycentric coordinates
     res.f = f.fn;
     res.m = f.mi;
 
@@ -289,7 +288,7 @@ float schlick(float cosine, float rindex) {
 void rayHitMetallicSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
     Mat metallic = u_mat[res.m];
 
-    ray.origin = res.p + u_nrm[res.f] * EPSILON;
+    ray.origin = res.p + u_nrm[res.f].xyz * EPSILON;
     ray.dir    = normalize(reflect(ray.dir, res.n) + (1.0 - metallic.shininess) * randPosInUnitSphere());
 
     if (dot(ray.dir, res.n) > 0.0) {
@@ -302,9 +301,8 @@ void rayHitMetallicSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
 void rayHitLambertianSurface(RayHitResult res, inout Ray ray, inout vec3 color) {
     Mat lambertian = u_mat[res.m];
 
-    ray.origin = res.p + u_nrm[res.f] * EPSILON;
-    ray.dir    = normalize(ray.origin + res.n + randPosInUnitSphere() - res.p);
-
+    ray.origin = res.p + u_nrm[res.f].xyz * EPSILON;
+    ray.dir = normalize(ray.origin + res.n + randPosInUnitSphere() - res.p);
     color *= lambertian.albedo.rgb;
 }
 
@@ -318,11 +316,11 @@ void rayHitDielectricSurface(RayHitResult res, inout Ray ray, inout vec3 color) 
     if (dot(ray.dir, res.n) < 0.0) { // into object from air
         refractiveRatio = 1.0 / dielectric.refractionIndex;
         normal = +res.n;
-        face_n = +u_nrm[res.f];
+        face_n = +u_nrm[res.f].xyz;
     } else { // from object into air
         refractiveRatio = dielectric.refractionIndex;
         normal = -res.n;
-        face_n = -u_nrm[res.f];
+        face_n = -u_nrm[res.f].xyz;
     }
 
     refraction = refract(ray.dir, normal, refractiveRatio);
@@ -330,7 +328,7 @@ void rayHitDielectricSurface(RayHitResult res, inout Ray ray, inout vec3 color) 
         ray.origin = res.p - EPSILON * face_n;
         ray.dir    = refraction;
     } else {
-        ray.origin = res.p + EPSILON * u_nrm[res.f];
+        ray.origin = res.p + EPSILON * u_nrm[res.f].xyz;
         ray.dir    = reflect(ray.dir, res.n);
     }
 
@@ -356,7 +354,7 @@ vec3 castPrimaryRay(Ray ray) {
             }
         } else {
             float t = (1.0 + normalize(ray.dir).z) * 0.5;
-            color *=  (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
+            color  *= (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
             break; // out of for loop
         }
     }
@@ -371,9 +369,7 @@ void main() {
     ivec2 fragCoord = ivec2(gl_FragCoord.xy);
 
     // must restore random number generator state 1st before using rand()
-    g_randGeneratorState = 
-        texelFetch(u_noiseCache, fragCoord, 0) + 
-        uvec4(u_render_pass, u_render_pass, u_render_pass, u_render_pass);
+    g_randGeneratorState = texelFetch(u_noiseCache, fragCoord, 0) + uvec4(u_render_pass, u_render_pass, u_render_pass, u_render_pass);
 
     vec4 rayTarget = u_eye_to_world * vec4( // from view space to world space
         v_eye_to_x + rand(), 

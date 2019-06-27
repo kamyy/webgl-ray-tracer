@@ -2,10 +2,14 @@
 
 import objParser from 'wavefront-obj-parser';
 
+import Material from '../material/Material.js';
+import {
+    METALLIC_MATERIAL_CLASS,
+    LAMBERTIAN_MATERIAL_CLASS,
+    DIELECTRIC_MATERIAL_CLASS,
+}   from '../material/Material.js';
+
 import Vector1x4 from '../math/Vector1x4.js';
-import MetallicMaterial from '../material/MetallicMaterial.js';
-import LambertianMaterial from '../material/LambertianMaterial.js';
-import DielectricMaterial from '../material/DielectricMaterial.js';
 
 const SIZEOF_INT32 = 4;
 const SIZEOF_FLOAT32 = 4;
@@ -232,7 +236,7 @@ export default class Scene {
         console.log(`# of tri ${this.triArray.length}`);
     }
 
-    initPos(obj) {
+    initPos(obj: Object) {
         this.posArray = [];
 
         for (let i = 0; i < obj.vertexPositions.length; i += 3) { // each element is x, y or z
@@ -250,13 +254,13 @@ export default class Scene {
             this.posTypedArray[i++] = p.x;
             this.posTypedArray[i++] = p.y;
             this.posTypedArray[i++] = p.z;
-            ++i; // padding
+            this.posTypedArray[i++] = p.w;
         });
 
         console.log(`# of pos ${this.posArray.length}`);
     }
 
-    initNrm(obj) {
+    initNrm(obj: Object) {
         this.nrmArray = [];
 
         for (let i = 0; i < obj.vertexNormals.length; i += 3) { // each element is x, y or z
@@ -271,7 +275,7 @@ export default class Scene {
         this.triArray.forEach(tri => {
             const a = this.posArray[tri.p1].sub(this.posArray[tri.p0]);
             const b = this.posArray[tri.p2].sub(this.posArray[tri.p0]);
-            const n = a.cross(b).normalize(); n.w = 0.0;
+            const n = a.cross(b).normalize(); n.w = n.dot(this.posArray[tri.p0]); // calculate D for plane equation
             this.nrmArray.push(n);
         });
 
@@ -281,34 +285,40 @@ export default class Scene {
             this.nrmTypedArray[i++] = n.x;
             this.nrmTypedArray[i++] = n.y;
             this.nrmTypedArray[i++] = n.z;
-            ++i; // padding
+            this.nrmTypedArray[i++] = n.w;
         });
 
         console.log(`# of nrm ${this.nrmArray.length}`);
     }
 
     initMat() {
-        const matArray = [
-            new MetallicMaterial(
+        const matArray : Material[] = [
+            new Material(
+                METALLIC_MATERIAL_CLASS,
                 'Metal 0',
                 new Vector1x4(0.9, 0.9, 0.9), 
                 0.95,
             ),
-            new LambertianMaterial(
+            new Material(
+                LAMBERTIAN_MATERIAL_CLASS,
                 'Matte 0',
                 new Vector1x4(0.4, 0.4, 0.8)
             ),
-            new LambertianMaterial(
+            new Material(
+                LAMBERTIAN_MATERIAL_CLASS,
                 'Matte 1',
                 new Vector1x4(0.5, 0.1, 0.1)
             ),
-            new LambertianMaterial(
+            new Material(
+                LAMBERTIAN_MATERIAL_CLASS,
                 'Matte 2',
                 new Vector1x4(0.8, 0.1, 0.8)
             ),
-            new DielectricMaterial(
+            new Material(
+                DIELECTRIC_MATERIAL_CLASS,
                 'Glass 0',
                 new Vector1x4(1.0, 1.0, 1.0), 
+                0.00,
                 1.33
             ),
         ];
@@ -321,12 +331,10 @@ export default class Scene {
             dv.setFloat32( 0, mat.albedo.x, littleEndian);
             dv.setFloat32( 4, mat.albedo.y, littleEndian);
             dv.setFloat32( 8, mat.albedo.z, littleEndian);
-            dv.setFloat32(12, 1.0, littleEndian);
+            dv.setFloat32(12, mat.albedo.w, littleEndian);
 
-            if (mat.shininess !== undefined) 
-                dv.setFloat32(16, mat.shininess, littleEndian);
-            if (mat.refractionIndex !== undefined) 
-                dv.setFloat32(20, mat.refractionIndex, littleEndian);
+            dv.setFloat32(16, mat.shininess, littleEndian);
+            dv.setFloat32(20, mat.refractionIdx, littleEndian);
 
             dv.setInt32(24, mat.materialClass, littleEndian);
         });
