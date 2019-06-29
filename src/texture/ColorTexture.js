@@ -1,10 +1,14 @@
 // @flow
 
-export default class ColorCache {
+import {
+    GL
+}   from '../component/Canvas.js';
+
+export default class ColorTexture {
     source: WebGLTexture;
     target: WebGLTexture;
 
-    constructor(GL: WebGL2RenderingContext, wd: number, ht: number) {
+    constructor(wd: number, ht: number) {
         GL.activeTexture(GL.TEXTURE0);
 
         this.source = GL.createTexture();
@@ -24,7 +28,7 @@ export default class ColorCache {
         GL.texStorage2D(GL.TEXTURE_2D, 1, GL.RGBA32F, wd, ht);
     }
 
-    bindToSampleShader(GL: WebGL2RenderingContext, program: WebGLProgram) {
+    bindToSampleShader(program: WebGLProgram) {
         const textureSwap = this.source;
         this.source = this.target;
         this.target = textureSwap;
@@ -37,13 +41,13 @@ export default class ColorCache {
         // using texture unit 1
         GL.activeTexture(GL.TEXTURE1);
         GL.bindTexture(GL.TEXTURE_2D, this.source);
-        GL.uniform1i(GL.getUniformLocation(program, 'u_colorCache'), 1);
+        GL.uniform1i(GL.getUniformLocation(program, 'u_color_sampler'), 1);
     }
-    
-    bindToCanvasShader(GL: WebGL2RenderingContext, program: WebGLProgram) {
+
+    bindToCanvasShader(program: WebGLProgram) {
         // using texture unit 0
         GL.activeTexture(GL.TEXTURE0);
         GL.bindTexture(GL.TEXTURE_2D, this.target);
-        GL.uniform1i(GL.getUniformLocation(program, 'u_colorCache'), 0);
+        GL.uniform1i(GL.getUniformLocation(program, 'u_color_sampler'), 0);
     }
 }

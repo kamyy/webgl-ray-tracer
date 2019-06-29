@@ -26,14 +26,13 @@ export default class Shader {
         const vtxBuf = GL.createBuffer();
         GL.bindBuffer(GL.ARRAY_BUFFER, vtxBuf);
         GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([ // vertices for clip space rectangle covering entire canvas
-            -1, -1, 
+            -1, -1,
             +1, -1,
-            +1, +1, 
+            +1, +1,
             -1, +1,
-            ]), 
+            ]),
             GL.STATIC_DRAW
         );
-
         const desc = {
             length: 2,
             stride: 8,
@@ -51,9 +50,6 @@ export default class Shader {
 
         GL.enableVertexAttribArray(loc);
         GL.bindVertexArray(null); // end vertex array object
-    }
-
-    initFSData() {
     }
 
     async init(vsURL:string, fsURL: string): Promise<void> {
@@ -87,8 +83,7 @@ export default class Shader {
             }
 
             this.initVSData();
-            this.initFSData();
-        } 
+        }
         catch(e) {
             throw e;
         }

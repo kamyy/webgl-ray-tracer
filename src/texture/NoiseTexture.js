@@ -1,11 +1,15 @@
 // @flow
 
-export default class NoiseCache {
+import {
+    GL
+}   from '../component/Canvas.js';
+
+export default class NoiseTexture {
     source: WebGLTexture;
     target: WebGLTexture;
 
-    constructor(GL: WebGL2RenderingContext, wd: number, ht: number) {
-        const data = new Uint32Array(wd * ht * 4);  // require 4 random values for each fragment to seed 
+    constructor(wd: number, ht: number) {
+        const data = new Uint32Array(wd * ht * 4);  // require 4 random values for each fragment to seed
         for (let i = 0; i < data.length; ++i) {     // tausworthe/LCG random number generator
             let n = Math.random() * 4294967295;
             while (n < 129) { //tausworthe/LCG random number generator seed must be 129 or larger
@@ -25,10 +29,10 @@ export default class NoiseCache {
         GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32UI, wd, ht, 0, GL.RGBA_INTEGER, GL.UNSIGNED_INT, data);
     }
 
-    bindToSampleShader(GL: WebGL2RenderingContext, program: WebGLProgram) {
+    bindToSampleShader(program: WebGLProgram) {
         // using texture unit 2
         GL.activeTexture(GL.TEXTURE2);
         GL.bindTexture(GL.TEXTURE_2D, this.source);
-        GL.uniform1i(GL.getUniformLocation(program, 'u_noiseCache'), 2);
+        GL.uniform1i(GL.getUniformLocation(program, 'u_noise_sampler'), 2);
     }
 }

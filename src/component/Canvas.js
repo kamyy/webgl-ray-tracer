@@ -1,16 +1,19 @@
+// @flow
 
 import React from 'react';
 
-import { 
-    connect 
+import {
+    connect
 }   from 'react-redux';
 
 import Vector1x4 from '../math/Vector1x4.js';
 import RefFrame from '../math/RefFrame.js';
 
+import ColorTexture from '../texture/ColorTexture.js';
+import NoiseTexture from '../texture/NoiseTexture.js';
+import SceneTexture from '../texture/SceneTexture.js';
 import SampleShader from '../shader/SampleShader.js';
 import CanvasShader from '../shader/CanvasShader.js';
-import Scene from '../scene/Scene.js';
 
 import {
     reduxStore
@@ -26,6 +29,12 @@ export const cameraNode = new RefFrame(parentNode);
 cameraNode.translate(new Vector1x4(0.0, -5.0, 0.0));
 
 class Canvas extends React.Component {
+    colorTexture: ColorTexture;
+    noiseTexture: NoiseTexture;
+    sceneTexture: SceneTexture;
+    sampleShader: SampleShader;
+    canvasShader: CanvasShader;
+
     constructor(props) {
         super(props);
 
@@ -40,8 +49,6 @@ class Canvas extends React.Component {
         this.onMouseMove = this.onMouseMove.bind(this);
         this.onMouseDown = this.onMouseDown.bind(this);
 
-        this.sampleShader = null;
-        this.canvasShader = null;
         this.bRendering = false;
         this.renderPass = 0;
     }
@@ -67,7 +74,7 @@ class Canvas extends React.Component {
             if (this.renderPass < reduxStore.getState().numSamples) {
                 this.renderPass++;
                 this.sampleShader.draw(this.renderPass, cameraNode.modelMatrix);
-                this.canvasShader.draw(this.renderPass, this.sampleShader.colorCache);
+                this.canvasShader.draw(this.renderPass);
                 this.executeRenderingPass();
             } else {
                 this.bRendering = false;
@@ -75,7 +82,7 @@ class Canvas extends React.Component {
         });
     }
 
-    reportStats() {
+    logGPUCaps() {
         console.log(`MAX_UNIFORM_BUFFER_BINDINGS=${GL.getParameter(GL.MAX_UNIFORM_BUFFER_BINDINGS)}`);
         console.log(`MAX_FRAGMENT_UNIFORM_BLOCKS=${GL.getParameter(GL.MAX_FRAGMENT_UNIFORM_BLOCKS)}`);
         console.log(`MAX_UNIFORM_BLOCK_SIZE=${GL.getParameter(GL.MAX_UNIFORM_BLOCK_SIZE)}`);
@@ -89,21 +96,24 @@ class Canvas extends React.Component {
         });
 
         if (GL) {
-            if (!GL.getExtension("EXT_color_buffer_float")) {
-                console.error("FLOAT color buffer not available");
+            if (!GL.getExtension('EXT_color_buffer_float')) {
+                throw new Error('FLOAT color buffer not available!');
             }
-            this.reportStats();
+            this.logGPUCaps();
 
             this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
             this.canvas.onmousedown = this.onMouseDown;
             window.onmousemove = this.onMouseMove;
             window.onmouseup = this.onMouseUp;
 
-            this.scene = new Scene('/webgl.obj');
-            this.sampleShader = new SampleShader(this.scene, canvasWd, canvasHt);
-            this.canvasShader = new CanvasShader();
+            this.colorTexture = new ColorTexture(canvasWd, canvasHt);
+            this.noiseTexture = new NoiseTexture(canvasWd, canvasHt);
+            this.sceneTexture = new SceneTexture('/webgl.obj');
 
-            this.scene.init()
+            this.sampleShader = new SampleShader(this.colorTexture, this.noiseTexture, this.sceneTexture, canvasWd, canvasHt);
+            this.canvasShader = new CanvasShader(this.colorTexture);
+
+            this.sceneTexture.init()
                 .then(() => this.sampleShader.init('/sample-vs.glsl', '/sample-fs.glsl'))
                 .then(() => this.canvasShader.init('/canvas-vs.glsl', '/canvas-fs.glsl'))
                 .then(() => this.restartRendering());
@@ -144,7 +154,7 @@ class Canvas extends React.Component {
     }
 
     onMouseMove(event) {
-        if (this.lButtonDown || 
+        if (this.lButtonDown ||
             this.rButtonDown) {
 
             const x = event.clientX;
@@ -189,5 +199,4 @@ function mapStateToProps(state) {
 }
 
 // triggers Canvas.shouldComponentUpdate() when redux state changes
-export default connect(mapStateToProps, null)(Canvas); 
-
+export default connect(mapStateToProps, null)(Canvas);
