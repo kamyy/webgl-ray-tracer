@@ -105,7 +105,7 @@ class Canvas extends React.Component {
 
             this.colorTexture = new ColorTexture(canvasWd, canvasHt);
             this.noiseTexture = new NoiseTexture(canvasWd, canvasHt);
-            this.sceneTexture = new SceneTexture('/webgl.obj');
+            this.sceneTexture = new SceneTexture('/suzanne.obj');
 
             this.sampleShader = new SampleShader(this.colorTexture, this.noiseTexture, this.sceneTexture, canvasWd, canvasHt);
             this.canvasShader = new CanvasShader(this.colorTexture);

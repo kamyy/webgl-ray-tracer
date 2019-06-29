@@ -115,33 +115,39 @@ vec3 randPosInUnitSphere() {
 bool rayIntersectFace(Ray r, int id, out RayHitResult res) {
     res.fn = texelFetch(u_face_sampler, ivec2(0, id), 0).xyz; // face normal
 
-    float n_dot_ray_dir = dot(res.fn, r.dir);
-    if (n_dot_ray_dir > 0.0 || abs(n_dot_ray_dir) < EPSILON) {
-        return false; // back face or face and ray direction almost parallel
+    float fn_dot_ray_dir = dot(res.fn, r.dir);
+    if (fn_dot_ray_dir > 0.0 || abs(fn_dot_ray_dir) < EPSILON) {
+        return false; // back facing or face and ray direction almost parallel
     }
 
     vec3 p0 = texelFetch(u_face_sampler, ivec2(1, id), 0).xyz; // vertex 0 position
 
-    // a(ox + t*dx) + b(oy + t*dy) + c(oz + t*dz) - d = 0 (solve for t)
-    res.t = (dot(res.fn, p0) - dot(res.fn, r.origin)) / n_dot_ray_dir;
-    if (res.t < EPSILON) {
-        return false; // contact point behind ray
-    }
-    res.p = r.origin + res.t * r.dir; // contact point on plane
+    // A(origin.x + t*dir.x) + B(origin.y + t*dir.y) + C(origin.z + t*dir.z) - D = 0 (solve for t)
+    res.t = (dot(res.fn, p0) - dot(res.fn, r.origin)) / fn_dot_ray_dir;
+    if (res.t < EPSILON) return false; // contact point behind ray
 
+    res.p = r.origin + res.t * r.dir; // contact point on plane
     vec3 p1 = texelFetch(u_face_sampler, ivec2(2, id), 0).xyz; // vertex 1 position
     vec3 p2 = texelFetch(u_face_sampler, ivec2(3, id), 0).xyz; // vertex 2 position
 
-    res.u = dot(res.fn, cross(p2 - p1, res.p - p1));
-    if (res.u < 0.0) return false; // contact point on right hand side of p1 -> p2
+    // from Real-Time Collision Detection by Christer Ericson
+    vec3 v0 = p1 - p0;
+    vec3 v1 = p2 - p0;
+    vec3 v2 = res.p - p0;
+    float d00 = dot(v0, v0);
+    float d01 = dot(v0, v1);
+    float d11 = dot(v1, v1);
+    float d20 = dot(v2, v0);
+    float d21 = dot(v2, v1);
+    float denominator = (d00 * d11) - (d01 * d01);
+    res.v = (d11 * d20 - d01 * d21) / denominator;
+    if (res.v < 0.0 || res.v > 1.0) return false;
+    res.w = (d00 * d21 - d01 * d20) / denominator;
+    if (res.w < 0.0 || res.w > 1.0) return false;
+    res.u = 1.0 - res.v - res.w;
+    if (res.u < 0.0 || res.u > 1.0) return false;
 
-    res.v = dot(res.fn, cross(p0 - p2, res.p - p2));
-    if (res.v < 0.0) return false; // contact point on right hand side of p2 -> p0
-
-    res.w = dot(res.fn, cross(p1 - p0, res.p - p0));
-    if (res.w < 0.0) return false; // contact point on right hand side of p0 -> p1
-
-    res.id = id;
+    res.id = id; // face id
     return true;
 }
 
@@ -195,10 +201,6 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     }
 
     if (nearest.t != MAX_FLT) {
-        float inv_n_dot_n = 1.0 / dot(nearest.fn, nearest.fn);
-        nearest.u *= inv_n_dot_n;
-        nearest.v *= inv_n_dot_n;
-
         // interpolate using barycentric coordinates
         nearest.n  = normalize( (texelFetch(u_face_sampler, ivec2(4, nearest.id), 0).xyz * nearest.u) +
                                 (texelFetch(u_face_sampler, ivec2(5, nearest.id), 0).xyz * nearest.v) +
