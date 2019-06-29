@@ -10,11 +10,15 @@ struct Ray {
 };
 
 struct RayHitResult {
-    float t; // ray origin to contact point distance
+    vec3  fn; // contact face normal
     vec3  p; // contact point
     vec3  n; // contact normal
-    vec3  fn; // contact face normal
-    int   mi; // contact material index
+    float t; // ray origin to contact point distance
+    float u; // barycentric coordinate for vertex 0
+    float v; // barycentric coordinate for vertex 1
+    float w; // barycentric coordinate for vertex 2
+    int mi; // material id
+    int id; // face id
 };
 
 struct Sphere {
@@ -109,48 +113,35 @@ vec3 randPosInUnitSphere() {
 // ray intersect objects
 //
 bool rayIntersectFace(Ray r, int id, out RayHitResult res) {
-    vec3 fn = texelFetch(u_face_sampler, ivec2(0, id), 0).xyz;
+    res.fn = texelFetch(u_face_sampler, ivec2(0, id), 0).xyz; // face normal
 
-    float n_dot_ray_dir = dot(fn, r.dir);
-    if (abs(n_dot_ray_dir) < EPSILON) {
-        return false; // face normal and ray direction almost perpendicular
+    float n_dot_ray_dir = dot(res.fn, r.dir);
+    if (n_dot_ray_dir > 0.0 || abs(n_dot_ray_dir) < EPSILON) {
+        return false; // back face or face and ray direction almost parallel
     }
 
-    vec3 p0 = texelFetch(u_face_sampler, ivec2(1, id), 0).xyz;
-    vec3 p1 = texelFetch(u_face_sampler, ivec2(2, id), 0).xyz;
-    vec3 p2 = texelFetch(u_face_sampler, ivec2(3, id), 0).xyz;
+    vec3 p0 = texelFetch(u_face_sampler, ivec2(1, id), 0).xyz; // vertex 0 position
 
-    float d = dot(fn, p0); // solve plane equation for D
-    float t = (d - dot(fn, r.origin)) / n_dot_ray_dir; // a(ox + t*dx) + b(oy + t*dy) + c(oz + t*dz) - d = 0 (solve for t)
+    // a(ox + t*dx) + b(oy + t*dy) + c(oz + t*dz) - d = 0 (solve for t)
+    res.t = (dot(res.fn, p0) - dot(res.fn, r.origin)) / n_dot_ray_dir;
+    if (res.t < EPSILON) {
+        return false; // contact point behind ray
+    }
+    res.p = r.origin + res.t * r.dir; // contact point on plane
 
-    if (t < EPSILON) return false; // contact point behind ray
-    vec3 p = r.origin + t * r.dir; // contact point on plane
+    vec3 p1 = texelFetch(u_face_sampler, ivec2(2, id), 0).xyz; // vertex 1 position
+    vec3 p2 = texelFetch(u_face_sampler, ivec2(3, id), 0).xyz; // vertex 2 position
 
-    float u = dot(fn, cross(p2 - p1, p - p1));
-    if (u < 0.0) return false; // contact point on right hand side of p1 -> p2
+    res.u = dot(res.fn, cross(p2 - p1, res.p - p1));
+    if (res.u < 0.0) return false; // contact point on right hand side of p1 -> p2
 
-    float v = dot(fn, cross(p0 - p2, p - p2));
-    if (v < 0.0) return false; // contact point on right hand side of p2 -> p0
+    res.v = dot(res.fn, cross(p0 - p2, res.p - p2));
+    if (res.v < 0.0) return false; // contact point on right hand side of p2 -> p0
 
-    float w = dot(fn, cross(p1 - p0, p - p0));
-    if (w < 0.0) return false; // contact point on right hand side of p0 -> p1
+    res.w = dot(res.fn, cross(p1 - p0, res.p - p0));
+    if (res.w < 0.0) return false; // contact point on right hand side of p0 -> p1
 
-    float inv_n_dot_n = 1.0 / dot(fn, fn);
-    u *= inv_n_dot_n;
-    v *= inv_n_dot_n;
-
-    vec3 n0 = texelFetch(u_face_sampler, ivec2(4, id), 0).xyz;
-    vec3 n1 = texelFetch(u_face_sampler, ivec2(5, id), 0).xyz;
-    vec3 n2 = texelFetch(u_face_sampler, ivec2(6, id), 0).xyz;
-
-    int  mi = int(texelFetch(u_face_sampler, ivec2(7, id), 0).x); // material index
-
-    res.t = t;
-    res.p = p;
-    res.n = normalize((u * n0) + (v * n1) + ((1.0 - u - v) * n2)); // interpolate using barycentric coordinates
-    res.fn = fn;
-    res.mi = mi;
-
+    res.id = id;
     return true;
 }
 
@@ -172,6 +163,7 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     vec4 texel;
     int lt, rt;
     int f0, f1;
+    int id;
 
     int stack[MAX_BV_STACK_SIZE];
     stack[0] = 0; // root BV id is always 0
@@ -179,12 +171,11 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
 
     nearest.t = MAX_FLT;
     while (top > -1) {
-        int id = stack[top--]; // Pop BVH id from top of stack
+        id = stack[top--]; // Pop BVH id from top of stack
         if (rayIntersectBV( r,
                             texelFetch(u_bvh_sampler, ivec2(0, id), 0).xyz,// min bounds
                             texelFetch(u_bvh_sampler, ivec2(1, id), 0).xyz // max bounds
                             )) {
-
             texel = texelFetch(u_bvh_sampler, ivec2(2, id), 0);
             lt = int(texel.r);
             rt = int(texel.g);
@@ -200,11 +191,23 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
             if (f1 != -1 && rayIntersectFace(r, f1, current) && current.t < nearest.t) {
                 nearest = current;
             }
-
         }
     }
 
-    return nearest.t != MAX_FLT;
+    if (nearest.t != MAX_FLT) {
+        float inv_n_dot_n = 1.0 / dot(nearest.fn, nearest.fn);
+        nearest.u *= inv_n_dot_n;
+        nearest.v *= inv_n_dot_n;
+
+        // interpolate using barycentric coordinates
+        nearest.n  = normalize( (texelFetch(u_face_sampler, ivec2(4, nearest.id), 0).xyz * nearest.u) +
+                                (texelFetch(u_face_sampler, ivec2(5, nearest.id), 0).xyz * nearest.v) +
+                                (texelFetch(u_face_sampler, ivec2(6, nearest.id), 0).xyz * (1.0 - nearest.u - nearest.v))
+                                );
+        nearest.mi = int(texelFetch(u_face_sampler, ivec2(7, nearest.id), 0).x); // material index
+        return true;
+    }
+    return false;
 }
 
 /*
@@ -278,7 +281,7 @@ void rayHitMetallicSurface(RayHitResult res, Mat metallic, inout Ray ray, inout 
 
 void rayHitLambertianSurface(RayHitResult res, Mat lambertian, inout Ray ray, inout vec3 color) {
     ray.origin = res.p + res.fn * EPSILON;
-    ray.dir = normalize(ray.origin + res.n + randPosInUnitSphere() - res.p);
+    ray.dir = normalize(res.p + res.n + randPosInUnitSphere() - res.p);
     color *= lambertian.albedo.rgb;
 }
 

@@ -82,10 +82,7 @@ class Canvas extends React.Component {
         });
     }
 
-    logGPUCaps() {
-        console.log(`MAX_UNIFORM_BUFFER_BINDINGS=${GL.getParameter(GL.MAX_UNIFORM_BUFFER_BINDINGS)}`);
-        console.log(`MAX_FRAGMENT_UNIFORM_BLOCKS=${GL.getParameter(GL.MAX_FRAGMENT_UNIFORM_BLOCKS)}`);
-        console.log(`MAX_UNIFORM_BLOCK_SIZE=${GL.getParameter(GL.MAX_UNIFORM_BLOCK_SIZE)}`);
+    log_GPU_Caps() {
     }
 
     componentDidMount() {
@@ -97,9 +94,9 @@ class Canvas extends React.Component {
 
         if (GL) {
             if (!GL.getExtension('EXT_color_buffer_float')) {
-                throw new Error('FLOAT color buffer not available!');
+                throw new Error('EXT_color_buffer_float not available on GPU!');
             }
-            this.logGPUCaps();
+            this.log_GPU_Caps();
 
             this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
             this.canvas.onmousedown = this.onMouseDown;
