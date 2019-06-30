@@ -59,7 +59,7 @@ class Canvas extends React.Component {
         </canvas>
     }
 
-    restartRendering() {
+    restartRender() {
         if (this.bRendering) {
             this.renderPass = 0;
         } else {
@@ -113,12 +113,12 @@ class Canvas extends React.Component {
             this.sceneTexture.init()
                 .then(() => this.sampleShader.init('/sample-vs.glsl', '/sample-fs.glsl'))
                 .then(() => this.canvasShader.init('/canvas-vs.glsl', '/canvas-fs.glsl'))
-                .then(() => this.restartRendering());
+                .then(() => this.restartRender());
         }
     }
 
     shouldComponentUpdate() {
-        this.restartRendering();
+        this.restartRender();
         return false;
     }
 
@@ -162,7 +162,7 @@ class Canvas extends React.Component {
                     cameraNode.translate(new Vector1x4(0, (x - this.lx) * this.TXYZ_SCALAR, 0));
                     this.lx = x;
                     this.ly = y;
-                    this.restartRendering();
+                    this.restartRender();
                 }
             } else if ((this.lButtonDown && event.ctrlKey) || this.rButtonDown) { // move
                 if (x !== this.lx || y !== this.ly) {
@@ -172,7 +172,7 @@ class Canvas extends React.Component {
                     parentNode.translate(dv) // move parent in camera space
                     this.lx = x;
                     this.ly = y;
-                    this.restartRendering();
+                    this.restartRender();
                 }
             } else if (this.lButtonDown) { // rotate
                 if (x !== this.lx || y !== this.ly) {
@@ -180,7 +180,7 @@ class Canvas extends React.Component {
                     cameraNode.rotateX(this.degreesToRadians(this.ly - y) * this.RXYZ_SCALAR, parentNode); // pitch around camera's parent x-axis
                     this.lx = x;
                     this.ly = y;
-                    this.restartRendering();
+                    this.restartRender();
                 }
             }
         }

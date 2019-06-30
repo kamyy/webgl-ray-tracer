@@ -1,5 +1,4 @@
 import React from 'react';
-
 import {
     bindActionCreators
 }   from 'redux';
@@ -7,6 +6,10 @@ import {
 import {
     connect
 }   from 'react-redux';
+
+import {
+    css
+}   from 'emotion'
 
 import {
     setNumSamples,
@@ -26,30 +29,24 @@ const minCameraFov = 5;
 const maxCameraFov = 90;
 
 function Params(props) {
-    const rangeStyle = {
-        color: 'yellow',
-        backgroundColor: 'black'
-    };
-
     return <fieldset>
         <legend>Rendering Controls</legend>
 
-        <div style={ {
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'flex-start'
-        } }>
-            <div style={ {
-                margin: '5px 15px 5px 15px',
-                display: 'flex',
-                flexDirection: 'column',
-                flexGrow: '2'
-            } }>
+        <div className={css`
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+        `}>
+            <div className={css`
+                display: flex;
+                flex-direction: column;
+                flex-grow: 2;
+                margin: 5px 10px;
+            `}>
                 <label htmlFor='cameraFov'>Camera Field of View</label>
                 <input type='range' id='cameraFov'
                     min={minCameraFov}
                     max={maxCameraFov}
-                    style={rangeStyle}
                     value={props.cameraFov}
                     onChange={event => props.setCameraFov(parseInt(event.target.value))}
                 />
@@ -58,7 +55,6 @@ function Params(props) {
                 <input type='range' id='numSamples'
                     min={minSamples}
                     max={maxSamples}
-                    style={rangeStyle}
                     value={props.numSamples}
                     onChange={event => props.setNumSamples(parseInt(event.target.value))}
                 />
@@ -67,22 +63,23 @@ function Params(props) {
                 <input type='range' id='numBounces'
                     min={minBounces}
                     max={maxBounces}
-                    style={rangeStyle}
                     value={props.numBounces}
                     onChange={event => props.setNumBounces(parseInt(event.target.value))}
                 />
             </div>
 
-            <fieldset style={ {
-                margin: '5px 15px 15px 15px',
-                borderStyle: 'none none none solid',
-            } }>
-                <legend>Shading Type</legend>
+            <fieldset className={css`
+                flex-grow: 0;
+                margin: 5px 10px;
+                border-style: none none none solid;
+            `}>
+                <legend>Shading Technique</legend>
 
-                <div style={ {
-                    display: 'flex',
-                    flexDirection: 'column',
-                } }>
+                <div className={css`
+                    display: flex;
+                    flex-direction: row;
+                    justify-content: space-evenly;
+                `}>
                     <label>
                         <input type='radio'
                             value={FLAT_SHADING}

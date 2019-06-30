@@ -69,7 +69,7 @@ class BV { // AABB bounding volume
         }
     }
 
-    splitAcross(axis: number, faceArray: Face[], bvhArray: BV[]) {
+    splitAcross(axis: X_AXIS | Y_AXIS | Z_AXIS, faceArray: Face[], bvhArray: BV[]) {
         const sorted = [...faceArray].sort((faceA, faceB) => {
             const a0 = faceA.p0.xyzw[axis];
             const a1 = faceA.p1.xyzw[axis];
@@ -157,8 +157,8 @@ export default class SceneTexture {
             throw e;
         }
         this.initFaceTexture(obj);
-        this.initMat();
-        this.initBVH();
+        this.initMatTexture();
+        this.initBVHTexture();
     }
 
     async fetchWavefrontObj(url: string): Promise<string> {
@@ -239,7 +239,7 @@ export default class SceneTexture {
         console.log(`# faces ${this.faceArray.length}`);
     }
 
-    initBVH() {
+    initBVHTexture() {
         const min = new Vector1x4(Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE);
         const max = new Vector1x4(Number.MIN_VALUE, Number.MIN_VALUE, Number.MIN_VALUE);
         this.faceArray.forEach(f => { // calculate min/max for root AABB bounding volume
@@ -292,7 +292,7 @@ export default class SceneTexture {
         console.log(`# AABBs ${bvhArray.length}`);
     }
 
-    initMat() {
+    initMatTexture() {
         const matArray : Material[] = [
             new Material(
                 METALLIC_MATERIAL_CLASS,
