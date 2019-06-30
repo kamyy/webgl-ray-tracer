@@ -8,6 +8,7 @@ import {
 }   from 'react-redux';
 
 import {
+    cx,
     css
 }   from 'emotion'
 
@@ -29,57 +30,95 @@ const minCameraFov = 5;
 const maxCameraFov = 90;
 
 function Params(props) {
+    const renderingControlsClass = css`
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+    `
+    const rangeControlsClass  = css`
+        display: flex;
+        flex-direction: column;
+        flex-grow: 2;
+        margin: 5px 10px;
+    `
+    const rangeControlClass  = css`
+        display: flex;
+        flex-direction: row;
+        padding-bottom: 10px;
+    `
+    const rangeInputMinLabelClass = css`
+        flex-basis: 5%;
+        text-align: right;
+        padding-right: 10px;
+    `
+    const rangeInputMaxLabelClass = css`
+        flex-basis: 10%;
+        text-align: left;
+        padding-left: 10px;
+    `
+    const rangeInputClass = css`
+        flex-basis: 85%;
+    `
+    const shadingTechniquesClass = css`
+        margin: 5px 0px;
+        border-style: none none none solid;
+    `
+    const shadingRadioButtonsClass = css`
+        display: flex;
+        flex-direction: row;
+        justify-content: space-evenly;
+    `
+
     return <fieldset>
         <legend>Rendering Controls</legend>
 
-        <div className={css`
-            display: flex;
-            flex-direction: row;
-            align-items: flex-start;
-        `}>
-            <div className={css`
-                display: flex;
-                flex-direction: column;
-                flex-grow: 2;
-                margin: 5px 10px;
-            `}>
+        <div className={cx(renderingControlsClass)}>
+            <div className={cx(rangeControlsClass)}>
+
                 <label htmlFor='cameraFov'>Camera Field of View</label>
-                <input type='range' id='cameraFov'
-                    min={minCameraFov}
-                    max={maxCameraFov}
-                    value={props.cameraFov}
-                    onChange={event => props.setCameraFov(parseInt(event.target.value))}
-                />
+
+                <div className={cx(rangeControlClass)}>
+                    <label className={cx(rangeInputMinLabelClass)}>{minCameraFov}</label>
+                    <input type='range' className={cx(rangeInputClass)}
+                        min={minCameraFov}
+                        max={maxCameraFov}
+                        value={props.cameraFov}
+                        onChange={event => props.setCameraFov(parseInt(event.target.value))}
+                    />
+                    <label className={cx(rangeInputMaxLabelClass)}>{maxCameraFov}</label>
+                </div>
 
                 <label htmlFor='numSamples'># of Samples Per Pixel</label>
-                <input type='range' id='numSamples'
-                    min={minSamples}
-                    max={maxSamples}
-                    value={props.numSamples}
-                    onChange={event => props.setNumSamples(parseInt(event.target.value))}
-                />
+
+                <div className={cx(rangeControlClass)}>
+                    <label className={cx(rangeInputMinLabelClass)}>{minSamples}</label>
+                    <input type='range' className={cx(rangeInputClass)}
+                        min={minSamples}
+                        max={maxSamples}
+                        value={props.numSamples}
+                        onChange={event => props.setNumSamples(parseInt(event.target.value))}
+                    />
+                    <label className={cx(rangeInputMaxLabelClass)}>{maxSamples}</label>
+                </div>
 
                 <label htmlFor='numBounces'># of Ray Bounces</label>
-                <input type='range' id='numBounces'
-                    min={minBounces}
-                    max={maxBounces}
-                    value={props.numBounces}
-                    onChange={event => props.setNumBounces(parseInt(event.target.value))}
-                />
+
+                <div className={cx(rangeControlClass)}>
+                    <label className={cx(rangeInputMinLabelClass)}>{minBounces}</label>
+                    <input type='range' className={cx(rangeInputClass)}
+                        min={minBounces}
+                        max={maxBounces}
+                        value={props.numBounces}
+                        onChange={event => props.setNumBounces(parseInt(event.target.value))}
+                    />
+                    <label className={cx(rangeInputMaxLabelClass)}>{maxBounces}</label>
+                </div>
             </div>
 
-            <fieldset className={css`
-                flex-grow: 0;
-                margin: 5px 10px;
-                border-style: none none none solid;
-            `}>
+            <fieldset className={cx(shadingTechniquesClass)}>
                 <legend>Shading Technique</legend>
 
-                <div className={css`
-                    display: flex;
-                    flex-direction: row;
-                    justify-content: space-evenly;
-                `}>
+                <div className={cx(shadingRadioButtonsClass)}>
                     <label>
                         <input type='radio'
                             value={FLAT_SHADING}
