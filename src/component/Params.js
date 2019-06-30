@@ -23,11 +23,11 @@ import {
 }   from '../redux/actions.js';
 
 const minSamples = 1;
-const maxSamples = 1000;
+const maxSamples = 500;
 const minBounces = 1;
-const maxBounces = 16;
-const minCameraFov = 5;
-const maxCameraFov = 90;
+const maxBounces = 8;
+const minCameraFov = 10;
+const maxCameraFov = 120;
 
 function Params(props) {
     const renderingControlsClass = css`
