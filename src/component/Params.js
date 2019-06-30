@@ -27,64 +27,83 @@ const maxCameraFov = 90;
 
 function Params(props) {
     const rangeStyle = {
-        width: "400px"
+        color: 'yellow',
+        backgroundColor: 'black'
     };
 
-    return <fieldset><legend>Rendering Controls</legend>
+    return <fieldset>
+        <legend>Rendering Controls</legend>
 
-        <label htmlFor='cameraFov'>Camera Field of View</label>
-        <input type='range'
-            id='cameraFov'
-            min={minCameraFov}
-            max={maxCameraFov}
-            style={rangeStyle}
-            value={props.cameraFov}
-            onChange={event => props.setCameraFov(parseInt(event.target.value))}
-        />
+        <div style={ {
+            display: 'flex',
+            flexDirection: 'row',
+        } }>
+            <div style={ {
+                margin: '5px 15px 5px 15px',
+                display: 'flex',
+                flexDirection: 'column',
+                flexGrow: '2'
+            } }>
+                <label htmlFor='cameraFov'>Camera Field of View</label>
+                <input type='range' id='cameraFov'
+                    min={minCameraFov}
+                    max={maxCameraFov}
+                    style={rangeStyle}
+                    value={props.cameraFov}
+                    onChange={event => props.setCameraFov(parseInt(event.target.value))}
+                />
 
-        <label htmlFor='numSamples'>Samples Per Pixel</label>
-        <input type='range'
-            id='numSamples'
-            min={minSamples}
-            max={maxSamples}
-            style={rangeStyle}
-            value={props.numSamples}
-            onChange={event => props.setNumSamples(parseInt(event.target.value))}
-        />
+                <label htmlFor='numSamples'># of Samples Per Pixel</label>
+                <input type='range' id='numSamples'
+                    min={minSamples}
+                    max={maxSamples}
+                    style={rangeStyle}
+                    value={props.numSamples}
+                    onChange={event => props.setNumSamples(parseInt(event.target.value))}
+                />
 
-        <label htmlFor='numBounces'>Ray Bounces</label>
-        <input type='range'
-            id='numBounces'
-            min={minBounces}
-            max={maxBounces}
-            style={rangeStyle}
-            value={props.numBounces}
-            onChange={event => props.setNumBounces(parseInt(event.target.value))}
-        />
+                <label htmlFor='numBounces'># of Ray Bounces</label>
+                <input type='range' id='numBounces'
+                    min={minBounces}
+                    max={maxBounces}
+                    style={rangeStyle}
+                    value={props.numBounces}
+                    onChange={event => props.setNumBounces(parseInt(event.target.value))}
+                />
+            </div>
 
-        <label>
-            <input type='radio'
-                id='flatShading'
-                value={FLAT_SHADING}
-                checked={props.shading === FLAT_SHADING}
-                onChange={event => props.setShading(parseInt(event.target.value))}
-            />
-            Flat Shading
-        </label>
+            <fieldset style={ {
+                margin: '5px 15px 15px 15px',
+                borderStyle: 'none none none solid',
+            } }>
+                <legend>Shading</legend>
 
-        <label>
-            <input type='radio'
-                id='gouraudShading'
-                value={GOURAUD_SHADING}
-                checked={props.shading === GOURAUD_SHADING}
-                onChange={event => props.setShading(parseInt(event.target.value))}
-            />
-            Gouraud Shading
-        </label>
+                <div style={ {
+                    display: 'flex',
+                    flexDirection: 'column',
+                } }>
+                    <label>
+                        <input type='radio'
+                            value={FLAT_SHADING}
+                            checked={props.shading === FLAT_SHADING}
+                            onChange={event => props.setShading(parseInt(event.target.value))}
+                        />
+                        Flat
+                    </label>
 
+                    <label>
+                        <input type='radio'
+                            value={GOURAUD_SHADING}
+                            checked={props.shading === GOURAUD_SHADING}
+                            onChange={event => props.setShading(parseInt(event.target.value))}
+                        />
+                        Gouraud
+                    </label>
+                </div>
+            </fieldset>
+        </div>
     </fieldset>
 }
-
 
 function mapStateToProps(state) {
     return {

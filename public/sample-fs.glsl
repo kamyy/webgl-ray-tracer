@@ -181,10 +181,11 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     nearest.t = MAX_FLT;
     while (top > -1) {
         id = stack[top--]; // Pop BVH id from top of stack
-        if (rayIntersectBV( r,
-                            texelFetch(u_bvh_sampler, ivec2(0, id), 0).xyz,// min bounds
-                            texelFetch(u_bvh_sampler, ivec2(1, id), 0).xyz // max bounds
-                            )) {
+        if (rayIntersectBV(
+            r,
+            texelFetch(u_bvh_sampler, ivec2(0, id), 0).xyz,// min bounds
+            texelFetch(u_bvh_sampler, ivec2(1, id), 0).xyz // max bounds
+        )) {
             texel = texelFetch(u_bvh_sampler, ivec2(2, id), 0);
             lt = int(texel.r);
             rt = int(texel.g);
