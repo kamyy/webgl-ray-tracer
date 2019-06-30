@@ -46,6 +46,7 @@ export default class SampleShader extends Shader {
         const {
             numBounces,
             cameraFov,
+            shading,
         } = reduxStore.getState();
 
         const origin = new Vector1x4(0.0, 0.0, 0.0); // in view space
@@ -59,6 +60,7 @@ export default class SampleShader extends Shader {
         GL.uniform1f(GL.getUniformLocation(this.program, 'u_half_ht'), this.ht * 0.5);
         GL.uniform1i(GL.getUniformLocation(this.program, 'u_render_pass'), renderPass);
         GL.uniform1i(GL.getUniformLocation(this.program, 'u_num_bounces'), numBounces);
+        GL.uniform1i(GL.getUniformLocation(this.program, 'u_shading'), shading);
         GL.uniform1f(GL.getUniformLocation(this.program, 'u_eye_to_image'), (this.ht * 0.5) / (Math.tan(cameraFov * 0.5 * (Math.PI / 180.0))));
         GL.uniform3f(GL.getUniformLocation(this.program, 'u_eye_position'), eyePos.x, eyePos.y, eyePos.z);
         GL.uniformMatrix4fv(GL.getUniformLocation(this.program, 'u_eye_to_world'), false, invViewMatrix.toFloat32Array());

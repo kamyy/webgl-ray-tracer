@@ -192,6 +192,7 @@ function mapStateToProps(state) {
         numSamples: state.numSamples,
         numBounces: state.numBounces,
         cameraFov:  state.cameraFov,
+        shading:    state.shading,
     };
 }
 

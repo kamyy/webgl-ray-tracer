@@ -41,6 +41,8 @@ struct Mat {
 const float MAX_FLT = intBitsToFloat(2139095039);
 const float EPSILON = 0.001;
 
+const int FLAT_SHADING = 0;
+
 const int METALLIC_MATERIAL   = 0;
 const int LAMBERTIAN_MATERIAL = 1;
 const int DIELECTRIC_MATERIAL = 2;
@@ -69,8 +71,9 @@ uniform highp sampler2D  u_mat_sampler; // texture unit 5
 
 uniform int u_render_pass; // current render pass number
 uniform int u_num_bounces; // max number of ray bounces
+uniform int u_shading; // flat or Gouraud shading
 
-uniform float u_eye_to_image; // y axis distance to image plane from eye
+uniform float u_eye_to_image; // y axis distance to image plane from eye in view space
 uniform vec3  u_eye_position; // eye position in world space
 uniform mat4  u_eye_to_world; // eye to world space matrix (BVH, rays and triangles are all stored in world space)
 
@@ -201,11 +204,14 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     }
 
     if (nearest.t != MAX_FLT) {
-        // interpolate using barycentric coordinates
-        nearest.n  = normalize( (texelFetch(u_face_sampler, ivec2(4, nearest.id), 0).xyz * nearest.u) +
-                                (texelFetch(u_face_sampler, ivec2(5, nearest.id), 0).xyz * nearest.v) +
-                                (texelFetch(u_face_sampler, ivec2(6, nearest.id), 0).xyz * (1.0 - nearest.u - nearest.v))
-                                );
+        if (u_shading == FLAT_SHADING) { // use the face normal for flat shading
+            nearest.n = nearest.fn;
+        } else { // interpolate using barycentric coordinates to implement Gouraud shading
+            nearest.n  = normalize( (texelFetch(u_face_sampler, ivec2(4, nearest.id), 0).xyz * nearest.u) +
+                                    (texelFetch(u_face_sampler, ivec2(5, nearest.id), 0).xyz * nearest.v) +
+                                    (texelFetch(u_face_sampler, ivec2(6, nearest.id), 0).xyz * (1.0 - nearest.u - nearest.v))
+                                    );
+        }
         nearest.mi = int(texelFetch(u_face_sampler, ivec2(7, nearest.id), 0).x); // material index
         return true;
     }

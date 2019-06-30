@@ -236,7 +236,7 @@ export default class SceneTexture {
         GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
         GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGB32F, 8, this.faceArray.length, 0, GL.RGB, GL.FLOAT, data);
 
-        console.log(`# of tri ${this.faceArray.length}`);
+        console.log(`# faces ${this.faceArray.length}`);
     }
 
     initBVH() {
@@ -289,7 +289,7 @@ export default class SceneTexture {
         GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
         GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32F, 3, bvhArray.length, 0, GL.RGBA, GL.FLOAT, data);
 
-        console.log(`# of BV ${bvhArray.length}`);
+        console.log(`# AABBs ${bvhArray.length}`);
     }
 
     initMat() {
@@ -345,7 +345,7 @@ export default class SceneTexture {
         GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
         GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGB32F, 2, matArray.length, 0, GL.RGB, GL.FLOAT, data);
 
-        console.log(`# of mat ${matArray.length}`);
+        console.log(`# materials ${matArray.length}`);
     }
 
     bindToSampleShader(program: WebGLProgram) {

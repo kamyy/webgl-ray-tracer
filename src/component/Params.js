@@ -1,87 +1,106 @@
 import React from 'react';
 
-import { 
-    bindActionCreators 
+import {
+    bindActionCreators
 }   from 'redux';
 
-import { 
-    connect 
+import {
+    connect
 }   from 'react-redux';
 
 import {
     setNumSamples,
     setNumBounces,
     setCameraFov,
+    setShading,
+
+    FLAT_SHADING,
+    GOURAUD_SHADING,
 }   from '../redux/actions.js';
 
 const minSamples = 1;
 const maxSamples = 1000;
 const minBounces = 1;
-const maxBounces = 32;
+const maxBounces = 16;
 const minCameraFov = 5;
 const maxCameraFov = 90;
 
 function Params(props) {
-    const { 
-        numSamples,
-        numBounces,
-        cameraFov,
-        setNumSamples,
-        setNumBounces,
-        setCameraFov,
-    } = props;
+    const rangeStyle = {
+        width: "400px"
+    };
 
-    return <fieldset><legend>Parameters</legend>
-        <span># of Rays Per Pixel</span>
-        <span>
-            <input
-                type='number' 
-                min={minSamples} 
-                max={maxSamples} 
-                value={numSamples}
-                onChange={event => setNumSamples(event.target.value)}
-            />
-        </span>
-        <span># of Ray Bounces</span>
-        <span>
-            <input
-                type='number'
-                min={minBounces}
-                max={maxBounces}
-                value={numBounces}
-                onChange={event => setNumBounces(event.target.value)}
-            />
-        </span>
-        <span>Camera Field of View</span>
-        <span>
-            <input
-                type='number'
-                min={minCameraFov}
-                max={maxCameraFov}
-                value={cameraFov}
-                onChange={event => setCameraFov(event.target.value)}
-            />
-        </span>
+    return <fieldset><legend>Rendering Controls</legend>
 
-        {/*
-        <span id='Clear' onClick={event => onChangeMaterialFilter(curSceneId, '')}>&times;</span>
-        */}
+        <label htmlFor='cameraFov'>Camera Field of View</label>
+        <input type='range'
+            id='cameraFov'
+            min={minCameraFov}
+            max={maxCameraFov}
+            style={rangeStyle}
+            value={props.cameraFov}
+            onChange={event => props.setCameraFov(parseInt(event.target.value))}
+        />
+
+        <label htmlFor='numSamples'>Samples Per Pixel</label>
+        <input type='range'
+            id='numSamples'
+            min={minSamples}
+            max={maxSamples}
+            style={rangeStyle}
+            value={props.numSamples}
+            onChange={event => props.setNumSamples(parseInt(event.target.value))}
+        />
+
+        <label htmlFor='numBounces'>Ray Bounces</label>
+        <input type='range'
+            id='numBounces'
+            min={minBounces}
+            max={maxBounces}
+            style={rangeStyle}
+            value={props.numBounces}
+            onChange={event => props.setNumBounces(parseInt(event.target.value))}
+        />
+
+        <label>
+            <input type='radio'
+                id='flatShading'
+                value={FLAT_SHADING}
+                checked={props.shading === FLAT_SHADING}
+                onChange={event => props.setShading(parseInt(event.target.value))}
+            />
+            Flat Shading
+        </label>
+
+        <label>
+            <input type='radio'
+                id='gouraudShading'
+                value={GOURAUD_SHADING}
+                checked={props.shading === GOURAUD_SHADING}
+                onChange={event => props.setShading(parseInt(event.target.value))}
+            />
+            Gouraud Shading
+        </label>
+
     </fieldset>
 }
+
 
 function mapStateToProps(state) {
     return {
         numSamples: state.numSamples,
         numBounces: state.numBounces,
         cameraFov:  state.cameraFov,
+        shading:    state.shading,
     };
 }
 
 function mapDispatchToProps(dispatch) {
-    return bindActionCreators({ 
+    return bindActionCreators({
         setNumSamples,
         setNumBounces,
         setCameraFov,
+        setShading,
     }, dispatch);
 }
 
