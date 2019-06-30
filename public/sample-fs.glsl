@@ -71,7 +71,7 @@ uniform highp sampler2D  u_mat_sampler; // texture unit 5
 
 uniform int u_render_pass; // current render pass number
 uniform int u_num_bounces; // max number of ray bounces
-uniform int u_shading; // flat or Gouraud shading
+uniform int u_shading; // flat or Phong shading
 
 uniform float u_eye_to_image; // y axis distance to image plane from eye in view space
 uniform vec3  u_eye_position; // eye position in world space
@@ -207,7 +207,7 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     if (nearest.t != MAX_FLT) {
         if (u_shading == FLAT_SHADING) { // use the face normal for flat shading
             nearest.n = nearest.fn;
-        } else { // interpolate using barycentric coordinates to implement Gouraud shading
+        } else { // interpolate using barycentric coordinates to implement Phong shading
             nearest.n  = normalize( (texelFetch(u_face_sampler, ivec2(4, nearest.id), 0).xyz * nearest.u) +
                                     (texelFetch(u_face_sampler, ivec2(5, nearest.id), 0).xyz * nearest.v) +
                                     (texelFetch(u_face_sampler, ivec2(6, nearest.id), 0).xyz * (1.0 - nearest.u - nearest.v))

@@ -15,7 +15,7 @@ import {
     setShading,
 
     FLAT_SHADING,
-    GOURAUD_SHADING,
+    PHONG_SHADING,
 }   from '../redux/actions.js';
 
 const minSamples = 1;
@@ -37,6 +37,7 @@ function Params(props) {
         <div style={ {
             display: 'flex',
             flexDirection: 'row',
+            alignItems: 'flex-start'
         } }>
             <div style={ {
                 margin: '5px 15px 5px 15px',
@@ -76,7 +77,7 @@ function Params(props) {
                 margin: '5px 15px 15px 15px',
                 borderStyle: 'none none none solid',
             } }>
-                <legend>Shading</legend>
+                <legend>Shading Type</legend>
 
                 <div style={ {
                     display: 'flex',
@@ -93,11 +94,11 @@ function Params(props) {
 
                     <label>
                         <input type='radio'
-                            value={GOURAUD_SHADING}
-                            checked={props.shading === GOURAUD_SHADING}
+                            value={PHONG_SHADING}
+                            checked={props.shading === PHONG_SHADING}
                             onChange={event => props.setShading(parseInt(event.target.value))}
                         />
-                        Gouraud
+                        Phong
                     </label>
                 </div>
             </fieldset>
