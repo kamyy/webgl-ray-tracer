@@ -4,12 +4,13 @@
   "private": true,
   "dependencies": {
     "emotion": "^10.0.14",
+    "mtl-file-parser": "^0.3.0",
+    "obj-file-parser": "^0.5.0",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
     "react-redux": "^7.0.3",
     "react-scripts": "2.1.8",
-    "redux": "^4.0.1",
-    "wavefront-obj-parser": "^2.0.1"
+    "redux": "^4.0.1"
   },
   "scripts": {
     "start": "react-scripts start",
