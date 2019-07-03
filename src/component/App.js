@@ -23,7 +23,6 @@ export default function App(props) {
 
     return <div style={appStyle}>
         <Canvas/>
-        <hr/>
         <Params/>
         <p style={projectInfoStyle}>MIT License</p>
         <p style={projectInfoStyle}><a href='https://github.com/kamyy/webgl-ray-tracer'>Project @ GitHub</a></p>

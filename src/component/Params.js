@@ -30,95 +30,101 @@ const minCameraFov = 10;
 const maxCameraFov = 120;
 
 function Params(props) {
-    const renderingControlsClass = css`
+    const cssRenderingFieldset = css`
+        margin: 12px 4px;
+        border-style: ridge none ridge none;
+        border-width: medium;
+    `
+    const cssRenderingGroupDiv = css`
         display: flex;
         flex-direction: row;
         align-items: flex-start;
     `
-    const rangeControlsClass  = css`
+    const cssSliderGroupsDiv = css`
         display: flex;
         flex-direction: column;
         flex-grow: 2;
-        margin: 5px 10px;
+        margin: 5px 0px;
     `
-    const rangeControlClass  = css`
+    const cssSliderGroupDiv = css`
         display: flex;
         flex-direction: row;
+        padding-top: 5px;
         padding-bottom: 10px;
     `
-    const rangeInputMinLabelClass = css`
+    const cssMinLabel = css`
         flex-basis: 5%;
         text-align: right;
-        padding-right: 10px;
+        margin-right: 10px;
     `
-    const rangeInputMaxLabelClass = css`
-        flex-basis: 10%;
-        text-align: left;
-        padding-left: 10px;
-    `
-    const rangeInputClass = css`
+    const cssRangeInput = css`
         flex-basis: 85%;
     `
-    const shadingTechniquesClass = css`
-        margin: 5px 0px;
-        border-style: none none none solid;
+    const cssMaxLabel = css`
+        flex-basis: 10%;
+        text-align: left;
+        margin-left: 10px;
     `
-    const shadingRadioButtonsClass = css`
+    const shadingTechniquesGroup = css`
+        margin: 5px 0px;
+        border-style: none none none ridge;
+    `
+    const shadingRadioButtonsGroup = css`
         display: flex;
         flex-direction: row;
         justify-content: space-evenly;
     `
 
-    return <fieldset>
+    return <fieldset className={cx(cssRenderingFieldset)}>
         <legend>Rendering Controls</legend>
 
-        <div className={cx(renderingControlsClass)}>
-            <div className={cx(rangeControlsClass)}>
+        <div className={cx(cssRenderingGroupDiv)}>
+            <div className={cx(cssSliderGroupsDiv)}>
 
                 <label htmlFor='cameraFov'>Camera Field of View</label>
 
-                <div className={cx(rangeControlClass)}>
-                    <label className={cx(rangeInputMinLabelClass)}>{minCameraFov}</label>
-                    <input type='range' className={cx(rangeInputClass)}
+                <div className={cx(cssSliderGroupDiv)}>
+                    <label className={cx(cssMinLabel)}>{minCameraFov}</label>
+                    <input type='range' className={cx(cssRangeInput)}
                         min={minCameraFov}
                         max={maxCameraFov}
                         value={props.cameraFov}
                         onChange={event => props.setCameraFov(parseInt(event.target.value))}
                     />
-                    <label className={cx(rangeInputMaxLabelClass)}>{maxCameraFov}</label>
+                    <label className={cx(cssMaxLabel)}>{maxCameraFov}</label>
                 </div>
 
                 <label htmlFor='numSamples'># of Samples Per Pixel</label>
 
-                <div className={cx(rangeControlClass)}>
-                    <label className={cx(rangeInputMinLabelClass)}>{minSamples}</label>
-                    <input type='range' className={cx(rangeInputClass)}
+                <div className={cx(cssSliderGroupDiv)}>
+                    <label className={cx(cssMinLabel)}>{minSamples}</label>
+                    <input type='range' className={cx(cssRangeInput)}
                         min={minSamples}
                         max={maxSamples}
                         value={props.numSamples}
                         onChange={event => props.setNumSamples(parseInt(event.target.value))}
                     />
-                    <label className={cx(rangeInputMaxLabelClass)}>{maxSamples}</label>
+                    <label className={cx(cssMaxLabel)}>{maxSamples}</label>
                 </div>
 
                 <label htmlFor='numBounces'># of Ray Bounces</label>
 
-                <div className={cx(rangeControlClass)}>
-                    <label className={cx(rangeInputMinLabelClass)}>{minBounces}</label>
-                    <input type='range' className={cx(rangeInputClass)}
+                <div className={cx(cssSliderGroupDiv)}>
+                    <label className={cx(cssMinLabel)}>{minBounces}</label>
+                    <input type='range' className={cx(cssRangeInput)}
                         min={minBounces}
                         max={maxBounces}
                         value={props.numBounces}
                         onChange={event => props.setNumBounces(parseInt(event.target.value))}
                     />
-                    <label className={cx(rangeInputMaxLabelClass)}>{maxBounces}</label>
+                    <label className={cx(cssMaxLabel)}>{maxBounces}</label>
                 </div>
             </div>
 
-            <fieldset className={cx(shadingTechniquesClass)}>
+            <fieldset className={cx(shadingTechniquesGroup)}>
                 <legend>Shading Technique</legend>
 
-                <div className={cx(shadingRadioButtonsClass)}>
+                <div className={cx(shadingRadioButtonsGroup)}>
                     <label>
                         <input type='radio'
                             value={FLAT_SHADING}

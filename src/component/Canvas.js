@@ -54,7 +54,7 @@ class Canvas extends React.Component {
     }
 
     render() {
-        return <canvas id='Canvas' width={canvasWd} height={canvasHt}>
+        return <canvas id='Canvas' width={canvasWd} height={canvasHt} style={{ borderStyle: 'ridge', borderWidth: 'medium'}}>
             Please use a browser that supports WebGL 2
         </canvas>
     }
