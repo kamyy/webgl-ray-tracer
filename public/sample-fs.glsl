@@ -163,8 +163,7 @@ bool rayIntersectBV(Ray r, vec3 bvMin, vec3 bvMax) { // ray intersect AABB slabs
     float max_tmin = max(tmin.x, max(tmin.y, tmin.z));
     float min_tmax = min(tmax.x, min(tmax.y, tmax.z));
 
-    return max_tmin < min_tmax
-        && max_tmin > 0.0; // no intersection if behind ray origin
+    return max_tmin < min_tmax;
 }
 
 bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
