@@ -9,9 +9,9 @@ import {
 import Vector1x4 from '../math/Vector1x4.js';
 import RefFrame from '../math/RefFrame.js';
 
+import SceneTextures from '../texture/SceneTextures.js';
 import ColorTexture from '../texture/ColorTexture.js';
 import NoiseTexture from '../texture/NoiseTexture.js';
-import SceneTexture from '../texture/SceneTexture.js';
 import SampleShader from '../shader/SampleShader.js';
 import CanvasShader from '../shader/CanvasShader.js';
 
@@ -29,9 +29,9 @@ export const cameraNode = new RefFrame(parentNode);
 cameraNode.translate(new Vector1x4(0.0, -5.0, 0.0));
 
 class Canvas extends React.Component {
+    sceneTextures: SceneTextures;
     colorTexture: ColorTexture;
     noiseTexture: NoiseTexture;
-    sceneTexture: SceneTexture;
     sampleShader: SampleShader;
     canvasShader: CanvasShader;
 
@@ -94,7 +94,7 @@ class Canvas extends React.Component {
 
         if (GL) {
             if (!GL.getExtension('EXT_color_buffer_float')) {
-                throw new Error('EXT_color_buffer_float not available on GPU!');
+                throw new Error('EXT_color_buffer_float support not available on GPU!');
             }
             this.log_GPU_Caps();
 
@@ -103,14 +103,13 @@ class Canvas extends React.Component {
             window.onmousemove = this.onMouseMove;
             window.onmouseup = this.onMouseUp;
 
+            this.sceneTextures = new SceneTextures('/suzanne.obj', '/suzanne.mtl');
             this.colorTexture = new ColorTexture(canvasWd, canvasHt);
             this.noiseTexture = new NoiseTexture(canvasWd, canvasHt);
-            this.sceneTexture = new SceneTexture('/suzanne.obj');
-
-            this.sampleShader = new SampleShader(this.colorTexture, this.noiseTexture, this.sceneTexture, canvasWd, canvasHt);
+            this.sampleShader = new SampleShader(this.sceneTextures, this.colorTexture, this.noiseTexture, canvasWd, canvasHt);
             this.canvasShader = new CanvasShader(this.colorTexture);
 
-            this.sceneTexture.init()
+            this.sceneTextures.init()
                 .then(() => this.sampleShader.init('/sample-vs.glsl', '/sample-fs.glsl'))
                 .then(() => this.canvasShader.init('/canvas-vs.glsl', '/canvas-fs.glsl'))
                 .then(() => this.restartRender());

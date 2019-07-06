@@ -17,22 +17,25 @@ struct RayHitResult {
     float u; // barycentric coordinate for vertex 0
     float v; // barycentric coordinate for vertex 1
     float w; // barycentric coordinate for vertex 2
-    int mi; // material id
-    int id; // face id
+    int mi; // material index
+    int fi; // face index
+    int oi; // obj index
 };
 
+/*
 struct Sphere {
     vec3  center;
     float radius;
     float radiusSquared;
     int   materialIndex;
 };
+*/
 
-struct Mat {
+struct Mtl {
     vec3  albedo;
-    float shininess;
+    int   mtlCls;
+    float reflectionGloss;
     float refractionIndex;
-    int   materialClass;
 };
 
 // ----------------------------------------------------------------------------
@@ -47,7 +50,22 @@ const int METALLIC_MATERIAL   = 0;
 const int LAMBERTIAN_MATERIAL = 1;
 const int DIELECTRIC_MATERIAL = 2;
 
-const int MAX_BV_STACK_SIZE = 16;
+const int BV_MAX_STACK_SIZE = 16;
+const int BV_MIN_BOUNDS_INDEX = 0;
+const int BV_MAX_BOUNDS_INDEX = 1;
+const int BV_PAYLOAD_INDEX = 2;
+
+const int FACE_NRM_INDEX = 0;
+const int VERTEX_0_POS_INDEX = 1;
+const int VERTEX_1_POS_INDEX = 2;
+const int VERTEX_2_POS_INDEX = 3;
+const int VERTEX_0_NRM_INDEX = 4;
+const int VERTEX_1_NRM_INDEX = 5;
+const int VERTEX_2_NRM_INDEX = 6;
+const int FACE_MTL_INDEX = 7;
+
+const int MTL_ALBEDO_INDEX = 0;
+const int MTL_ATTRIB_INDEX = 1;
 
 // ----------------------------------------------------------------------------
 // varyings
@@ -65,10 +83,11 @@ layout (location = 0) out vec4 o_color; // texture unit 0, COLOR_ATTACHMENT0
 //
 uniform highp sampler2D  u_color_sampler; // texture unit 1
 uniform highp usampler2D u_noise_sampler; // texture unit 2
-uniform highp sampler2D  u_face_sampler; // texture unit 3
-uniform highp sampler2D  u_bvh_sampler; // texture unit 4
-uniform highp sampler2D  u_mat_sampler; // texture unit 5
+uniform highp sampler2DArray u_face_sampler; // texture unit 3
+uniform highp sampler2DArray u_aabb_sampler; // texture unit 4
+uniform highp sampler2D u_mtl_sampler; // texture unit 5
 
+uniform int u_num_objects; // number of models/objects to render
 uniform int u_render_pass; // current render pass number
 uniform int u_num_bounces; // max number of ray bounces
 uniform int u_shading; // flat or Phong shading
@@ -115,25 +134,25 @@ vec3 randPosInUnitSphere() {
 // ----------------------------------------------------------------------------
 // ray intersect objects
 //
-bool rayIntersectFace(Ray r, int id, out RayHitResult res) {
-    res.fn = texelFetch(u_face_sampler, ivec2(0, id), 0).xyz; // face normal
+bool rayIntersectFace(Ray r, int face_index, int obj_index, out RayHitResult res) {
+    res.fn = texelFetch(u_face_sampler, ivec3(FACE_NRM_INDEX, face_index, obj_index), 0).xyz; // face normal
 
     float fn_dot_ray_dir = dot(res.fn, r.dir);
     if (fn_dot_ray_dir > 0.0 || abs(fn_dot_ray_dir) < EPSILON) {
         return false; // back facing or face and ray direction almost parallel
     }
 
-    vec3 p0 = texelFetch(u_face_sampler, ivec2(1, id), 0).xyz; // vertex 0 position
+    vec3 p0 = texelFetch(u_face_sampler, ivec3(VERTEX_0_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 0 position
 
     // A(origin.x + t*dir.x) + B(origin.y + t*dir.y) + C(origin.z + t*dir.z) - D = 0 (solve for t)
     res.t = (dot(res.fn, p0) - dot(res.fn, r.origin)) / fn_dot_ray_dir;
     if (res.t < EPSILON) return false; // contact point behind ray
 
     res.p = r.origin + res.t * r.dir; // contact point on plane
-    vec3 p1 = texelFetch(u_face_sampler, ivec2(2, id), 0).xyz; // vertex 1 position
-    vec3 p2 = texelFetch(u_face_sampler, ivec2(3, id), 0).xyz; // vertex 2 position
+    vec3 p1 = texelFetch(u_face_sampler, ivec3(VERTEX_1_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 1 position
+    vec3 p2 = texelFetch(u_face_sampler, ivec3(VERTEX_2_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 2 position
 
-    // from Real-Time Collision Detection by Christer Ericson
+    // from Real-Time Collision Detection (Morgan Kaufman) by Christer Ericson
     vec3 v0 = p1 - p0;
     vec3 v1 = p2 - p0;
     vec3 v2 = res.p - p0;
@@ -143,14 +162,18 @@ bool rayIntersectFace(Ray r, int id, out RayHitResult res) {
     float d20 = dot(v2, v0);
     float d21 = dot(v2, v1);
     float denominator = (d00 * d11) - (d01 * d01);
+
     res.v = (d11 * d20 - d01 * d21) / denominator;
     if (res.v < 0.0 || res.v > 1.0) return false;
+
     res.w = (d00 * d21 - d01 * d20) / denominator;
     if (res.w < 0.0 || res.w > 1.0) return false;
+
     res.u = 1.0 - res.v - res.w;
     if (res.u < 0.0 || res.u > 1.0) return false;
 
-    res.id = id; // face id
+    res.fi = face_index;
+    res.oi = obj_index;
     return true;
 }
 
@@ -167,52 +190,62 @@ bool rayIntersectBV(Ray r, vec3 bvMin, vec3 bvMax) { // ray intersect AABB slabs
 }
 
 bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
+    int stack[BV_MAX_STACK_SIZE];
     RayHitResult current;
     vec4 texel;
-    int lt, rt;
-    int f0, f1;
-    int id;
 
-    int stack[MAX_BV_STACK_SIZE];
-    stack[0] = 0; // root BV id is always 0
-    int top = 0;
+    int lt_idx, rt_idx;
+    int f0_idx, f1_idx;
+    int bv_idx;
+    int top;
 
     nearest.t = MAX_FLT;
-    while (top > -1) {
-        id = stack[top--]; // Pop BVH id from top of stack
-        if (rayIntersectBV(
-            r,
-            texelFetch(u_bvh_sampler, ivec2(0, id), 0).xyz,// min bounds
-            texelFetch(u_bvh_sampler, ivec2(1, id), 0).xyz // max bounds
-        )) {
-            texel = texelFetch(u_bvh_sampler, ivec2(2, id), 0);
-            lt = int(texel.r);
-            rt = int(texel.g);
-            f0 = int(texel.b);
-            f1 = int(texel.a);
 
-            if (lt != -1) { stack[++top] = lt; } // push lt BV id on to stack
-            if (rt != -1) { stack[++top] = rt; } // push rt BV id on to stack
+    for (int obj_idx = 0; obj_idx < u_num_objects; ++obj_idx) { // for each mesh object/BVH tree
+        stack[0] = 0; // push root BV index which is always 0 on to empty stack
+        top = 0;
 
-            if (f0 != -1 && rayIntersectFace(r, f0, current) && current.t < nearest.t) {
-                nearest = current;
-            }
-            if (f1 != -1 && rayIntersectFace(r, f1, current) && current.t < nearest.t) {
-                nearest = current;
+        while (top > -1) {
+            bv_idx = stack[top--]; // pop BV index from top of stack
+            if (rayIntersectBV(r,
+                texelFetch(u_aabb_sampler, ivec3(BV_MIN_BOUNDS_INDEX, bv_idx, obj_idx), 0).xyz,// BV AABB min bounds
+                texelFetch(u_aabb_sampler, ivec3(BV_MAX_BOUNDS_INDEX, bv_idx, obj_idx), 0).xyz // BV AABB max bounds
+            )) {
+                texel = texelFetch(u_aabb_sampler, ivec3(BV_PAYLOAD_INDEX, bv_idx, obj_idx), 0);
+                lt_idx = int(texel.r); // index of L child BV node
+                rt_idx = int(texel.g); // index of R child BV node
+                f0_idx = int(texel.b); // index of a face inside current BV bounds
+                f1_idx = int(texel.a); // index of a face inside current BV bounds
+
+                if (lt_idx != -1) { stack[++top] = lt_idx; } // push lt BV index on to stack
+                if (rt_idx != -1) { stack[++top] = rt_idx; } // push rt BV index on to stack
+
+                if (f0_idx != -1 && rayIntersectFace(r, f0_idx, obj_idx, current) && current.t < nearest.t) {
+                    nearest = current;
+                }
+                if (f1_idx != -1 && rayIntersectFace(r, f1_idx, obj_idx, current) && current.t < nearest.t) {
+                    nearest = current;
+                }
             }
         }
     }
 
-    if (nearest.t != MAX_FLT) {
+    if (nearest.t != MAX_FLT) { // ray has a nearest hit
         if (u_shading == FLAT_SHADING) { // use the face normal for flat shading
             nearest.n = nearest.fn;
-        } else { // interpolate using barycentric coordinates to implement Phong shading
-            nearest.n  = normalize( (texelFetch(u_face_sampler, ivec2(4, nearest.id), 0).xyz * nearest.u) +
-                                    (texelFetch(u_face_sampler, ivec2(5, nearest.id), 0).xyz * nearest.v) +
-                                    (texelFetch(u_face_sampler, ivec2(6, nearest.id), 0).xyz * (1.0 - nearest.u - nearest.v))
-                                    );
+        } else { // interpolate vertex normals using barycentric coordinates to implement Phong shading
+            float u = nearest.u;
+            float v = nearest.v;
+            float w = 1.0 - u - v;
+            int obj_index = nearest.oi;
+            int face_index = nearest.fi;
+            nearest.n = normalize(
+                (texelFetch(u_face_sampler, ivec3(VERTEX_0_NRM_INDEX, face_index, obj_index), 0).xyz * u) +
+                (texelFetch(u_face_sampler, ivec3(VERTEX_1_NRM_INDEX, face_index, obj_index), 0).xyz * v) +
+                (texelFetch(u_face_sampler, ivec3(VERTEX_2_NRM_INDEX, face_index, obj_index), 0).xyz * w)
+            );
         }
-        nearest.mi = int(texelFetch(u_face_sampler, ivec2(7, nearest.id), 0).x); // material index
+        nearest.mi = int(texelFetch(u_face_sampler, ivec3(FACE_MTL_INDEX, nearest.fi, nearest.oi), 0).x); // material index
         return true;
     }
     return false;
@@ -276,9 +309,9 @@ float schlick(float cosine, float rindex) {
     return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
 }
 
-void rayHitMetallicSurface(RayHitResult res, Mat metallic, inout Ray ray, inout vec3 color) {
+void rayHitMetallicSurface(RayHitResult res, Mtl metallic, inout Ray ray, inout vec3 color) {
     ray.origin = res.p + res.fn * EPSILON;
-    ray.dir    = normalize(reflect(ray.dir, res.n) + (1.0 - metallic.shininess) * randPosInUnitSphere());
+    ray.dir    = normalize(reflect(ray.dir, res.n) + (1.0 - metallic.reflectionGloss) * randPosInUnitSphere());
 
     if (dot(ray.dir, res.n) > 0.0) {
         color *= metallic.albedo.rgb;
@@ -287,13 +320,13 @@ void rayHitMetallicSurface(RayHitResult res, Mat metallic, inout Ray ray, inout 
     }
 }
 
-void rayHitLambertianSurface(RayHitResult res, Mat lambertian, inout Ray ray, inout vec3 color) {
+void rayHitLambertianSurface(RayHitResult res, Mtl lambertian, inout Ray ray, inout vec3 color) {
     ray.origin = res.p + res.fn * EPSILON;
     ray.dir = normalize(res.p + res.n + randPosInUnitSphere() - res.p);
     color *= lambertian.albedo.rgb;
 }
 
-void rayHitDielectricSurface(RayHitResult res, Mat dielectric, inout Ray ray, inout vec3 color) {
+void rayHitDielectricSurface(RayHitResult res, Mtl dielectric, inout Ray ray, inout vec3 color) {
     float refractiveRatio;
     vec3  refraction;
     vec3  normal;
@@ -322,29 +355,28 @@ void rayHitDielectricSurface(RayHitResult res, Mat dielectric, inout Ray ray, in
 }
 
 vec3 castPrimaryRay(Ray ray) {
+    RayHitResult res;
     vec3 color = vec3(1.0, 1.0, 1.0);
     vec3 texel;
-    Mat  mat;
-
-    RayHitResult res;
+    Mtl  mtl;
 
     for (int i = 0; i <= u_num_bounces; ++i) {
         if (rayIntersectBVH(ray, res)) {
-            mat.albedo = texelFetch(u_mat_sampler, ivec2(0, res.mi), 0).xyz;
-            texel      = texelFetch(u_mat_sampler, ivec2(1, res.mi), 0).xyz;
-            mat.shininess       = texel.x;
-            mat.refractionIndex = texel.y;
-            mat.materialClass   = int(texel.z);
+            mtl.albedo = texelFetch(u_mtl_sampler, ivec2(MTL_ALBEDO_INDEX, res.mi), 0).xyz;
+            texel      = texelFetch(u_mtl_sampler, ivec2(MTL_ATTRIB_INDEX, res.mi), 0).xyz;
+            mtl.mtlCls = int(texel.x);
+            mtl.reflectionGloss = texel.y;
+            mtl.refractionIndex = texel.z;
 
-            switch (mat.materialClass) {
+            switch (mtl.mtlCls) {
             case METALLIC_MATERIAL:
-                rayHitMetallicSurface(res, mat, ray, color);
+                rayHitMetallicSurface(res, mtl, ray, color);
                 break;
             case LAMBERTIAN_MATERIAL:
-                rayHitLambertianSurface(res, mat, ray, color);
+                rayHitLambertianSurface(res, mtl, ray, color);
                 break;
             case DIELECTRIC_MATERIAL:
-                rayHitDielectricSurface(res, mat, ray, color);
+                rayHitDielectricSurface(res, mtl, ray, color);
                 break;
             }
         } else {
@@ -367,7 +399,7 @@ void main() {
     g_randGeneratorState = texelFetch(u_noise_sampler, fragCoord, 0)
                             + uvec4(u_render_pass, u_render_pass, u_render_pass, u_render_pass);
 
-    vec4 rayTarget = u_eye_to_world * vec4( // transform pos on image plane from view space to world space
+    vec4 rayTarget = u_eye_to_world * vec4( // transform ray target pos on image plane from view space to world space
         v_eye_to_x + rand(),
         u_eye_to_image,
         v_eye_to_z + rand(),
@@ -375,9 +407,14 @@ void main() {
     );
 
     Ray ray = Ray(u_eye_position, normalize(rayTarget.xyz - u_eye_position));
-    if (u_render_pass > 1) {
+    if (u_render_pass == 1) { // o_color is a RGBAF32 texture render target
+        o_color = vec4(castPrimaryRay(ray), 1.0); // very 1st render pass (initialize RGBAF32 texture render target)
+    } else { // add sample color into RGBA32F texture render target
         o_color = vec4(castPrimaryRay(ray), 0.0) + texelFetch(u_color_sampler, fragCoord, 0);
-    } else {
-        o_color = vec4(castPrimaryRay(ray), 1.0);
     }
+
+    /*
+    vec3 texel = texelFetch(u_mtl_sampler, ivec2(MTL_ATTRIB_INDEX, 0), 0).xyz;
+    if (texel.z == 1.0) o_color = vec4(0.0, 1.0, 0.0, 1.0); else o_color = vec4(1.0, 0.0, 0.0, 1.0);
+    */
 }
