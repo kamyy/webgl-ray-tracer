@@ -21,36 +21,55 @@ import {
 
 export const canvasWd = 800;
 export const canvasHt = 600;
-export let GL = null;
+export let GL: WebGL2RenderingContext;
 
-export const rootNode = new RefFrame(null);
+export const rootNode = new RefFrame();
 export const parentNode = new RefFrame(rootNode);
 export const cameraNode = new RefFrame(parentNode);
 cameraNode.translate(new Vector1x4(0.0, -5.0, 0.0));
 
-class Canvas extends React.Component {
+type Props = {
+    numSamples: number,
+    numBounces: number,
+    cameraFov:  number,
+    shading:    number,
+};
+
+class Canvas extends React.Component<Props> {
+    lx: number;
+    ly: number;
+    TXYZ_SCALAR: number;
+    RXYZ_SCALAR: number;
+    lButtonDown: boolean;
+    rButtonDown: boolean;
+
+    bRendering: boolean;
+    renderPass: number;
+
     sceneTextures: SceneTextures;
     colorTexture: ColorTexture;
     noiseTexture: NoiseTexture;
     sampleShader: SampleShader;
     canvasShader: CanvasShader;
 
+    canvas: HTMLCanvasElement;
+
     constructor(props) {
         super(props);
 
+        this.lx = 0;
+        this.ly = 0;
         this.TXYZ_SCALAR = 0.01;
         this.RXYZ_SCALAR = 0.25;
         this.lButtonDown = false;
         this.rButtonDown = false;
-        this.lx = 0;
-        this.ly = 0;
+
+        this.bRendering = false;
+        this.renderPass = 0;
 
         this.onMouseUp = this.onMouseUp.bind(this);
         this.onMouseMove = this.onMouseMove.bind(this);
         this.onMouseDown = this.onMouseDown.bind(this);
-
-        this.bRendering = false;
-        this.renderPass = 0;
     }
 
     render() {
@@ -86,33 +105,35 @@ class Canvas extends React.Component {
     }
 
     componentDidMount() {
-        this.canvas = document.getElementById('Canvas');
-        GL = this.canvas.getContext('webgl2', {
-            depth: false,
-            alpha: false,
-        });
+        const canvas = document.getElementById('Canvas');
+        if (canvas instanceof HTMLCanvasElement) {
+            this.canvas = canvas;
 
-        if (GL) {
-            if (!GL.getExtension('EXT_color_buffer_float')) {
-                throw new Error('EXT_color_buffer_float support not available on GPU!');
+            const gl = this.canvas.getContext('webgl2', { depth: false, alpha: false, });
+            if (gl instanceof WebGL2RenderingContext) {
+                GL = gl;
+
+                if (!GL.getExtension('EXT_color_buffer_float')) {
+                    throw new Error('EXT_color_buffer_float support not available on GPU!');
+                }
+                this.log_GPU_Caps();
+
+                this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
+                this.canvas.onmousedown = this.onMouseDown;
+                window.onmousemove = this.onMouseMove;
+                window.onmouseup = this.onMouseUp;
+
+                this.sceneTextures = new SceneTextures('/suzanne.obj', '/suzanne.mtl');
+                this.colorTexture = new ColorTexture(canvasWd, canvasHt);
+                this.noiseTexture = new NoiseTexture(canvasWd, canvasHt);
+                this.sampleShader = new SampleShader(this.sceneTextures, this.colorTexture, this.noiseTexture, canvasWd, canvasHt);
+                this.canvasShader = new CanvasShader(this.colorTexture);
+
+                this.sceneTextures.init()
+                    .then(() => this.sampleShader.init('/sample-vs.glsl', '/sample-fs.glsl'))
+                    .then(() => this.canvasShader.init('/canvas-vs.glsl', '/canvas-fs.glsl'))
+                    .then(() => this.restartRender());
             }
-            this.log_GPU_Caps();
-
-            this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
-            this.canvas.onmousedown = this.onMouseDown;
-            window.onmousemove = this.onMouseMove;
-            window.onmouseup = this.onMouseUp;
-
-            this.sceneTextures = new SceneTextures('/suzanne.obj', '/suzanne.mtl');
-            this.colorTexture = new ColorTexture(canvasWd, canvasHt);
-            this.noiseTexture = new NoiseTexture(canvasWd, canvasHt);
-            this.sampleShader = new SampleShader(this.sceneTextures, this.colorTexture, this.noiseTexture, canvasWd, canvasHt);
-            this.canvasShader = new CanvasShader(this.colorTexture);
-
-            this.sceneTextures.init()
-                .then(() => this.sampleShader.init('/sample-vs.glsl', '/sample-fs.glsl'))
-                .then(() => this.canvasShader.init('/canvas-vs.glsl', '/canvas-fs.glsl'))
-                .then(() => this.restartRender());
         }
     }
 
@@ -187,12 +208,13 @@ class Canvas extends React.Component {
 }
 
 function mapStateToProps(state) {
-    return {
+    const props: Props = {
         numSamples: state.numSamples,
         numBounces: state.numBounces,
         cameraFov:  state.cameraFov,
         shading:    state.shading,
     };
+    return props;
 }
 
 // triggers Canvas.shouldComponentUpdate() when redux state changes

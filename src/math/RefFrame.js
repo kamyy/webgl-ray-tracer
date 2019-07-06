@@ -11,7 +11,7 @@ export default class RefFrame {
     localM: Matrix4x4;
     modelM: Matrix4x4;
 
-    constructor(parent: RefFrame | null = null, node: RefFrame | null = null) {
+    constructor(parent?: RefFrame, node?: RefFrame) {
         this.validSubtree = true;
         this.parent       = null;
         this.child        = null;
@@ -26,8 +26,8 @@ export default class RefFrame {
             this.parent.child  = this;
         }
 
-        if (node) {
-           this.modelMatrix = new Matrix4x4(node.modelMatrix); 
+        if (node instanceof RefFrame) {
+           this.modelMatrix = new Matrix4x4(node.modelMatrix);
         }
     }
 
@@ -77,8 +77,8 @@ export default class RefFrame {
         }
     }
 
-    translate(v: Vector1x4, relative2: RefFrame | null) {
-        if (relative2 === this || !relative2) { // relative to own axes
+    translate(v: Vector1x4, relative2?: RefFrame) {
+        if (!(relative2 instanceof RefFrame) || relative2 === this) { // relative to own axes
             const x = this.localM._m[_30];
             const y = this.localM._m[_31];
             const z = this.localM._m[_32];
@@ -106,8 +106,8 @@ export default class RefFrame {
         this.invalidateSubtree();
     }
 
-    rotateX(theta: number, relative2: RefFrame | null) {
-        if (relative2 === this || !relative2) { // relative to own axes
+    rotateX(theta: number, relative2?: RefFrame) {
+        if (!(relative2 instanceof RefFrame) || relative2 === this) { // relative to own axes
             const rotx = Matrix4x4.createRx(theta);
             this.localMatrix = rotx.mul(this.localMatrix);
         } else if (relative2 === this.parent) { // relative to parent
@@ -119,8 +119,8 @@ export default class RefFrame {
         this.invalidateSubtree();
     }
 
-    rotateY(theta: number, relative2: RefFrame | null) {
-        if (relative2 === this || !relative2) { // relative to own axes
+    rotateY(theta: number, relative2?: RefFrame) {
+        if (!(relative2 instanceof RefFrame) || relative2 === this) { // relative to own axes
             const roty = Matrix4x4.createRy(theta);
             this.localMatrix = roty.mul(this.localMatrix);
         } else if (relative2 === this.parent) { // relative to parent
@@ -132,8 +132,8 @@ export default class RefFrame {
         this.invalidateSubtree();
     }
 
-    rotateZ(theta: number, relative2: RefFrame | null) {
-        if (relative2 === this || !relative2) { // relative to own axes
+    rotateZ(theta: number, relative2?: RefFrame) {
+        if (!(relative2 instanceof RefFrame) || relative2 === this) { // relative to own axes
             const rotz = Matrix4x4.createRz(theta);
             this.localMatrix = rotz.mul(this.localMatrix);
         } else if (relative2 === this.parent) { // relative to parent
@@ -155,4 +155,3 @@ export default class RefFrame {
         }
     }
 }
-
