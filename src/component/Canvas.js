@@ -102,6 +102,10 @@ class Canvas extends React.Component<Props> {
     }
 
     log_GPU_Caps() {
+        console.log(`MAX_ARRAY_TEXTURE_LAYERS = ${GL.getParameter(GL.MAX_ARRAY_TEXTURE_LAYERS)}`);
+        console.log(`MAX_TEXTURE_IMAGE_UNITS = ${GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS)}`);
+        console.log(`MAX_RENDERBUFFER_SIZE = ${GL.getParameter(GL.MAX_RENDERBUFFER_SIZE)}`);
+        console.log(`MAX_TEXTURE_SIZE = ${GL.getParameter(GL.MAX_TEXTURE_SIZE)}`);
     }
 
     componentDidMount() {
