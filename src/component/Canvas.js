@@ -31,7 +31,7 @@ type Props = {
     numSamples: number,
     numBounces: number,
     cameraFov:  number,
-    shading:    number,
+    shadingMethod: number,
 };
 
 class Canvas extends React.Component<Props> {
@@ -218,7 +218,7 @@ function mapStateToProps(state) {
         numSamples: state.numSamples,
         numBounces: state.numBounces,
         cameraFov:  state.cameraFov,
-        shading:    state.shading,
+        shadingMethod: state.shadingMethod,
     };
     return props;
 }

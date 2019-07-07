@@ -90,7 +90,7 @@ uniform highp sampler2D u_mtl_sampler; // texture unit 5
 uniform int u_num_objects; // number of models/objects to render
 uniform int u_render_pass; // current render pass number
 uniform int u_num_bounces; // max number of ray bounces
-uniform int u_shading; // flat or Phong shading
+uniform int u_shadingMethod; // flat or Phong shading
 
 uniform float u_eye_to_image; // y axis distance to image plane from eye in view space
 uniform vec3  u_eye_position; // eye position in world space
@@ -231,7 +231,7 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     }
 
     if (nearest.t != MAX_FLT) { // ray has a nearest hit
-        if (u_shading == FLAT_SHADING) { // use the face normal for flat shading
+        if (u_shadingMethod == FLAT_SHADING) { // use the face normal for flat shading
             nearest.n = nearest.fn;
         } else { // interpolate vertex normals using barycentric coordinates to implement Phong shading
             float u = nearest.u;

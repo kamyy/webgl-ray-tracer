@@ -16,16 +16,16 @@ import {
     setNumSamples,
     setNumBounces,
     setCameraFov,
-    setShading,
+    setShadingMethod,
 
     FLAT_SHADING,
     PHONG_SHADING,
 }   from '../redux/actions.js';
 
 const minSamples = 1;
-const maxSamples = 500;
+const maxSamples = 3000;
 const minBounces = 1;
-const maxBounces = 8;
+const maxBounces = 12;
 const minCameraFov = 10;
 const maxCameraFov = 120;
 
@@ -65,7 +65,7 @@ function Params(props) {
         text-align: left;
         margin-left: 10px;
     `
-    const shadingTechniquesGroup = css`
+    const shadingMethodGroup = css`
         margin: 5px 0px;
         border-style: none none none ridge;
     `
@@ -121,15 +121,15 @@ function Params(props) {
                 </div>
             </div>
 
-            <fieldset className={cx(shadingTechniquesGroup)}>
-                <legend>Shading Technique</legend>
+            <fieldset className={cx(shadingMethodGroup)}>
+                <legend>Shading Method</legend>
 
                 <div className={cx(shadingRadioButtonsGroup)}>
                     <label>
                         <input type='radio'
                             value={FLAT_SHADING}
-                            checked={props.shading === FLAT_SHADING}
-                            onChange={event => props.setShading(parseInt(event.target.value))}
+                            checked={props.shadingMethod === FLAT_SHADING}
+                            onChange={event => props.setShadingMethod(parseInt(event.target.value))}
                         />
                         Flat
                     </label>
@@ -137,8 +137,8 @@ function Params(props) {
                     <label>
                         <input type='radio'
                             value={PHONG_SHADING}
-                            checked={props.shading === PHONG_SHADING}
-                            onChange={event => props.setShading(parseInt(event.target.value))}
+                            checked={props.shadingMethod === PHONG_SHADING}
+                            onChange={event => props.setShadingMethod(parseInt(event.target.value))}
                         />
                         Phong
                     </label>
@@ -153,7 +153,7 @@ function mapStateToProps(state) {
         numSamples: state.numSamples,
         numBounces: state.numBounces,
         cameraFov:  state.cameraFov,
-        shading:    state.shading,
+        shadingMethod: state.shadingMethod,
     };
 }
 
@@ -162,7 +162,7 @@ function mapDispatchToProps(dispatch) {
         setNumSamples,
         setNumBounces,
         setCameraFov,
-        setShading,
+        setShadingMethod,
     }, dispatch);
 }
 

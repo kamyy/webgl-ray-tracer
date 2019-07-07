@@ -9,7 +9,7 @@ import {
     SET_NUM_SAMPLES,
     SET_NUM_BOUNCES,
     SET_CAMERA_FOV,
-    SET_SHADING,
+    SET_SHADING_METHOD,
 
     FLAT_SHADING,
 }   from './actions.js'
@@ -17,10 +17,10 @@ import {
 // ----------------------------------------------------------------
 // default states
 //
-const defaultNumSamples = 100;
-const defaultNumBounces = 2;
-const defaultCameraFov  = 30;
-const defaultShading    = FLAT_SHADING;
+const defaultNumSamples     = 300;
+const defaultNumBounces     = 4;
+const defaultCameraFov      = 30;
+const defaultShadingMethod  = FLAT_SHADING;
 
 // ----------------------------------------------------------------
 // reducers
@@ -46,9 +46,9 @@ function cameraFov(state = defaultCameraFov, action) {
     return state;
 }
 
-function shading(state = defaultShading, action) {
-    if (action.type === SET_SHADING) {
-        return action.shading;
+function shadingMethod(state = defaultShadingMethod, action) {
+    if (action.type === SET_SHADING_METHOD) {
+        return action.shadingMethod;
     }
     return state;
 }
@@ -57,5 +57,5 @@ function shading(state = defaultShading, action) {
 // redux store
 //
 export const reduxStore = createStore(
-    combineReducers({ numSamples, numBounces, cameraFov, shading })
+    combineReducers({ numSamples, numBounces, cameraFov, shadingMethod })
 );
