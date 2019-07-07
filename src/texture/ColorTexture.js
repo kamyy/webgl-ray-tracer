@@ -1,14 +1,10 @@
 // @flow
 
-import {
-    GL
-}   from '../component/Canvas.js';
-
 export default class ColorTexture {
     source: WebGLTexture;
     target: WebGLTexture;
 
-    constructor(wd: number, ht: number) {
+    constructor(GL: any, wd: number, ht: number) {
         GL.activeTexture(GL.TEXTURE0);
 
         this.source = GL.createTexture();
@@ -28,7 +24,7 @@ export default class ColorTexture {
         GL.texStorage2D(GL.TEXTURE_2D, 1, GL.RGBA32F, wd, ht);
     }
 
-    bindToSampleShader(program: WebGLProgram) {
+    bindToSampleShader(GL: any, program: WebGLProgram) {
         const textureSwap = this.source;
         this.source = this.target;
         this.target = textureSwap;
@@ -44,7 +40,7 @@ export default class ColorTexture {
         GL.uniform1i(GL.getUniformLocation(program, 'u_color_sampler'), 1);
     }
 
-    bindToCanvasShader(program: WebGLProgram) {
+    bindToCanvasShader(GL: any, program: WebGLProgram) {
         // using texture unit 0
         GL.activeTexture(GL.TEXTURE0);
         GL.bindTexture(GL.TEXTURE_2D, this.target);

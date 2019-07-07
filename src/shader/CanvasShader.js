@@ -1,9 +1,5 @@
 // @flow
 
-import {
-    GL
-}   from '../component/Canvas.js';
-
 import ColorTexture from '../texture/ColorTexture.js';
 import Shader from './Shader.js';
 
@@ -15,11 +11,11 @@ export default class CanvasShader extends Shader {
         this.colorTexture = colorTexture;
     }
 
-    draw(renderPass: number) {
+    draw(GL: any, renderPass: number) {
         GL.bindFramebuffer(GL.FRAMEBUFFER, null);
         GL.useProgram(this.program);
         GL.bindVertexArray(this.va);
-        this.colorTexture.bindToCanvasShader(this.program);
+        this.colorTexture.bindToCanvasShader(GL, this.program);
 
         GL.uniform1f(GL.getUniformLocation(this.program, 'u_inv_render_pass'), 1.0 / renderPass);
 

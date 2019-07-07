@@ -1,14 +1,10 @@
 
 // @flow
 
-import {
-    GL
-}   from '../component/Canvas.js';
-
 export default class Shader {
     vs: WebGLShader;
     fs: WebGLShader;
-    va: WebGLVertexArrayObject;
+    va: any;
     program: WebGLProgram;
 
     async fetchShader(url: string): Promise<string> {
@@ -19,7 +15,7 @@ export default class Shader {
         return response.text();
     }
 
-    initVSData() {
+    initVSData(GL: any) {
         this.va = GL.createVertexArray(); // begin vertex array object
         GL.bindVertexArray(this.va);
 
@@ -52,7 +48,7 @@ export default class Shader {
         GL.bindVertexArray(null); // end vertex array object
     }
 
-    async init(vsURL:string, fsURL: string): Promise<void> {
+    async init(GL: any, vsURL:string, fsURL: string): Promise<void> {
         try {
             const responses = await Promise.all([
                 this.fetchShader(vsURL),
@@ -82,7 +78,7 @@ export default class Shader {
                 throw new Error(`Error linking shader program!\n ${log}\n`);
             }
 
-            this.initVSData();
+            this.initVSData(GL);
         }
         catch(e) {
             throw e;

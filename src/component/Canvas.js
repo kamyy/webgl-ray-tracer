@@ -21,7 +21,6 @@ import {
 
 export const canvasWd = 800;
 export const canvasHt = 600;
-export let GL: WebGL2RenderingContext;
 
 export const rootNode = new RefFrame();
 export const parentNode = new RefFrame(rootNode);
@@ -46,13 +45,14 @@ class Canvas extends React.Component<Props> {
     bRendering: boolean;
     renderPass: number;
 
+    canvas: any;
+    GL:     any;
+
     sceneTextures: SceneTextures;
     colorTexture: ColorTexture;
     noiseTexture: NoiseTexture;
     sampleShader: SampleShader;
     canvasShader: CanvasShader;
-
-    canvas: HTMLCanvasElement;
 
     constructor(props) {
         super(props);
@@ -92,8 +92,8 @@ class Canvas extends React.Component<Props> {
         requestAnimationFrame(() => {
             if (this.renderPass < reduxStore.getState().numSamples) {
                 this.renderPass++;
-                this.sampleShader.draw(this.renderPass, cameraNode.modelMatrix);
-                this.canvasShader.draw(this.renderPass);
+                this.sampleShader.draw(this.GL, this.renderPass, cameraNode.modelMatrix);
+                this.canvasShader.draw(this.GL, this.renderPass);
                 this.executeRenderingPass();
             } else {
                 this.bRendering = false;
@@ -102,42 +102,44 @@ class Canvas extends React.Component<Props> {
     }
 
     log_GPU_Caps() {
-        console.log(`MAX_ARRAY_TEXTURE_LAYERS = ${GL.getParameter(GL.MAX_ARRAY_TEXTURE_LAYERS)}`);
-        console.log(`MAX_TEXTURE_IMAGE_UNITS = ${GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS)}`);
-        console.log(`MAX_RENDERBUFFER_SIZE = ${GL.getParameter(GL.MAX_RENDERBUFFER_SIZE)}`);
-        console.log(`MAX_TEXTURE_SIZE = ${GL.getParameter(GL.MAX_TEXTURE_SIZE)}`);
+        console.log(`MAX_ARRAY_TEXTURE_LAYERS = ${this.GL.getParameter(this.GL.MAX_ARRAY_TEXTURE_LAYERS)}`);
+        console.log(`MAX_TEXTURE_IMAGE_UNITS = ${this.GL.getParameter(this.GL.MAX_TEXTURE_IMAGE_UNITS)}`);
+        console.log(`MAX_RENDERBUFFER_SIZE = ${this.GL.getParameter(this.GL.MAX_RENDERBUFFER_SIZE)}`);
+        console.log(`MAX_TEXTURE_SIZE = ${this.GL.getParameter(this.GL.MAX_TEXTURE_SIZE)}`);
     }
 
     componentDidMount() {
-        const canvas = document.getElementById('Canvas');
-        if (canvas instanceof HTMLCanvasElement) {
-            this.canvas = canvas;
+        this.canvas = document.getElementById('Canvas');
+        if (this.canvas instanceof HTMLCanvasElement) {
+            this.GL = this.canvas.getContext('webgl2', {
+                depth: false,
+                alpha: false,
+            });
 
-            const gl = this.canvas.getContext('webgl2', { depth: false, alpha: false, });
-            if (gl instanceof WebGL2RenderingContext) {
-                GL = gl;
-
-                if (!GL.getExtension('EXT_color_buffer_float')) {
-                    throw new Error('EXT_color_buffer_float support not available on GPU!');
-                }
-                this.log_GPU_Caps();
-
-                this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
-                this.canvas.onmousedown = this.onMouseDown;
-                window.onmousemove = this.onMouseMove;
-                window.onmouseup = this.onMouseUp;
-
-                this.sceneTextures = new SceneTextures('/suzanne.obj', '/suzanne.mtl');
-                this.colorTexture = new ColorTexture(canvasWd, canvasHt);
-                this.noiseTexture = new NoiseTexture(canvasWd, canvasHt);
-                this.sampleShader = new SampleShader(this.sceneTextures, this.colorTexture, this.noiseTexture, canvasWd, canvasHt);
-                this.canvasShader = new CanvasShader(this.colorTexture);
-
-                this.sceneTextures.init()
-                    .then(() => this.sampleShader.init('/sample-vs.glsl', '/sample-fs.glsl'))
-                    .then(() => this.canvasShader.init('/canvas-vs.glsl', '/canvas-fs.glsl'))
-                    .then(() => this.restartRender());
+            if (!this.GL.getExtension('EXT_color_buffer_float')) {
+                throw new Error('EXT_color_buffer_float support not available on GPU!');
             }
+            this.log_GPU_Caps();
+
+            this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
+            this.canvas.onmousedown = this.onMouseDown;
+            window.onmousemove = this.onMouseMove;
+            window.onmouseup = this.onMouseUp;
+
+            this.sceneTextures = new SceneTextures(this.GL, '/suzanne.obj', '/suzanne.mtl');
+            this.colorTexture = new ColorTexture(this.GL, canvasWd, canvasHt);
+            this.noiseTexture = new NoiseTexture(this.GL, canvasWd, canvasHt);
+            this.sampleShader = new SampleShader(this.GL, this.sceneTextures,
+                                                 this.colorTexture,
+                                                 this.noiseTexture,
+                                                 canvasWd,
+                                                 canvasHt);
+            this.canvasShader = new CanvasShader(this.colorTexture);
+
+            this.sceneTextures.init(this.GL)
+                .then(() => this.sampleShader.init(this.GL, '/sample-vs.glsl', '/sample-fs.glsl'))
+                .then(() => this.canvasShader.init(this.GL, '/canvas-vs.glsl', '/canvas-fs.glsl'))
+                .then(() => this.restartRender());
         }
     }
 

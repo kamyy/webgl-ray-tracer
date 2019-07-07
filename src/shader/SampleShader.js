@@ -4,10 +4,6 @@ import {
     reduxStore
 }   from '../redux/reducers.js';
 
-import {
-    GL
-}   from '../component/Canvas.js';
-
 import SceneTextures from '../texture/SceneTextures.js';
 import ColorTexture from '../texture/ColorTexture.js';
 import NoiseTexture from '../texture/NoiseTexture.js';
@@ -23,7 +19,8 @@ export default class SampleShader extends Shader {
     ht: number;
     frameBuffer: WebGLFramebuffer;
 
-    constructor(sceneTextures: SceneTextures,
+    constructor(GL: any,
+                sceneTextures: SceneTextures,
                 colorTexture: ColorTexture,
                 noiseTexture: NoiseTexture,
                 wd: number,
@@ -42,7 +39,7 @@ export default class SampleShader extends Shader {
         GL.bindFramebuffer(GL.FRAMEBUFFER, null);
     }
 
-    draw(renderPass: number, invViewMatrix: Matrix4x4) {
+    draw(GL: any, renderPass: number, invViewMatrix: Matrix4x4) {
         const {
             numBounces,
             cameraFov,
@@ -66,9 +63,9 @@ export default class SampleShader extends Shader {
         GL.uniform3f(GL.getUniformLocation(this.program, 'u_eye_position'), eyePos.x, eyePos.y, eyePos.z);
         GL.uniformMatrix4fv(GL.getUniformLocation(this.program, 'u_eye_to_world'), false, invViewMatrix.toFloat32Array());
 
-        this.sceneTextures.bindToSampleShader(this.program);
-        this.colorTexture.bindToSampleShader(this.program);
-        this.noiseTexture.bindToSampleShader(this.program);
+        this.sceneTextures.bindToSampleShader(GL, this.program);
+        this.colorTexture.bindToSampleShader(GL, this.program);
+        this.noiseTexture.bindToSampleShader(GL, this.program);
         GL.drawArrays(GL.TRIANGLE_FAN, 0, 4);
     }
 }

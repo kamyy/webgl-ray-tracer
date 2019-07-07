@@ -12,8 +12,6 @@ import {
 
 import Vector1x4 from '../math/Vector1x4.js';
 
-import { GL } from '../component/Canvas.js';
-
 const X_AXIS = 0;
 const Y_AXIS = 1;
 const Z_AXIS = 2;
@@ -69,7 +67,7 @@ class BV { // AABB bounding volume
         }
     }
 
-    splitAcross(axis: X_AXIS | Y_AXIS | Z_AXIS, faces: Face[], AABBs: BV[]) {
+    splitAcross(axis: 0 | 1 | 2, faces: Face[], AABBs: BV[]) {
         const sorted = [...faces].sort((faceA, faceB) => {
             const a0 = faceA.p0.xyzw[axis];
             const a1 = faceA.p1.xyzw[axis];
@@ -143,7 +141,7 @@ export default class SceneTextures {
     AABBsTexture: WebGLTexture;
     mtlsTexture: WebGLTexture;
 
-    constructor(objUrl: string, mtlUrl: string) {
+    constructor(GL: any, objUrl: string, mtlUrl: string) {
         this.objUrl = objUrl;
         this.mtlUrl = mtlUrl;
         this.objCount = 0;
@@ -161,7 +159,7 @@ export default class SceneTextures {
         return response.text();
     }
 
-    async init(): Promise<void> {
+    async init(GL: any): Promise<void> {
         let wavefrontObj;
         let wavefrontMtl;
         try {
@@ -240,12 +238,12 @@ export default class SceneTextures {
         });
         console.log(`# mtls ${parsedMtls.length}`);
 
-        this.initTextures(parsedObjs, parsedMtls);
+        this.initTextures(GL, parsedObjs, parsedMtls);
         this.objCount = parsedObjs.length;
         this.mtlCount = parsedMtls.length;
     }
 
-    initTextures(parsedObjs: Object[], parsedMtls: Object[]) {
+    initTextures(GL: any, parsedObjs: Object[], parsedMtls: Object[]) {
         const maxNumFaces = parsedObjs.reduce((max, obj) => Math.max(max, obj.faces.length), 0); // max number of faces
         const numTexelsPerFace = 8; // RGBA texel
         const numFloatsPerFace = 24;
@@ -331,7 +329,7 @@ export default class SceneTextures {
         GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32F, numTexelsPerMtl, parsedMtls.length, 0, GL.RGBA, GL.FLOAT, data);
     }
 
-    bindToSampleShader(program: WebGLProgram) {
+    bindToSampleShader(GL: any, program: WebGLProgram) {
         GL.activeTexture(GL.TEXTURE3);
         GL.bindTexture(GL.TEXTURE_2D_ARRAY, this.facesTexture);
         GL.uniform1i(GL.getUniformLocation(program, 'u_face_sampler'), 3);
