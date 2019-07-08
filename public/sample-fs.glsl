@@ -67,6 +67,8 @@ const int FACE_MTL_INDEX = 7;
 const int MTL_ALBEDO_INDEX = 0;
 const int MTL_ATTRIB_INDEX = 1;
 
+const int RAY_BOUNCE_MAX_STACK_SIZE = 16;
+
 // ----------------------------------------------------------------------------
 // varyings
 //
@@ -138,8 +140,8 @@ bool rayIntersectFace(Ray r, int face_index, int obj_index, out RayHitResult res
     res.fn = texelFetch(u_face_sampler, ivec3(FACE_NRM_INDEX, face_index, obj_index), 0).xyz; // face normal
 
     float fn_dot_ray_dir = dot(res.fn, r.dir);
-    if (fn_dot_ray_dir > 0.0 || abs(fn_dot_ray_dir) < EPSILON) {
-        return false; // back facing or face and ray direction almost parallel
+    if (abs(fn_dot_ray_dir) < EPSILON) {
+        return false; // ray direction almost parallel
     }
 
     vec3 p0 = texelFetch(u_face_sampler, ivec3(VERTEX_0_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 0 position
@@ -309,81 +311,88 @@ float schlick(float cosine, float rindex) {
     return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
 }
 
-void rayHitMetallicSurface(RayHitResult res, Mtl metallic, inout Ray ray, inout vec3 color) {
+Ray rayBounceOffMetallicSurface(Ray ray, RayHitResult res, Mtl mtl) {
     ray.origin = res.p + res.fn * EPSILON;
-    ray.dir    = normalize(reflect(ray.dir, res.n) + (1.0 - metallic.reflectionGloss) * randPosInUnitSphere());
-
-    if (dot(ray.dir, res.n) > 0.0) {
-        color *= metallic.albedo.rgb;
-    } else {
-        color = vec3(0.0, 0.0, 0.0);
-    }
+    ray.dir    = normalize(reflect(ray.dir, res.n) + (1.0 - mtl.reflectionGloss) * randPosInUnitSphere());
+    return ray;
 }
 
-void rayHitLambertianSurface(RayHitResult res, Mtl lambertian, inout Ray ray, inout vec3 color) {
+Ray rayBounceOffLambertianSurface(Ray ray, RayHitResult res, Mtl mtl) {
     ray.origin = res.p + res.fn * EPSILON;
-    ray.dir = normalize(res.p + res.n + randPosInUnitSphere() - res.p);
-    color *= lambertian.albedo.rgb;
+    ray.dir    = normalize(res.p + res.n + randPosInUnitSphere() - res.p);
+    return ray;
 }
 
-void rayHitDielectricSurface(RayHitResult res, Mtl dielectric, inout Ray ray, inout vec3 color) {
+Ray rayBounceOffDielectricSurface(Ray ray, RayHitResult res, Mtl mtl) {
     float refractiveRatio;
     vec3  refraction;
-    vec3  normal;
-    vec3  face_n;
+    vec3  contactN;
+    vec3  faceN;
 
     if (dot(ray.dir, res.n) < 0.0) { // into object from air
-        refractiveRatio = 1.0 / dielectric.refractionIndex;
-        normal = +res.n;
-        face_n = +res.fn;
+        refractiveRatio = 1.0 / mtl.refractionIndex;
+        contactN = +res.n;
+        faceN    = +res.fn;
     } else { // from object into air
-        refractiveRatio = dielectric.refractionIndex;
-        normal = -res.n;
-        face_n = -res.fn;
+        refractiveRatio = mtl.refractionIndex;
+        contactN = -res.n;
+        faceN    = -res.fn;
     }
 
-    refraction = refract(ray.dir, normal, refractiveRatio);
+    refraction = refract(ray.dir, contactN, refractiveRatio);
     if (dot(refraction, refraction) > 0.0) {
-        ray.origin = res.p - EPSILON * face_n;
+        ray.origin = res.p - EPSILON * faceN;
         ray.dir    = refraction;
     } else {
         ray.origin = res.p + EPSILON * res.fn;
         ray.dir    = reflect(ray.dir, res.n);
     }
 
-    color *= dielectric.albedo.rgb;
+    return ray;
 }
 
-vec3 castPrimaryRay(Ray ray) {
-    RayHitResult res;
-    vec3 color = vec3(1.0, 1.0, 1.0);
+vec3 pathTrace(Ray ray) {
+    RayHitResult hitStack[RAY_BOUNCE_MAX_STACK_SIZE];
+    Mtl          mtlStack[RAY_BOUNCE_MAX_STACK_SIZE];
+    Ray          rayStack[RAY_BOUNCE_MAX_STACK_SIZE];
     vec3 texel;
-    Mtl  mtl;
+    vec3 color;
+    int  i = 0;
 
-    for (int i = 0; i <= u_num_bounces; ++i) {
-        if (rayIntersectBVH(ray, res)) {
-            mtl.albedo = texelFetch(u_mtl_sampler, ivec2(MTL_ALBEDO_INDEX, res.mi), 0).xyz;
-            texel      = texelFetch(u_mtl_sampler, ivec2(MTL_ATTRIB_INDEX, res.mi), 0).xyz;
-            mtl.mtlCls = int(texel.x);
-            mtl.reflectionGloss = texel.y;
-            mtl.refractionIndex = texel.z;
+    while (i < u_num_bounces && rayIntersectBVH(ray, hitStack[i])) {
+        mtlStack[i].albedo = texelFetch(u_mtl_sampler, ivec2(MTL_ALBEDO_INDEX, hitStack[i].mi), 0).xyz;
+        texel              = texelFetch(u_mtl_sampler, ivec2(MTL_ATTRIB_INDEX, hitStack[i].mi), 0).xyz;
+        mtlStack[i].mtlCls = int(texel.x);
+        mtlStack[i].reflectionGloss = texel.y;
+        mtlStack[i].refractionIndex = texel.z;
 
-            switch (mtl.mtlCls) {
-            case METALLIC_MATERIAL:
-                rayHitMetallicSurface(res, mtl, ray, color);
-                break;
-            case LAMBERTIAN_MATERIAL:
-                rayHitLambertianSurface(res, mtl, ray, color);
-                break;
-            case DIELECTRIC_MATERIAL:
-                rayHitDielectricSurface(res, mtl, ray, color);
-                break;
+        switch (mtlStack[i].mtlCls) {
+        case METALLIC_MATERIAL:
+            ray = rayBounceOffMetallicSurface(ray, hitStack[i], mtlStack[i]);
+            if (dot(ray.dir, hitStack[i].n) > 0.0) { // ray absorbed by surface
+                return vec3(0.0, 0.0, 0.0);
             }
-        } else {
-            float t = (1.0 + normalize(ray.dir).z) * 0.5;
-            color  *= (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
-            break; // out of for loop
+            break;
+        case LAMBERTIAN_MATERIAL:
+            ray = rayBounceOffLambertianSurface(ray, hitStack[i], mtlStack[i]);
+            break;
+        case DIELECTRIC_MATERIAL:
+            ray = rayBounceOffDielectricSurface(ray, hitStack[i], mtlStack[i]);
+            break;
         }
+
+        ++i;
+    }
+
+    if (i < u_num_bounces) { // final bounced ray hit nothing
+        float t = (1.0 + normalize(ray.dir).z) * 0.5;
+        color   = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
+    } else { // final bounced ray hit mesh
+        color   = vec3(1.0, 1.0, 1.0);
+    }
+
+    while (i > 0) {
+        color *= mtlStack[--i].albedo;
     }
 
     return color;
@@ -408,9 +417,9 @@ void main() {
 
     Ray ray = Ray(u_eye_position, normalize(rayTarget.xyz - u_eye_position));
     if (u_render_pass == 1) { // o_color is a RGBAF32 texture render target
-        o_color = vec4(castPrimaryRay(ray), 1.0); // very 1st render pass (initialize RGBAF32 texture render target)
+        o_color = vec4(pathTrace(ray), 1.0); // very 1st render pass (initialize RGBAF32 texture render target)
     } else { // add sample color into RGBA32F texture render target
-        o_color = vec4(castPrimaryRay(ray), 0.0) + texelFetch(u_color_sampler, fragCoord, 0);
+        o_color = vec4(pathTrace(ray), 0.0) + texelFetch(u_color_sampler, fragCoord, 0);
     }
 
     /*
