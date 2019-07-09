@@ -5,6 +5,7 @@ import wavefrontMtlParser from 'mtl-file-parser';
 
 import Material from '../material/Material.js';
 import {
+    EMISSIVE_MATERIAL,
     METALLIC_MATERIAL,
     LAMBERTIAN_MATERIAL,
     DIELECTRIC_MATERIAL,
@@ -229,9 +230,15 @@ export default class SceneTextures {
             const mat = new Material(new Vector1x4(mtl.Kd.red, mtl.Kd.green, mtl.Kd.blue));
             // 'Metal 0', 0.95, 'Glass 0', 0.00, 1.33
             switch (mtl.name) {
-            case 'mirror':
+            case 'teapot':
                 mat.mtlCls = METALLIC_MATERIAL;
                 mat.reflectionGloss = 1.0;
+                break;
+            case 'light':
+                mat.mtlCls = EMISSIVE_MATERIAL;
+                mat.albedo.r = 2.5;
+                mat.albedo.g = 2.5;
+                mat.albedo.b = 2.5;
                 break;
             default:
                 break;

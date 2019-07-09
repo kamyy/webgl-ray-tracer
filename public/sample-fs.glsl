@@ -46,9 +46,10 @@ const float EPSILON = 0.001;
 
 const int FLAT_SHADING = 0;
 
-const int METALLIC_MATERIAL   = 0;
-const int LAMBERTIAN_MATERIAL = 1;
-const int DIELECTRIC_MATERIAL = 2;
+const int EMISSIVE_MATERIAL   = 0;
+const int METALLIC_MATERIAL   = 1;
+const int LAMBERTIAN_MATERIAL = 2;
+const int DIELECTRIC_MATERIAL = 3;
 
 const int BV_MAX_STACK_SIZE = 16;
 const int BV_MIN_BOUNDS_INDEX = 0;
@@ -140,7 +141,7 @@ bool rayIntersectFace(Ray r, int face_index, int obj_index, out RayHitResult res
     res.fn = texelFetch(u_face_sampler, ivec3(FACE_NRM_INDEX, face_index, obj_index), 0).xyz; // face normal
 
     float fn_dot_ray_dir = dot(res.fn, r.dir);
-    if (abs(fn_dot_ray_dir) < EPSILON) {
+    if (fn_dot_ray_dir > 0.0 || abs(fn_dot_ray_dir) < EPSILON) {
         return false; // ray direction almost parallel
     }
 
@@ -311,19 +312,17 @@ float schlick(float cosine, float rindex) {
     return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
 }
 
-Ray rayBounceOffMetallicSurface(Ray ray, RayHitResult res, Mtl mtl) {
+void rayBounceOffMetallicSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
     ray.origin = res.p + res.fn * EPSILON;
     ray.dir    = normalize(reflect(ray.dir, res.n) + (1.0 - mtl.reflectionGloss) * randPosInUnitSphere());
-    return ray;
 }
 
-Ray rayBounceOffLambertianSurface(Ray ray, RayHitResult res, Mtl mtl) {
+void rayBounceOffLambertianSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
     ray.origin = res.p + res.fn * EPSILON;
     ray.dir    = normalize(res.p + res.n + randPosInUnitSphere() - res.p);
-    return ray;
 }
 
-Ray rayBounceOffDielectricSurface(Ray ray, RayHitResult res, Mtl mtl) {
+void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
     float refractiveRatio;
     vec3  refraction;
     vec3  contactN;
@@ -347,19 +346,17 @@ Ray rayBounceOffDielectricSurface(Ray ray, RayHitResult res, Mtl mtl) {
         ray.origin = res.p + EPSILON * res.fn;
         ray.dir    = reflect(ray.dir, res.n);
     }
-
-    return ray;
 }
 
 vec3 pathTrace(Ray ray) {
     RayHitResult hitStack[RAY_BOUNCE_MAX_STACK_SIZE];
     Mtl          mtlStack[RAY_BOUNCE_MAX_STACK_SIZE];
-    Ray          rayStack[RAY_BOUNCE_MAX_STACK_SIZE];
+    vec3 color = vec3(0.0, 0.0, 0.0);
     vec3 texel;
-    vec3 color;
+    bool bLoop = true;
     int  i = 0;
 
-    while (i < u_num_bounces && rayIntersectBVH(ray, hitStack[i])) {
+    while (bLoop && rayIntersectBVH(ray, hitStack[i])) {
         mtlStack[i].albedo = texelFetch(u_mtl_sampler, ivec2(MTL_ALBEDO_INDEX, hitStack[i].mi), 0).xyz;
         texel              = texelFetch(u_mtl_sampler, ivec2(MTL_ATTRIB_INDEX, hitStack[i].mi), 0).xyz;
         mtlStack[i].mtlCls = int(texel.x);
@@ -367,28 +364,45 @@ vec3 pathTrace(Ray ray) {
         mtlStack[i].refractionIndex = texel.z;
 
         switch (mtlStack[i].mtlCls) {
+        case EMISSIVE_MATERIAL:
+            color = mtlStack[i].albedo;
+            bLoop = false;
+            break;
+
         case METALLIC_MATERIAL:
-            ray = rayBounceOffMetallicSurface(ray, hitStack[i], mtlStack[i]);
-            if (dot(ray.dir, hitStack[i].n) > 0.0) { // ray absorbed by surface
-                return vec3(0.0, 0.0, 0.0);
+            if (i < u_num_bounces) {
+                rayBounceOffMetallicSurface(ray, hitStack[i], mtlStack[i]);
+                if (dot(ray.dir, hitStack[i].n) < 0.0) {
+                    color = vec3(0.0, 0.0, 0.0);
+                    bLoop = false;
+                    i=0;
+                } else {
+                    i++;
+                }
+            } else {
+                color = mtlStack[i].albedo;
+                bLoop = false;
             }
             break;
+
         case LAMBERTIAN_MATERIAL:
-            ray = rayBounceOffLambertianSurface(ray, hitStack[i], mtlStack[i]);
+            if (i < u_num_bounces) {
+                rayBounceOffLambertianSurface(ray, hitStack[i], mtlStack[i]); ++i;
+            } else {
+                color = mtlStack[i].albedo;
+                bLoop = false;
+            }
             break;
+
         case DIELECTRIC_MATERIAL:
-            ray = rayBounceOffDielectricSurface(ray, hitStack[i], mtlStack[i]);
+            if (i < u_num_bounces) {
+                rayBounceOffDielectricSurface(ray, hitStack[i], mtlStack[i]); ++i;
+            } else {
+                color = mtlStack[i].albedo;
+                bLoop = false;
+            }
             break;
         }
-
-        ++i;
-    }
-
-    if (i < u_num_bounces) { // final bounced ray hit nothing
-        float t = (1.0 + normalize(ray.dir).z) * 0.5;
-        color   = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
-    } else { // final bounced ray hit mesh
-        color   = vec3(1.0, 1.0, 1.0);
     }
 
     while (i > 0) {

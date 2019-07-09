@@ -19,8 +19,8 @@ import {
     reduxStore
 }   from '../redux/reducers.js';
 
-export const canvasWd = 800;
-export const canvasHt = 600;
+export const canvasWd = 1024;
+export const canvasHt = 768;
 
 export const rootNode = new RefFrame();
 export const parentNode = new RefFrame(rootNode);
