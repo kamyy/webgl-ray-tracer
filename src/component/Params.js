@@ -23,7 +23,7 @@ import {
 }   from '../redux/actions.js';
 
 const minSamples = 1;
-const maxSamples = 13000;
+const maxSamples = 10000;
 const minBounces = 1;
 const maxBounces = 12;
 const minCameraFov = 10;

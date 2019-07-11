@@ -6,8 +6,7 @@ import wavefrontMtlParser from 'mtl-file-parser';
 import Material from '../material/Material.js';
 import {
     EMISSIVE_MATERIAL,
-    METALLIC_MATERIAL,
-    LAMBERTIAN_MATERIAL,
+    REFLECTIVE_MATERIAL,
     DIELECTRIC_MATERIAL,
 }   from '../material/Material.js';
 
@@ -230,16 +229,31 @@ export default class SceneTextures {
             const mat = new Material(new Vector1x4(mtl.Kd.red, mtl.Kd.green, mtl.Kd.blue));
             // 'Metal 0', 0.95, 'Glass 0', 0.00, 1.33
             switch (mtl.name) {
-            case 'teapot':
-                mat.mtlCls = METALLIC_MATERIAL;
-                mat.reflectionGloss = 1.0;
-                break;
             case 'light':
                 mat.mtlCls = EMISSIVE_MATERIAL;
-                mat.albedo.r = 2.5;
-                mat.albedo.g = 2.5;
-                mat.albedo.b = 2.5;
+                mat.albedo.r = 3.0;
+                mat.albedo.g = 3.0;
+                mat.albedo.b = 3.0;
                 break;
+            case 'glass':
+                mat.mtlCls = DIELECTRIC_MATERIAL;
+                mat.refractionIndex = 1.52;
+                mat.albedo.r = 1.0;
+                mat.albedo.g = 1.0;
+                mat.albedo.b = 1.0;
+                break;
+            case 'suzanne':
+                mat.reflectionRatio = 0.5;
+                mat.reflectionGloss = 0.7;
+                break;
+            case 'teapot':
+                mat.reflectionRatio = 0.9;
+                break;
+            case 'ladder':
+                mat.reflectionRatio = 0.3;
+                mat.reflectionGloss = 0.8;
+                break;
+
             default:
                 break;
             }
@@ -323,9 +337,10 @@ export default class SceneTextures {
             data[i++] = mtl.albedo.x;
             data[i++] = mtl.albedo.y;
             data[i++] = mtl.albedo.z;
-            data[i++] = mtl.albedo.w;
+            data[i++] = 1.0;
 
             data[i++] = mtl.mtlCls + 0.5; // material type is cast to int in fragment shader
+            data[i++] = mtl.reflectionRatio;
             data[i++] = mtl.reflectionGloss;
             data[i++] = mtl.refractionIndex;
         });

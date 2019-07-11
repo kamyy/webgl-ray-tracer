@@ -1,5 +1,5 @@
 # Blender MTL File: 'suzanne.blend'
-# Material Count: 5
+# Material Count: 6
 
 newmtl floor
 Ns 96.078431
@@ -14,6 +14,15 @@ newmtl glass
 Ns 96.078431
 Ka 1.000000 1.000000 1.000000
 Kd 0.640000 0.109032 0.353191
+Ks 0.500000 0.500000 0.500000
+Ni 1.000000
+d 1.000000
+illum 2
+
+newmtl ladder
+Ns 96.078431
+Ka 1.000000 1.000000 1.000000
+Kd 0.135984 0.034157 0.012573
 Ks 0.500000 0.500000 0.500000
 Ni 1.000000
 d 1.000000

@@ -32,8 +32,9 @@ struct Sphere {
 */
 
 struct Mtl {
-    vec3  albedo;
     int   mtlCls;
+    vec3  albedo;
+    float reflectionRatio;
     float reflectionGloss;
     float refractionIndex;
 };
@@ -47,9 +48,8 @@ const float EPSILON = 0.001;
 const int FLAT_SHADING = 0;
 
 const int EMISSIVE_MATERIAL   = 0;
-const int METALLIC_MATERIAL   = 1;
-const int LAMBERTIAN_MATERIAL = 2;
-const int DIELECTRIC_MATERIAL = 3;
+const int REFLECTIVE_MATERIAL = 1;
+const int DIELECTRIC_MATERIAL = 2;
 
 const int BV_MAX_STACK_SIZE = 16;
 const int BV_MIN_BOUNDS_INDEX = 0;
@@ -312,14 +312,13 @@ float schlick(float cosine, float rindex) {
     return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
 }
 
-void rayBounceOffMetallicSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
+void rayBounceOffReflectiveSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
     ray.origin = res.p + res.fn * EPSILON;
-    ray.dir    = normalize(reflect(ray.dir, res.n) + (1.0 - mtl.reflectionGloss) * randPosInUnitSphere());
-}
-
-void rayBounceOffLambertianSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
-    ray.origin = res.p + res.fn * EPSILON;
-    ray.dir    = normalize(res.p + res.n + randPosInUnitSphere() - res.p);
+    if (rand() < mtl.reflectionRatio) {
+        ray.dir = normalize(reflect(ray.dir, res.n) + (1.0 - mtl.reflectionGloss) * randPosInUnitSphere());
+    } else {
+        ray.dir = normalize(res.p + res.n + randPosInUnitSphere() - res.p);
+    }
 }
 
 void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
@@ -352,16 +351,17 @@ vec3 pathTrace(Ray ray) {
     RayHitResult hitStack[RAY_BOUNCE_MAX_STACK_SIZE];
     Mtl          mtlStack[RAY_BOUNCE_MAX_STACK_SIZE];
     vec3 color = vec3(0.0, 0.0, 0.0);
-    vec3 texel;
+    vec4 texel;
     bool bLoop = true;
     int  i = 0;
 
     while (bLoop && rayIntersectBVH(ray, hitStack[i])) {
         mtlStack[i].albedo = texelFetch(u_mtl_sampler, ivec2(MTL_ALBEDO_INDEX, hitStack[i].mi), 0).xyz;
-        texel              = texelFetch(u_mtl_sampler, ivec2(MTL_ATTRIB_INDEX, hitStack[i].mi), 0).xyz;
+        texel              = texelFetch(u_mtl_sampler, ivec2(MTL_ATTRIB_INDEX, hitStack[i].mi), 0);
         mtlStack[i].mtlCls = int(texel.x);
-        mtlStack[i].reflectionGloss = texel.y;
-        mtlStack[i].refractionIndex = texel.z;
+        mtlStack[i].reflectionRatio = texel.y;
+        mtlStack[i].reflectionGloss = texel.z;
+        mtlStack[i].refractionIndex = texel.w;
 
         switch (mtlStack[i].mtlCls) {
         case EMISSIVE_MATERIAL:
@@ -369,25 +369,16 @@ vec3 pathTrace(Ray ray) {
             bLoop = false;
             break;
 
-        case METALLIC_MATERIAL:
+        case REFLECTIVE_MATERIAL:
             if (i < u_num_bounces) {
-                rayBounceOffMetallicSurface(ray, hitStack[i], mtlStack[i]);
-                if (dot(ray.dir, hitStack[i].n) < 0.0) {
+                rayBounceOffReflectiveSurface(ray, hitStack[i], mtlStack[i]);
+                if (dot(ray.dir, hitStack[i].n) < 0.0) { // absorb ray
                     color = vec3(0.0, 0.0, 0.0);
                     bLoop = false;
                     i=0;
                 } else {
                     i++;
                 }
-            } else {
-                color = mtlStack[i].albedo;
-                bLoop = false;
-            }
-            break;
-
-        case LAMBERTIAN_MATERIAL:
-            if (i < u_num_bounces) {
-                rayBounceOffLambertianSurface(ray, hitStack[i], mtlStack[i]); ++i;
             } else {
                 color = mtlStack[i].albedo;
                 bLoop = false;
