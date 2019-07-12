@@ -141,7 +141,7 @@ bool rayIntersectFace(Ray r, int face_index, int obj_index, out RayHitResult res
     res.fn = texelFetch(u_face_sampler, ivec3(FACE_NRM_INDEX, face_index, obj_index), 0).xyz; // face normal
 
     float fn_dot_ray_dir = dot(res.fn, r.dir);
-    if (fn_dot_ray_dir > 0.0 || abs(fn_dot_ray_dir) < EPSILON) {
+    if (abs(fn_dot_ray_dir) < EPSILON) {
         return false; // ray direction almost parallel
     }
 
