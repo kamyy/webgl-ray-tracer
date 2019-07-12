@@ -1,6 +1,6 @@
 // @flow
 
-export default class ColorTexture {
+export default class ColorTextures {
     source: WebGLTexture;
     target: WebGLTexture;
 

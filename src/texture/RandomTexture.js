@@ -1,6 +1,6 @@
 // @flow
 
-export default class NoiseTexture {
+export default class RandomTexture {
     source: WebGLTexture;
     target: WebGLTexture;
 
@@ -29,6 +29,6 @@ export default class NoiseTexture {
         // using texture unit 2
         GL.activeTexture(GL.TEXTURE2);
         GL.bindTexture(GL.TEXTURE_2D, this.source);
-        GL.uniform1i(GL.getUniformLocation(program, 'u_noise_sampler'), 2);
+        GL.uniform1i(GL.getUniformLocation(program, 'u_random_sampler'), 2);
     }
 }

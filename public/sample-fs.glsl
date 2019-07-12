@@ -84,8 +84,8 @@ layout (location = 0) out vec4 o_color; // texture unit 0, COLOR_ATTACHMENT0
 // ----------------------------------------------------------------------------
 // uniforms
 //
-uniform highp sampler2D  u_color_sampler; // texture unit 1
-uniform highp usampler2D u_noise_sampler; // texture unit 2
+uniform highp sampler2D u_color_sampler; // texture unit 1
+uniform highp usampler2D u_random_sampler; // texture unit 2
 uniform highp sampler2DArray u_face_sampler; // texture unit 3
 uniform highp sampler2DArray u_aabb_sampler; // texture unit 4
 uniform highp sampler2D u_mtl_sampler; // texture unit 5
@@ -306,9 +306,7 @@ bool rayIntersectNearestSphere(Ray r, out RayHitResult nearest) {
 // ray cast from eye through image pixel
 //
 float schlick(float cosine, float rindex) {
-    float r0 = (1.0 - rindex) / (1.0 + rindex);
-    r0 *= r0;
-
+    float  r0 = (1.0 - rindex) / (1.0 + rindex); r0 *= r0;
     return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
 }
 
@@ -322,28 +320,35 @@ void rayBounceOffReflectiveSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
 }
 
 void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
-    float refractiveRatio;
+    float refractionRatio;
+    float reflectionProb;
+    float cosine;
     vec3  refraction;
-    vec3  contactN;
-    vec3  faceN;
+    vec3  n;
 
-    if (dot(ray.dir, res.n) < 0.0) { // into object from air
-        refractiveRatio = 1.0 / mtl.refractionIndex;
-        contactN = +res.n;
-        faceN    = +res.fn;
+    if (dot(ray.dir, res.n) < 0.0) { // into liquid/solid from air
+        refractionRatio = 1.0 / mtl.refractionIndex;
+        n  = +res.n;
+        cosine = -dot(ray.dir, res.n);
     } else { // from object into air
-        refractiveRatio = mtl.refractionIndex;
-        contactN = -res.n;
-        faceN    = -res.fn;
+        refractionRatio = mtl.refractionIndex;
+        n  = -res.n;
+        cosine =  dot(ray.dir, res.n) * mtl.refractionIndex;
     }
 
-    refraction = refract(ray.dir, contactN, refractiveRatio);
+    refraction = refract(ray.dir, n, refractionRatio);
     if (dot(refraction, refraction) > 0.0) {
-        ray.origin = res.p - EPSILON * faceN;
-        ray.dir    = refraction;
+        reflectionProb = schlick(cosine, mtl.refractionIndex);
     } else {
-        ray.origin = res.p + EPSILON * res.fn;
+        reflectionProb = 1.0;
+    }
+
+    if (rand() < reflectionProb) { // reflected ray
+        ray.origin = res.p + EPSILON * n;
         ray.dir    = reflect(ray.dir, res.n);
+    } else { // refracted ray
+        ray.origin = res.p - EPSILON * n;
+        ray.dir    = refraction;
     }
 }
 
@@ -410,7 +415,7 @@ void main() {
     ivec2 fragCoord = ivec2(gl_FragCoord.xy);
 
     // seed the random number generator before using rand(), use render pass number to change the seed for every pass
-    g_randGeneratorState = texelFetch(u_noise_sampler, fragCoord, 0)
+    g_randGeneratorState = texelFetch(u_random_sampler, fragCoord, 0)
                             + uvec4(u_render_pass, u_render_pass, u_render_pass, u_render_pass);
 
     vec4 rayTarget = u_eye_to_world * vec4( // transform ray target pos on image plane from view space to world space

@@ -10,8 +10,8 @@ import Vector1x4 from '../math/Vector1x4.js';
 import RefFrame from '../math/RefFrame.js';
 
 import SceneTextures from '../texture/SceneTextures.js';
-import ColorTexture from '../texture/ColorTexture.js';
-import NoiseTexture from '../texture/NoiseTexture.js';
+import ColorTextures from '../texture/ColorTextures.js';
+import RandomTexture from '../texture/RandomTexture.js';
 import SampleShader from '../shader/SampleShader.js';
 import CanvasShader from '../shader/CanvasShader.js';
 
@@ -49,8 +49,8 @@ class Canvas extends React.Component<Props> {
     GL:     any;
 
     sceneTextures: SceneTextures;
-    colorTexture: ColorTexture;
-    noiseTexture: NoiseTexture;
+    colorTextures: ColorTextures;
+    randomTexture: RandomTexture;
     sampleShader: SampleShader;
     canvasShader: CanvasShader;
 
@@ -130,14 +130,14 @@ class Canvas extends React.Component<Props> {
             window.onmouseup = this.onMouseUp;
 
             this.sceneTextures = new SceneTextures(this.GL, '/suzanne.obj', '/suzanne.mtl');
-            this.colorTexture = new ColorTexture(this.GL, canvasWd, canvasHt);
-            this.noiseTexture = new NoiseTexture(this.GL, canvasWd, canvasHt);
+            this.colorTextures = new ColorTextures(this.GL, canvasWd, canvasHt);
+            this.randomTexture = new RandomTexture(this.GL, canvasWd, canvasHt);
             this.sampleShader = new SampleShader(this.GL, this.sceneTextures,
-                                                 this.colorTexture,
-                                                 this.noiseTexture,
+                                                 this.colorTextures,
+                                                 this.randomTexture,
                                                  canvasWd,
                                                  canvasHt);
-            this.canvasShader = new CanvasShader(this.colorTexture);
+            this.canvasShader = new CanvasShader(this.colorTextures);
 
             this.sceneTextures.init(this.GL)
                 .then(() => this.sampleShader.init(this.GL, '/sample-vs.glsl', '/sample-fs.glsl'))
