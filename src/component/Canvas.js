@@ -91,9 +91,12 @@ class Canvas extends React.Component<Props> {
     executeRenderingPass() {
         requestAnimationFrame(() => {
             if (this.renderPass < reduxStore.getState().numSamples) {
-                this.renderPass++;
-                this.sampleShader.draw(this.GL, this.renderPass, cameraNode.modelMatrix);
-                this.canvasShader.draw(this.GL, this.renderPass);
+                if (this.renderPass === 0 ||
+                        (!this.lButtonDown && !this.rButtonDown)) { // render 1st pass only if still moving camera around
+                    this.renderPass++;
+                    this.sampleShader.draw(this.GL, this.renderPass, cameraNode.modelMatrix);
+                    this.canvasShader.draw(this.GL, this.renderPass);
+                }
                 this.executeRenderingPass();
             } else {
                 this.bRendering = false;
