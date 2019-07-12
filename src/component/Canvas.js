@@ -25,7 +25,7 @@ export const canvasHt = 720;
 export const rootNode = new RefFrame();
 export const parentNode = new RefFrame(rootNode);
 export const cameraNode = new RefFrame(parentNode);
-cameraNode.translate(new Vector1x4(0.0, -15.0, 3.0));
+cameraNode.translate(new Vector1x4(0.0, -15.0, 2.5));
 
 type Props = {
     numSamples: number,
