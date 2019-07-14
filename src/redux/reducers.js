@@ -17,8 +17,8 @@ import {
 // ----------------------------------------------------------------
 // default states
 //
-const defaultNumSamples     = 1000;
-const defaultNumBounces     = 12;
+const defaultNumSamples     = 1;//1000;
+const defaultNumBounces     = 1;//12;
 const defaultCameraFov      = 30;
 const defaultShadingMethod  = FLAT_SHADING;
 
