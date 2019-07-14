@@ -8,7 +8,7 @@ import {
 
 export default function App(props) {
     const appStyle = {
-        fontFamily: 'Arial',
+        fontFamily: 'Roboto',
         backgroundColor: '#f5f5f5',
         position: 'relative',
         padding: 16,

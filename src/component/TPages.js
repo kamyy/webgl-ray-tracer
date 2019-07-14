@@ -18,35 +18,37 @@ const cssTabPages = css`
     display: flex;
     flex-direction: column;
     font-size: 14px;
+    margin: 0px;
 `
 const cssTabBar = css`
     display: flex;
     flex-direction: row;
-    align-items: flex-start;
-    border-style: none none ridge none;
-    margin: 0px 0px 0px 2px;
+    align-items: flex-end;
+    margin: 0px;
+    border-style: none;
 `
 const cssTabButton = css`
     border-style: none ridge none none;
     border-radius: 5px 5px 0px 0px;
+    border-bottom-color: lightgray;
     padding: 8px 16px;
     &:focus {
         background-color: lightgray;
         outline: 0;
     }
-    font-family: "Arial";
+    font-family: 'Roboto';
     font-weight: bold;
     font-size: 12px;
 `
 const cssSelectedTabButton = css`
     border-style: none ridge solid none;
     border-radius: 5px 5px 0px 0px;
-    border-bottom-color: darkgray;
+    border-bottom-color: darkgreen;
     padding: 8px 16px;
     &:focus {
         outline: 0;
     }
-    font-family: "Arial";
+    font-family: 'Roboto';
     font-weight: bold;
     font-size: 12px;
 `

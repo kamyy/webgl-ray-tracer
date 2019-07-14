@@ -9,7 +9,6 @@ import {
 }   from 'react-redux';
 
 import {
-    cx,
     css
 }   from 'emotion';
 
@@ -18,12 +17,12 @@ function RenderingStatus(props) {
         display: flex;
         flex-direction: row;
         align-items: flex-start;
-        border-style: none ridge ridge ridge;
-        border-width: medium;
+        border-style: groove;
+        border-width: thin;
         padding: 16px 32px;
     `;
 
-    return <div className={cx(cssRenderingStatus)}></div>
+    return <div className={cssRenderingStatus}></div>
 }
 
 function mapStateToProps(state) {

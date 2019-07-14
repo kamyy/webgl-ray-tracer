@@ -9,7 +9,6 @@ import {
 }   from 'react-redux';
 
 import {
-    cx,
     css
 }   from 'emotion';
 
@@ -18,8 +17,8 @@ function ApplicationInfo(props) {
         display: flex;
         flex-direction: row;
         align-items: flex-start;
-        border-style: none ridge ridge ridge;
-        border-width: medium;
+        border-style: groove;
+        border-width: thin;
         padding: 16px 32px;
     `;
 
@@ -31,9 +30,9 @@ function ApplicationInfo(props) {
 
     return <div className={cssApplicationInfo}>
         <div>
-            <p className={cx(cssProjectInfoStyle)}>MIT License</p>
-            <p className={cx(cssProjectInfoStyle)}><a href='https://github.com/kamyy/webgl-ray-tracer'>Project @ GitHub</a></p>
-            <p className={cx(cssProjectInfoStyle)}>Copyright &copy; 2019 <a href='mailto:kam.yin.yip@gmail.com'>Kam Y Yip</a></p>
+            <p className={cssProjectInfoStyle}>MIT License</p>
+            <p className={cssProjectInfoStyle}><a href='https://github.com/kamyy/webgl-ray-tracer'>Project @ GitHub</a></p>
+            <p className={cssProjectInfoStyle}>Copyright &copy; 2019 <a href='mailto:kam.yin.yip@gmail.com'>Kam Y Yip</a></p>
         </div>
     </div>
 }
