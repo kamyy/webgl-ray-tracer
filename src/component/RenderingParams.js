@@ -80,14 +80,14 @@ function RenderingParams(props) {
         flex-basis: 90%;
     `
 
-    const cssShadingMethodRadioButtonsGroup = css`
+    const cssShadingMethodSection = css`
         display: flex;
         flex-direction: row;
         justify-content: space-between;
         padding: 8px 0px;
     `
 
-    const cssShadingMethodRadioButtonGroup = css`
+    const cssShadingMethodButtons = css`
         margin-right: 4px;
     `
 
@@ -137,8 +137,8 @@ function RenderingParams(props) {
         <fieldset className={cssRtSection}>
             <legend class={cssHeadingLabel}>Shading Method</legend>
 
-            <div className={cssShadingMethodRadioButtonsGroup}>
-                <label className={cssShadingMethodRadioButtonGroup}>
+            <div className={cssShadingMethodSection}>
+                <label className={cssShadingMethodButtons}>
                     <input type='radio'
                         value={FLAT_SHADING}
                         checked={props.shadingMethod === FLAT_SHADING}
@@ -147,7 +147,7 @@ function RenderingParams(props) {
                     Flat
                 </label>
 
-                <label className={cssShadingMethodRadioButtonGroup}>
+                <label className={cssShadingMethodButtons}>
                     <input type='radio'
                         value={PHONG_SHADING}
                         checked={props.shadingMethod === PHONG_SHADING}

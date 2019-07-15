@@ -17,18 +17,18 @@ function RenderingStatus(props) {
         flex-direction: column;
         border-style: groove;
         border-width: thin;
-        padding: 16px 32px;
+        padding: 24px 32px;
     `
 
     const cssProgressArea = css`
         margin 0px 32px;
-        height: 2px;
+        height: 3px;
         background-color: lightgray;
     `
 
     const cssProgressFill = css`
         width: ${percentComplete}%;
-        height: 2px;
+        height: 3px;
         background-color: darkgreen;
     `
 
@@ -43,16 +43,68 @@ function RenderingStatus(props) {
         font-size: 12px;
     `
 
+    const cssBottomSection = css`
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        margin-top: 24px;
+    `
+
+    const cssLegend = css`
+        margin: 0px;
+        font-weight: bold;
+        font-size: 12px;
+    `
+
+    const cssPassFieldset = css`
+        border-style: none groove none groove;
+        border-width: thin;
+        padding: 8px;
+        width: 250px;
+        text-align: center;
+    `
+
+    const cssTimeFieldset = css`
+        border-style: none groove none none;
+        border-width: thin;
+        padding: 8px;
+        width: 250px;
+        text-align: center;
+    `
+
     return <div className={cssTabPage}>
-        <div className={cssHeadingLabel}>Rendering Progress</div>
+        <div className={cssHeadingLabel}>Completion</div>
         <div className={cssProgressArea}>
             <div className={cssProgressFill}/>
         </div>
         <div className={cssPercentLabel}>
             {percentComplete}%
         </div>
-        <div> {props.renderingPass} </div>
-        <div> {props.numSamples} </div>
+
+        <div className={cssBottomSection}>
+
+            <fieldset className={cssPassFieldset}>
+                <legend class={cssLegend}>Rendering Pass</legend>
+                <div> { props.renderingPass} / {props.numSamples} </div>
+            </fieldset>
+
+            <fieldset className={cssTimeFieldset}>
+                <legend class={cssLegend}>Elapsed Time</legend>
+                <div>02:16:33</div>
+            </fieldset>
+
+            <fieldset className={cssTimeFieldset}>
+                <legend class={cssLegend}>Estimated Time Left</legend>
+                <div>01:03:12</div>
+            </fieldset>
+
+            <fieldset className={cssTimeFieldset}>
+                <legend class={cssLegend}>Avg. Rendering Pass Duration</legend>
+                <div>500ms</div>
+            </fieldset>
+
+        </div>
+
     </div>
 }
 
