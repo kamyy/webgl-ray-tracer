@@ -29,65 +29,74 @@ const minCameraFov = 10;
 const maxCameraFov = 120;
 
 function RenderingParams(props) {
-    const cssRenderingParams = css`
+    const cssTabPage = css`
         display: flex;
         flex-direction: row;
         align-items: flex-start;
         border-style: groove;
         border-width: thin;
         padding: 16px 32px;
-    `;
-    const cssRenderingParamLabel = css`
+    `
+
+    const cssHeadingLabel = css`
         font-weight: bold;
         font-size: 12px;
-    `;
-    const cssSliderGroups = css`
+    `
+
+    const cssLtSection = css`
         display: flex;
         flex-direction: column;
         flex-grow: 2;
         margin: 5px 0px;
-    `;
-    const cssSliderGroup = css`
-        display: flex;
-        flex-direction: row;
-        padding-top: 5px;
-        padding-bottom: 15px;
-    `;
-    const cssMinLabel = css`
-        flex-basis: 5%;
-        text-align: right;
-        margin-right: 10px;
-    `;
-    const cssRangeInput = css`
-        flex-basis: 90%;
-    `;
-    const cssMaxLabel = css`
-        flex-basis: 5%;
-        text-align: left;
-        margin-left: 10px;
-    `;
-    const cssShadingMethodFieldset = css`
+    `
+
+    const cssRtSection = css`
         border-style: none none none groove;
         border-width: thin;
         padding: 0px 0px 0px 16px;
         margin: 4px 4px;
-    `;
+    `
+
+    const cssRangeGroup = css`
+        display: flex;
+        flex-direction: row;
+        padding-top: 5px;
+        padding-bottom: 15px;
+    `
+
+    const cssMinLabel = css`
+        flex-basis: 5%;
+        text-align: right;
+        margin-right: 10px;
+    `
+
+    const cssMaxLabel = css`
+        flex-basis: 5%;
+        text-align: left;
+        margin-left: 10px;
+    `
+
+    const cssRangeInput = css`
+        flex-basis: 90%;
+    `
+
     const cssShadingMethodRadioButtonsGroup = css`
         display: flex;
         flex-direction: row;
         justify-content: space-between;
         padding: 8px 0px;
-    `;
+    `
+
     const cssShadingMethodRadioButtonGroup = css`
         margin-right: 4px;
-    `;
+    `
 
-    return <div className={cssRenderingParams}>
-        <div className={cssSliderGroups}>
+    return <div className={cssTabPage}>
+        <div className={cssLtSection}>
 
-            <label class={cssRenderingParamLabel}>Camera Field of View ( {props.cameraFov} )</label>
+            <label class={cssHeadingLabel}>Camera Field of View ( {props.cameraFov} )</label>
 
-            <div className={cssSliderGroup}>
+            <div className={cssRangeGroup}>
                 <label className={cssMinLabel}>{minCameraFov}</label>
                 <input type='range' className={cssRangeInput}
                     min={minCameraFov}
@@ -98,9 +107,9 @@ function RenderingParams(props) {
                 <label className={cssMaxLabel}>{maxCameraFov}</label>
             </div>
 
-            <label class={cssRenderingParamLabel}># of Samples Per Pixel ( {props.numSamples} )</label>
+            <label class={cssHeadingLabel}># of Samples Per Pixel ( {props.numSamples} )</label>
 
-            <div className={cssSliderGroup}>
+            <div className={cssRangeGroup}>
                 <label className={cssMinLabel}>{minSamples}</label>
                 <input type='range' className={cssRangeInput}
                     min={minSamples}
@@ -111,9 +120,9 @@ function RenderingParams(props) {
                 <label className={cssMaxLabel}>{maxSamples}</label>
             </div>
 
-            <label class={cssRenderingParamLabel}># of Ray Bounces ( {props.numBounces} )</label>
+            <label class={cssHeadingLabel}># of Ray Bounces ( {props.numBounces} )</label>
 
-            <div className={cssSliderGroup}>
+            <div className={cssRangeGroup}>
                 <label className={cssMinLabel}>{minBounces}</label>
                 <input type='range' className={cssRangeInput}
                     min={minBounces}
@@ -125,8 +134,8 @@ function RenderingParams(props) {
             </div>
         </div>
 
-        <fieldset className={cssShadingMethodFieldset}>
-            <legend class={cssRenderingParamLabel}>Shading Method</legend>
+        <fieldset className={cssRtSection}>
+            <legend class={cssHeadingLabel}>Shading Method</legend>
 
             <div className={cssShadingMethodRadioButtonsGroup}>
                 <label className={cssShadingMethodRadioButtonGroup}>

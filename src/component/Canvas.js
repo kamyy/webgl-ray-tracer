@@ -3,8 +3,16 @@
 import React from 'react';
 
 import {
+    bindActionCreators
+}   from 'redux';
+
+import {
     connect
 }   from 'react-redux';
+
+import {
+    setRenderingPass,
+}   from '../redux/actions.js';
 
 import Vector1x4 from '../math/Vector1x4.js';
 import RefFrame from '../math/RefFrame.js';
@@ -79,6 +87,7 @@ class Canvas extends React.Component<Props> {
     }
 
     restartRender() {
+        this.props.setRenderingPass(0);
         if (this.bRendering) {
             this.renderPass = 0;
         } else {
@@ -96,6 +105,7 @@ class Canvas extends React.Component<Props> {
                     this.renderPass++;
                     this.sampleShader.draw(this.GL, this.renderPass, cameraNode.modelMatrix);
                     this.canvasShader.draw(this.GL, this.renderPass);
+                    this.props.setRenderingPass(this.renderPass);
                 }
                 this.executeRenderingPass();
             } else {
@@ -226,5 +236,11 @@ function mapStateToProps(state) {
     return props;
 }
 
+function mapDispatchToProps(dispatch) {
+    return bindActionCreators({
+        setRenderingPass
+    }, dispatch);
+}
+
 // triggers Canvas.shouldComponentUpdate() when redux state changes
-export default connect(mapStateToProps, null)(Canvas);
+export default connect(mapStateToProps, mapDispatchToProps)(Canvas);
