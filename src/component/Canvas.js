@@ -12,6 +12,9 @@ import {
 
 import {
     setRenderingPass,
+    setElapsedTime,
+    setEtaTime,
+    setAvgTime,
 }   from '../redux/actions.js';
 
 import Vector1x4 from '../math/Vector1x4.js';
@@ -40,6 +43,11 @@ type Props = {
     numBounces: number,
     cameraFov:  number,
     shadingMethod: number,
+
+    setRenderingPass: (a: number) => void,
+    setElapsedTime: (a: string) => void,
+    setEtaTime: (a: string) => void,
+    setAvgTime: (a: string) => void,
 };
 
 class Canvas extends React.Component<Props> {
@@ -50,8 +58,8 @@ class Canvas extends React.Component<Props> {
     lButtonDown: boolean;
     rButtonDown: boolean;
 
+    restartRenderTimestamp: number;
     bRendering: boolean;
-    renderPass: number;
 
     canvas: any;
     GL:     any;
@@ -73,11 +81,11 @@ class Canvas extends React.Component<Props> {
         this.rButtonDown = false;
 
         this.bRendering = false;
-        this.renderPass = 0;
 
         this.onMouseUp = this.onMouseUp.bind(this);
         this.onMouseMove = this.onMouseMove.bind(this);
         this.onMouseDown = this.onMouseDown.bind(this);
+        this.refreshTimers = this.refreshTimers.bind(this);
     }
 
     render() {
@@ -86,12 +94,37 @@ class Canvas extends React.Component<Props> {
         </canvas>
     }
 
+    refreshTimers() {
+        const renderPass = reduxStore.getState().renderingPass;
+        const numSamples = reduxStore.getState().numSamples;
+
+        if (renderPass > 0) {
+            const durationMs = Date.now() - this.restartRenderTimestamp;
+            const avg = (durationMs / renderPass);
+            const eta = (numSamples - renderPass) * avg;
+
+            this.props.setElapsedTime(new Date(durationMs).toISOString().substr(11, 8));
+            this.props.setEtaTime(new Date(eta).toISOString().substr(11, 8));
+            this.props.setAvgTime(avg.toFixed(0) + 'ms');
+        }
+
+        if (renderPass < numSamples) {
+            setTimeout(this.refreshTimers, 1000);
+        }
+    }
+
+    restartTimers() {
+        this.restartRenderTimestamp = Date.now();
+        this.props.setElapsedTime('00:00:00');
+        this.props.setEtaTime('??:??:??');
+        this.props.setAvgTime('????');
+        setTimeout(this.refreshTimers, 1000);
+    }
+
     restartRender() {
         this.props.setRenderingPass(0);
-        if (this.bRendering) {
-            this.renderPass = 0;
-        } else {
-            this.renderPass = 0;
+        this.restartTimers();
+        if(!this.bRendering) {
             this.bRendering = true;
             this.executeRenderingPass();
         }
@@ -99,13 +132,15 @@ class Canvas extends React.Component<Props> {
 
     executeRenderingPass() {
         requestAnimationFrame(() => {
-            if (this.renderPass < reduxStore.getState().numSamples) {
-                if (this.renderPass === 0 ||
-                        (!this.lButtonDown && !this.rButtonDown)) { // render 1st pass only if still moving camera around
-                    this.renderPass++;
-                    this.sampleShader.draw(this.GL, this.renderPass, cameraNode.modelMatrix);
-                    this.canvasShader.draw(this.GL, this.renderPass);
-                    this.props.setRenderingPass(this.renderPass);
+            let renderPass = reduxStore.getState().renderingPass;
+            let numSamples = reduxStore.getState().numSamples;
+
+            if (renderPass < numSamples) {
+                if (renderPass === 0 || (!this.lButtonDown && !this.rButtonDown)) { // render 1st pass only if still moving camera around
+                    renderPass ++;
+                    this.sampleShader.draw(this.GL, renderPass, cameraNode.modelMatrix);
+                    this.canvasShader.draw(this.GL, renderPass);
+                    this.props.setRenderingPass(renderPass);
                 }
                 this.executeRenderingPass();
             } else {
@@ -238,7 +273,10 @@ function mapStateToProps(state) {
 
 function mapDispatchToProps(dispatch) {
     return bindActionCreators({
-        setRenderingPass
+        setRenderingPass,
+        setElapsedTime,
+        setEtaTime,
+        setAvgTime,
     }, dispatch);
 }
 

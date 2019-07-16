@@ -11,6 +11,9 @@ import {
     SET_CAMERA_FOV,
     SET_SHADING_METHOD,
     SET_RENDERING_PASS,
+    SET_ELAPSED_TIME,
+    SET_ETA_TIME,
+    SET_AVG_TIME,
 
     FLAT_SHADING,
 }   from './actions.js'
@@ -18,11 +21,14 @@ import {
 // ----------------------------------------------------------------
 // default states
 //
-const defaultNumSamples    = 1;//1000;
-const defaultNumBounces    = 1;//12;
+const defaultNumSamples    = 100;
+const defaultNumBounces    = 12;
 const defaultCameraFov     = 30;
 const defaultShadingMethod = FLAT_SHADING;
 const defaultRenderingPass = 0;
+const defaultElapsedTime   = 0;
+const defaultEtaTime = 0;
+const defaultAvgTime = 0;
 
 // ----------------------------------------------------------------
 // reducers
@@ -62,9 +68,39 @@ function renderingPass(state = defaultRenderingPass, action) {
     return state;
 }
 
+function elapsedTime(state = defaultElapsedTime, action) {
+    if (action.type === SET_ELAPSED_TIME) {
+        return action.elapsedTime;
+    }
+    return state;
+}
+
+function etaTime(state = defaultEtaTime, action) {
+    if (action.type === SET_ETA_TIME) {
+        return action.etaTime;
+    }
+    return state;
+}
+
+function avgTime(state = defaultAvgTime, action) {
+    if (action.type === SET_AVG_TIME) {
+        return action.avgTime;
+    }
+    return state;
+}
+
 // ----------------------------------------------------------------
 // redux store
 //
 export const reduxStore = createStore(
-    combineReducers({ numSamples, numBounces, cameraFov, shadingMethod, renderingPass })
+    combineReducers({
+        numSamples,
+        numBounces,
+        cameraFov,
+        shadingMethod,
+        renderingPass,
+        elapsedTime,
+        etaTime,
+        avgTime,
+    })
 );
