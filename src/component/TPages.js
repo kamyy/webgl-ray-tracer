@@ -1,3 +1,4 @@
+// @flow
 
 import React from 'react';
 
@@ -53,18 +54,17 @@ const cssSelectedTabButton = css`
     font-size: 12px;
 `
 
-export default class TPages extends React.Component<Props> {
-    currentTab: number;
+type Props = {
+};
 
-    constructor(props) {
-        super(props);
+type State = {
+    currentTab: 0 | 1 | 2;
+};
 
-        this.state = {
-            currentTab: RENDERING_PARAMS_TAB
-        };
-
-        this.onClick = this.onClick.bind(this);
-    }
+export default class TPages extends React.Component<Props, State> {
+    state = {
+        currentTab: RENDERING_PARAMS_TAB
+    };
 
     render() {
         const renderingParamsTabButtonStyle = this.state.currentTab === RENDERING_PARAMS_TAB ? cx(cssSelectedTabButton) : cx(cssTabButton);
@@ -82,22 +82,16 @@ export default class TPages extends React.Component<Props> {
         return <div className={css(cssTabPages)}>
 
             <div className={cx(cssTabBar)}>
-                <button type='button'
-                    className={renderingParamsTabButtonStyle}
-                    onClick={() => this.onClick(RENDERING_PARAMS_TAB)}>
-                        Rendering Parameters
+                <button type='button' className={renderingParamsTabButtonStyle} onClick={() => this.onClick(RENDERING_PARAMS_TAB)}>
+                    Rendering Parameters
                 </button>
 
-                <button type='button'
-                    className={renderingStatusTabButtonStyle}
-                    onClick={() => this.onClick(RENDERING_STATUS_TAB)}>
-                        Rendering Status
+                <button type='button' className={renderingStatusTabButtonStyle} onClick={() => this.onClick(RENDERING_STATUS_TAB)}>
+                    Rendering Status
                 </button>
 
-                <button type='button'
-                    className={applicationInfoTabButtonStyle}
-                    onClick={() => this.onClick(APPLICATION_INFO_TAB)}>
-                        App Info
+                <button type='button' className={applicationInfoTabButtonStyle} onClick={() => this.onClick(APPLICATION_INFO_TAB)}>
+                    App Info
                 </button>
             </div>
 
@@ -106,8 +100,9 @@ export default class TPages extends React.Component<Props> {
         </div>
     }
 
-    onClick(selectedTab) {
-        this.setState({ currentTab: selectedTab });
+    onClick(selectedTab: 0 | 1 | 2) {
+        this.setState({
+            currentTab: selectedTab
+        });
     }
-
 };

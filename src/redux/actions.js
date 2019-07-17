@@ -1,4 +1,5 @@
 // @flow
+
 export const SET_NUM_SAMPLES = 'SET_NUM_SAMPLES';
 export const SET_NUM_BOUNCES = 'SET_NUM_BOUNCES';
 export const SET_CAMERA_FOV  = 'SET_CAMERA_FOV';

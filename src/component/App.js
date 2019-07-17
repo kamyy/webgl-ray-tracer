@@ -1,3 +1,5 @@
+// @flow
+
 import React from 'react';
 import Canvas from './Canvas.js';
 import TPages from './TPages.js';
@@ -14,7 +16,12 @@ import {
     canvasWd,
 }   from './Canvas.js';
 
-function App(props) {
+type Props = {
+    renderingPass: number,
+    numSamples: number
+};
+
+function App(props: Props) {
     const ratio = props.renderingPass / props.numSamples;
     const width = ratio * canvasWd;
 
@@ -33,7 +40,7 @@ function App(props) {
     const cssProgressBar = css`
         margin: 6px 0px 12px 2px;
         border-radius: 6px;
-        width: ${width}px;
+        width: ${width - 8}px;
         height: 3px;
         background-color: darkgreen;
     `

@@ -1,3 +1,4 @@
+// @flow
 
 import React from 'react';
 
@@ -5,7 +6,7 @@ import {
     css
 }   from 'emotion';
 
-export default function ApplicationInfo(props) {
+export default function ApplicationInfo() {
     const cssApplicationInfo = css`
         display: flex;
         flex-direction: row;
