@@ -15,7 +15,8 @@ import {
 }   from './Canvas.js';
 
 function App(props) {
-    const progressBarWidth = props.renderingPass / props.numSamples * canvasWd + 2;
+    const ratio = props.renderingPass / props.numSamples;
+    const width = ratio * canvasWd;
 
     const cssApp = css`
         font-family: 'Roboto';
@@ -24,17 +25,31 @@ function App(props) {
         width: ${canvasWd + 4}px;
         margin: auto;
     `
+    const cssProgressRow = css`
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-start;
+    `
     const cssProgressBar = css`
-        margin: 4px 0px 12px 2px;
+        margin: 6px 0px 12px 2px;
         border-radius: 6px;
-        width: ${progressBarWidth}px;
-        height: 2px;
+        width: ${width}px;
+        height: 3px;
         background-color: darkgreen;
     `
+    const cssProgressPercentage = css`
+        margin: 0px 0px 0px 4px;
+        font-size: 12px;
+        font-weight: bold;
+    `
+
+    const percentage = Math.floor(ratio * 100 + 0.5);
 
     return <div className={cssApp}>
         <Canvas/>
-        <div className={cssProgressBar}/>
+        <div className={cssProgressRow}>
+            <div className={cssProgressBar}/><div className={cssProgressPercentage}>{percentage}%</div>
+        </div>
         <TPages/>
     </div>
 }
