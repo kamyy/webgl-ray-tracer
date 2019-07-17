@@ -93,7 +93,7 @@ class Canvas extends React.Component<Props> {
         const renderPass = reduxStore.getState().renderingPass;
         const numSamples = reduxStore.getState().numSamples;
 
-        if (renderPass > 0) {
+        if (renderPass > 1) {
             const durationMs = Date.now() - this.restartRenderTimestamp;
             const avg = (durationMs / renderPass);
             const eta = (numSamples - renderPass) * avg;
@@ -102,10 +102,6 @@ class Canvas extends React.Component<Props> {
             this.props.setEtaTime(new Date(eta).toISOString().substr(11, 8));
             this.props.setAvgTime(avg.toFixed(0) + 'ms');
         }
-
-        if (renderPass < numSamples) {
-            setTimeout(() => this.refreshTimers(), 1000);
-        }
     }
 
     restartTimers() {
@@ -113,7 +109,6 @@ class Canvas extends React.Component<Props> {
         this.props.setElapsedTime('00:00:00');
         this.props.setEtaTime('??:??:??');
         this.props.setAvgTime('????');
-        setTimeout(() => this.refreshTimers(), 1000);
     }
 
     restartRender() {
@@ -140,6 +135,7 @@ class Canvas extends React.Component<Props> {
                     this.props.setRenderingPass(renderPass);
                 }
                 this.executeRenderingPass();
+                this.refreshTimers();
             } else {
                 this.bRendering = false;
             }
