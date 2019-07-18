@@ -10,38 +10,38 @@ import {
     css
 }   from 'emotion';
 
+const cssTabPage = css`
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    border-style: groove;
+    border-width: thin;
+    padding: 24px;
+`
+
+const cssLegend = css`
+    margin: 0px;
+    font-weight: bold;
+    font-size: 12px;
+`
+
+const cssPassFieldset = css`
+    border-style: none groove none groove;
+    border-width: thin;
+    padding: 8px;
+    width: 280px;
+    text-align: center;
+`
+
+const cssTimeFieldset = css`
+    border-style: none groove none none;
+    border-width: thin;
+    padding: 8px;
+    width: 280px;
+    text-align: center;
+`
+
 function RenderingStatus(props) {
-    const cssTabPage = css`
-        display: flex;
-        flex-direction: row;
-        justify-content: center;
-        border-style: groove;
-        border-width: thin;
-        padding: 24px;
-    `
-
-    const cssLegend = css`
-        margin: 0px;
-        font-weight: bold;
-        font-size: 12px;
-    `
-
-    const cssPassFieldset = css`
-        border-style: none groove none groove;
-        border-width: thin;
-        padding: 8px;
-        width: 280px;
-        text-align: center;
-    `
-
-    const cssTimeFieldset = css`
-        border-style: none groove none none;
-        border-width: thin;
-        padding: 8px;
-        width: 280px;
-        text-align: center;
-    `
-
     return <div className={cssTabPage}>
         <fieldset className={cssPassFieldset}>
             <legend class={cssLegend}>Rendering Pass</legend>

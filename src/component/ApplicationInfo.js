@@ -6,33 +6,33 @@ import {
     css
 }   from 'emotion';
 
+const cssApplicationInfo = css`
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: center;
+    border-style: groove;
+    border-width: thin;
+    padding: 16px 32px;
+`;
+
+const cssProjectInfo = css`
+    margin: 6px;
+    font-size: 14px;
+    text-align: center;
+`;
+
+const cssMouseInfo = css`
+    margin: 2px;
+    font-size: 14px;
+    text-align: center;
+`
+
+const cssMouseBold = css`
+    font-weight: bold;
+`
+
 export default function ApplicationInfo() {
-    const cssApplicationInfo = css`
-        display: flex;
-        flex-direction: row;
-        justify-content: space-evenly;
-        align-items: center;
-        border-style: groove;
-        border-width: thin;
-        padding: 16px 32px;
-    `;
-
-    const cssProjectInfo = css`
-        margin: 6px;
-        font-size: 14px;
-        text-align: center;
-    `;
-
-    const cssMouseInfo = css`
-        margin: 2px;
-        font-size: 14px;
-        text-align: center;
-    `
-
-    const cssMouseBold = css`
-        font-weight: bold;
-    `
-
     return <div className={cssApplicationInfo}>
         <div>
             <p className={cssProjectInfo}>MIT License</p>
