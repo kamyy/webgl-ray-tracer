@@ -39,7 +39,7 @@ const cssTabPage = css`
     padding: 16px 32px;
 `
 
-const cssHeadingLabel = css`
+const cssBold = css`
     font-weight: bold;
     font-size: 12px;
 `
@@ -50,7 +50,6 @@ const cssLtSection = css`
     flex-grow: 2;
     margin: 5px 0px;
 `
-
 const cssRtSection = css`
     border-style: none none none groove;
     border-width: thin;
@@ -58,27 +57,35 @@ const cssRtSection = css`
     margin: 4px 4px;
 `
 
-const cssRangeGroup = css`
+const cssValueRow = css`
+    display: flex;
+    flex-direction: row;
+`
+const cssHeading = css`
+    flex-basis: 95%;
+    font-weight: bold;
+    font-size: 12px;
+`
+
+const cssRangeRow = css`
     display: flex;
     flex-direction: row;
     padding-top: 5px;
     padding-bottom: 15px;
 `
 
-const cssMinLabel = css`
+const cssMinRange = css`
     flex-basis: 5%;
     text-align: right;
     margin-right: 10px;
 `
-
-const cssMaxLabel = css`
+const cssInputRange = css`
+    flex-basis: 90%;
+`
+const cssMaxRange = css`
     flex-basis: 5%;
     text-align: left;
     margin-left: 10px;
-`
-
-const cssRangeInput = css`
-    flex-basis: 90%;
 `
 
 const cssShadingMethodSection = css`
@@ -96,48 +103,57 @@ function RenderingParams(props) {
     return <div className={cssTabPage}>
         <div className={cssLtSection}>
 
-            <label class={cssHeadingLabel}>Camera Field of View ( {props.cameraFov} )</label>
+            <div className={cssValueRow}>
+                <label className={cssHeading}>Camera Field of View</label>
+                <div className={cssBold}>{props.cameraFov}</div>
+            </div>
 
-            <div className={cssRangeGroup}>
-                <label className={cssMinLabel}>{minCameraFov}</label>
-                <input type='range' className={cssRangeInput}
+            <div className={cssRangeRow}>
+                <label className={cssMinRange}>{minCameraFov}</label>
+                <input type='range' className={cssInputRange}
                     min={minCameraFov}
                     max={maxCameraFov}
                     value={props.cameraFov}
                     onChange={event => props.setCameraFov(parseInt(event.target.value))}
                 />
-                <label className={cssMaxLabel}>{maxCameraFov}</label>
+                <label className={cssMaxRange}>{maxCameraFov}</label>
             </div>
 
-            <label class={cssHeadingLabel}># of Samples Per Pixel ( {props.numSamples} )</label>
+            <div className={cssValueRow}>
+                <label className={cssHeading}># of Samples Per Pixel</label>
+                <div className={cssBold}>{props.numSamples}</div>
+            </div>
 
-            <div className={cssRangeGroup}>
-                <label className={cssMinLabel}>{minSamples}</label>
-                <input type='range' className={cssRangeInput}
+            <div className={cssRangeRow}>
+                <label className={cssMinRange}>{minSamples}</label>
+                <input type='range' className={cssInputRange}
                     min={minSamples}
                     max={maxSamples}
                     value={props.numSamples}
                     onChange={event => props.setNumSamples(parseInt(event.target.value))}
                 />
-                <label className={cssMaxLabel}>{maxSamples}</label>
+                <label className={cssMaxRange}>{maxSamples}</label>
             </div>
 
-            <label class={cssHeadingLabel}># of Ray Bounces ( {props.numBounces} )</label>
+            <div className={cssValueRow}>
+                <label className={cssHeading}># of Ray Bounces</label>
+                <div className={cssBold}>{props.numBounces}</div>
+            </div>
 
-            <div className={cssRangeGroup}>
-                <label className={cssMinLabel}>{minBounces}</label>
-                <input type='range' className={cssRangeInput}
+            <div className={cssRangeRow}>
+                <label className={cssMinRange}>{minBounces}</label>
+                <input type='range' className={cssInputRange}
                     min={minBounces}
                     max={maxBounces}
                     value={props.numBounces}
                     onChange={event => props.setNumBounces(parseInt(event.target.value))}
                 />
-                <label className={cssMaxLabel}>{maxBounces}</label>
+                <label className={cssMaxRange}>{maxBounces}</label>
             </div>
         </div>
 
         <fieldset className={cssRtSection}>
-            <legend class={cssHeadingLabel}>Shading Method</legend>
+            <legend className={cssBold}>Shading Method</legend>
 
             <div className={cssShadingMethodSection}>
                 <label className={cssShadingMethodButtons}>
