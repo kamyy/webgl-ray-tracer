@@ -23,7 +23,7 @@ import {
 //
 const defaultNumSamples    = 100;
 const defaultNumBounces    = 12;
-const defaultCameraFov     = 30;
+const defaultCameraFov     = 45;
 const defaultShadingMethod = FLAT_SHADING;
 const defaultRenderingPass = 0;
 const defaultElapsedTime   = 0;
