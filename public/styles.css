@@ -1,3 +1,4 @@
+/* input range */
 input[type=range] {
     -webkit-appearance: none;
     width: 100%; /* required for Firefox. */
@@ -48,4 +49,31 @@ input[type=range]::-moz-range-thumb {
     height: 12px;
     background: darkgray;
     box-shadow: 2px 2px 2px #000000, 0px 0px 2px #0d0d0d;
+}
+
+/* loading spinner */
+.spinner {
+  position: absolute;
+  top: 35%;
+  left: 49%;
+  margin: auto;
+  border-radius: 50%;
+  border-top: 16px solid blue;
+  border-right: 16px solid green;
+  border-bottom: 16px solid red;
+  border-left: 16px solid yellow;
+  width: 12px;
+  height: 12px;
+  -webkit-animation: spin 2s linear infinite;
+  animation: spin 1s linear infinite;
+}
+
+@-webkit-keyframes spin {
+  0% { -webkit-transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
