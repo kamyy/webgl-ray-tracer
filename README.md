@@ -1,4 +1,5 @@
 # WebGL Ray Tracer
+
 I attended a talk given by Eric Haines at GDC 2019 titled 'A Fast Forward Through [Ray Tracing Gems](http://www.realtimerendering.com/raytracinggems)'. Real-time ray tracing was a hot topic at GDC 2019 and Peter Shirley's series of tutorials [writing a ray tracer in just one weekend](http://in1weekend.blogspot.com/2016/01/ray-tracing-in-one-weekend.html) was mentioned in passing.
 
 Inspired by what I'd seen I started this project to see if it was possible to write a ray tracer utilzing the awesome compute power of the GPU and put it on the World Wide Web.
