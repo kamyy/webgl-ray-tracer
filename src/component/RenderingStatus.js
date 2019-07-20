@@ -44,22 +44,22 @@ const cssTimeFieldset = css`
 function RenderingStatus(props) {
     return <div className={cssTabPage}>
         <fieldset className={cssPassFieldset}>
-            <legend class={cssLegend}>Rendering Pass</legend>
+            <legend className={cssLegend}>Rendering Pass</legend>
             <div> { props.renderingPass} / {props.numSamples} </div>
         </fieldset>
 
         <fieldset className={cssTimeFieldset}>
-            <legend class={cssLegend}>Elapsed Time</legend>
+            <legend className={cssLegend}>Elapsed Time</legend>
             <div>{props.elapsedTime}</div>
         </fieldset>
 
         <fieldset className={cssTimeFieldset}>
-            <legend class={cssLegend}>Remaining Time</legend>
+            <legend className={cssLegend}>Remaining Time</legend>
             <div>{props.etaTime}</div>
         </fieldset>
 
         <fieldset className={cssTimeFieldset}>
-            <legend class={cssLegend}>Avg. Duration Per Pass</legend>
+            <legend className={cssLegend}>Avg. Duration Per Pass</legend>
             <div>{props.avgTime}</div>
         </fieldset>
     </div>
