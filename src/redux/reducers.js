@@ -6,6 +6,7 @@ import {
 }   from 'redux';
 
 import {
+    SET_LOAD_STATUS,
     SET_NUM_SAMPLES,
     SET_NUM_BOUNCES,
     SET_CAMERA_FOV,
@@ -15,12 +16,14 @@ import {
     SET_ETA_TIME,
     SET_AVG_TIME,
 
+    SPINNER_SHOW,
     FLAT_SHADING,
 }   from './actions.js'
 
 // ----------------------------------------------------------------
 // default states
 //
+const defaultLoadStatus    = SPINNER_SHOW;
 const defaultNumSamples    = 100;
 const defaultNumBounces    = 12;
 const defaultCameraFov     = 45;
@@ -33,6 +36,13 @@ const defaultAvgTime = 0;
 // ----------------------------------------------------------------
 // reducers
 //
+function loadStatus(state = defaultLoadStatus, action) {
+    if (action.type === SET_LOAD_STATUS) {
+        return action.loadStatus;
+    }
+    return state;
+}
+
 function numSamples(state = defaultNumSamples, action) {
     if (action.type === SET_NUM_SAMPLES) {
         return action.numSamples;
@@ -94,6 +104,7 @@ function avgTime(state = defaultAvgTime, action) {
 //
 export const reduxStore = createStore(
     combineReducers({
+        loadStatus,
         numSamples,
         numBounces,
         cameraFov,

@@ -13,8 +13,13 @@ import {
 import {
     setRenderingPass,
     setElapsedTime,
+    setLoadStatus,
     setEtaTime,
     setAvgTime,
+
+    SPINNER_SHOW,
+    SPINNER_HIDE,
+    LOAD_FAILURE,
 }   from '../redux/actions.js';
 
 import Vector1x4 from '../math/Vector1x4.js';
@@ -39,6 +44,7 @@ export const cameraNode = new RefFrame(parentNode);
 cameraNode.translate(new Vector1x4(0.0, -10.0, 2.0));
 
 type Props = {
+    loadStatus: number,
     numSamples: number,
     numBounces: number,
     cameraFov:  number,
@@ -46,6 +52,7 @@ type Props = {
 
     setRenderingPass: (a: number) => void,
     setElapsedTime: (a: string) => void,
+    setLoadStatus: (a: number) => void,
     setEtaTime: (a: string) => void,
     setAvgTime: (a: string) => void,
 };
@@ -84,9 +91,29 @@ class Canvas extends React.Component<Props> {
     }
 
     render() {
-        return <canvas id='Canvas' width={canvasWd} height={canvasHt} style={{ borderStyle: 'ridge', borderWidth: 'medium'}}>
-            Please use a GPU and browser that supports WebGL 2
-        </canvas>
+        let spinner;
+
+        switch (this.props.loadStatus) {
+        case SPINNER_SHOW:
+            spinner = <div className='spinner'/>;
+            break;
+        case SPINNER_HIDE:
+            spinner = null;
+            break;
+        case LOAD_FAILURE:
+            spinner = <h1>*** Error! WebGL 2 not supported or GPU does not meet minimum requirements! ***</h1>
+            break;
+        default:
+            break;
+        }
+
+        return <div>
+            <canvas id='Canvas' width={canvasWd} height={canvasHt} style={{ borderStyle: 'ridge', borderWidth: 'medium'}}>
+                Please use a GPU and browser that supports WebGL 2
+            </canvas>
+
+            {spinner}
+        </div>
     }
 
     refreshTimers() {
@@ -142,11 +169,28 @@ class Canvas extends React.Component<Props> {
         });
     }
 
-    log_GPU_Caps() {
-        console.log(`MAX_ARRAY_TEXTURE_LAYERS = ${this.GL.getParameter(this.GL.MAX_ARRAY_TEXTURE_LAYERS)}`);
-        console.log(`MAX_TEXTURE_IMAGE_UNITS = ${this.GL.getParameter(this.GL.MAX_TEXTURE_IMAGE_UNITS)}`);
-        console.log(`MAX_RENDERBUFFER_SIZE = ${this.GL.getParameter(this.GL.MAX_RENDERBUFFER_SIZE)}`);
-        console.log(`MAX_TEXTURE_SIZE = ${this.GL.getParameter(this.GL.MAX_TEXTURE_SIZE)}`);
+    GPU_MeetsRequirements() {
+        const MAX_ARRAY_TEXTURE_LAYERS  = this.GL.getParameter(this.GL.MAX_ARRAY_TEXTURE_LAYERS);
+        const MAX_TEXTURE_IMAGE_UNITS   = this.GL.getParameter(this.GL.MAX_TEXTURE_IMAGE_UNITS);
+        const MAX_RENDERBUFFER_SIZE     = this.GL.getParameter(this.GL.MAX_RENDERBUFFER_SIZE);
+        const MAX_TEXTURE_SIZE          = this.GL.getParameter(this.GL.MAX_TEXTURE_SIZE);
+
+        console.log(`MAX_ARRAY_TEXTURE_LAYERS = ${MAX_ARRAY_TEXTURE_LAYERS}`);
+        console.log(`MAX_TEXTURE_IMAGE_UNITS = ${MAX_TEXTURE_IMAGE_UNITS}`);
+        console.log(`MAX_RENDERBUFFER_SIZE = ${MAX_RENDERBUFFER_SIZE}`);
+        console.log(`MAX_TEXTURE_SIZE = ${MAX_TEXTURE_SIZE}`);
+
+        if (!this.GL.getExtension('EXT_color_buffer_float')) {
+            console.log(`EXT_color_buffer_float not supported`);
+            return false;
+        }
+        if (MAX_ARRAY_TEXTURE_LAYERS < 2048     ||
+            MAX_TEXTURE_IMAGE_UNITS  < 16       ||
+            MAX_RENDERBUFFER_SIZE    < 16384    ||
+            MAX_TEXTURE_SIZE         < 16384) {
+            return false;
+        }
+        return true;
     }
 
     componentDidMount() {
@@ -157,40 +201,41 @@ class Canvas extends React.Component<Props> {
                 alpha: false,
             });
 
-            if (this.GL instanceof WebGL2RenderingContext) {
-                if (this.GL.getExtension('EXT_color_buffer_float')) {
-                    this.log_GPU_Caps();
+            if (this.GL instanceof WebGL2RenderingContext && this.GPU_MeetsRequirements()) {
 
-                    this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
-                    this.canvas.onmousedown = e => this.onMouseDown(e);
-                    window.onmousemove = e => this.onMouseMove(e);
-                    window.onmouseup = e => this.onMouseUp(e);
+                this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
+                this.canvas.onmousedown = e => this.onMouseDown(e);
+                window.onmousemove = e => this.onMouseMove(e);
+                window.onmouseup = e => this.onMouseUp(e);
 
-                    this.sceneTextures = new SceneTextures(this.GL, '/suzanne.obj', '/suzanne.mtl');
-                    this.colorTextures = new ColorTextures(this.GL, canvasWd, canvasHt);
-                    this.randomTexture = new RandomTexture(this.GL, canvasWd, canvasHt);
-                    this.sampleShader = new SampleShader(this.GL, this.sceneTextures,
-                                                        this.colorTextures,
-                                                        this.randomTexture,
-                                                        canvasWd,
-                                                        canvasHt);
-                    this.canvasShader = new CanvasShader(this.colorTextures);
+                this.sceneTextures = new SceneTextures(this.GL, '/suzanne.obj', '/suzanne.mtl');
+                this.colorTextures = new ColorTextures(this.GL, canvasWd, canvasHt);
+                this.randomTexture = new RandomTexture(this.GL, canvasWd, canvasHt);
+                this.sampleShader = new SampleShader(this.GL, this.sceneTextures,
+                                                    this.colorTextures,
+                                                    this.randomTexture,
+                                                    canvasWd,
+                                                    canvasHt);
+                this.canvasShader = new CanvasShader(this.colorTextures);
 
-                    this.sceneTextures.init(this.GL)
-                        .then(() => this.sampleShader.init(this.GL, '/sample-vs.glsl', '/sample-fs.glsl'))
-                        .then(() => this.canvasShader.init(this.GL, '/canvas-vs.glsl', '/canvas-fs.glsl'))
-                        .then(() => this.restartRender());
+                this.sceneTextures.init(this.GL)
+                    .then(() => this.sampleShader.init(this.GL, '/sample-vs.glsl', '/sample-fs.glsl'))
+                    .then(() => this.canvasShader.init(this.GL, '/canvas-vs.glsl', '/canvas-fs.glsl'))
+                    .then(() => {
+                        this.props.setLoadStatus(SPINNER_HIDE);
+                        this.restartRender();
+                    });
 
-                    return;
-                }
+                return;
             }
+            this.props.setLoadStatus(LOAD_FAILURE);
             this.GL = null;
         }
     }
 
     shouldComponentUpdate() {
         this.restartRender();
-        return false;
+        return true;
     }
 
     degreesToRadians(degrees) {
@@ -260,6 +305,7 @@ class Canvas extends React.Component<Props> {
 
 function mapStateToProps(state) {
     const props = {
+        loadStatus: state.loadStatus,
         numSamples: state.numSamples,
         numBounces: state.numBounces,
         cameraFov:  state.cameraFov,
@@ -272,6 +318,7 @@ function mapDispatchToProps(dispatch) {
     return bindActionCreators({
         setRenderingPass,
         setElapsedTime,
+        setLoadStatus,
         setEtaTime,
         setAvgTime,
     }, dispatch);
