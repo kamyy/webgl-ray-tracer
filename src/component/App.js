@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Canvas from './Canvas.js';
-import TPages from './TPages.js';
+import BottomTabPages from './BottomTabPages.js';
 
 import {
     css
@@ -58,9 +58,10 @@ function App(props: Props) {
     return <div className={cssApp}>
         <Canvas/>
         <div className={cssProgressRow}>
-            <div className={cssProgressBar}/><div className={cssProgressPercentage}>{percentage}%</div>
+            <div className={cssProgressBar}/>
+            <div className={cssProgressPercentage}>{percentage}%</div>
         </div>
-        <TPages/>
+        <BottomTabPages/>
     </div>
 }
 

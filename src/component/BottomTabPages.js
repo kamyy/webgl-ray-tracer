@@ -61,7 +61,7 @@ type State = {
     currentTab: 0 | 1 | 2;
 };
 
-export default class TPages extends React.Component<Props, State> {
+export default class BottomTabPages extends React.Component<Props, State> {
     state = {
         currentTab: RENDERING_PARAMS_TAB
     };

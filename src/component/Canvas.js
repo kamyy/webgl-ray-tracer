@@ -97,13 +97,12 @@ class Canvas extends React.Component<Props> {
         case SPINNER_SHOW:
             spinner = <div className='spinner'/>;
             break;
-        case SPINNER_HIDE:
-            spinner = null;
-            break;
         case LOAD_FAILURE:
             spinner = <h1>*** Error! WebGL 2 not supported or GPU does not meet minimum requirements! ***</h1>
             break;
+        case SPINNER_HIDE:
         default:
+            spinner = null;
             break;
         }
 
