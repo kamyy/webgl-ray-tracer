@@ -1,5 +1,8 @@
 // @flow
 
+import Scene from '../texture/Scene.js';
+
+export const SET_SCENE = 'SET_SCENE';
 export const SET_LOAD_STATUS = 'SET_LOAD_STATUS';
 export const SET_NUM_SAMPLES = 'SET_NUM_SAMPLES';
 export const SET_NUM_BOUNCES = 'SET_NUM_BOUNCES';
@@ -17,7 +20,11 @@ export const LOAD_FAILURE = 2;
 export const FLAT_SHADING  = 0;
 export const PHONG_SHADING = 1;
 
-export function setLoadStatus(loadStatus: number) {
+export function setScene(scene: Scene) {
+    return { type: SET_SCENE, scene };
+}
+
+export function setLoadStatus(loadStatus: 0 | 1 | 2) {
     return { type: SET_LOAD_STATUS, loadStatus };
 }
 

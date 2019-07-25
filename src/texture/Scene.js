@@ -6,16 +6,20 @@ import wavefrontMtlParser from 'mtl-file-parser';
 import Material from '../material/Material.js';
 import {
     EMISSIVE_MATERIAL,
-    REFLECTIVE_MATERIAL,
     DIELECTRIC_MATERIAL,
 }   from '../material/Material.js';
 
 import Vector1x4 from '../math/Vector1x4.js';
+import RefFrame from '../math/RefFrame.js';
 
 const X_AXIS = 0;
 const Y_AXIS = 1;
 const Z_AXIS = 2;
 const BV_MIN_DELTA = 0.01;
+
+export const SCENE_UNINITIALIZED = 0;
+export const SCENE_INITIALIZING = 1;
+export const SCENE_INITIALIZED = 2;
 
 type Face = {
     p0: Vector1x4, // vertex position 0
@@ -132,23 +136,41 @@ class BV { // AABB bounding volume
     }
 }
 
-export default class SceneTextures {
+
+export default class Scene {
+    sceneStatus: number;
     objUrl: string;
     mtlUrl: string;
     objCount: number;
     mtlCount: number;
+    parsedObjs: Object;
+    parsedMtls: Object;
+
+    rootNode: RefFrame;
+    parentNode: RefFrame;
+    cameraNode: RefFrame;
+
+    GL: WebGL2RenderingContext;
     facesTexture: WebGLTexture;
     AABBsTexture: WebGLTexture;
     mtlsTexture: WebGLTexture;
 
-    constructor(GL: any, objUrl: string, mtlUrl: string) {
+    constructor(GL: WebGL2RenderingContext, objUrl: string, mtlUrl: string) {
+        this.sceneStatus = SCENE_UNINITIALIZED;
         this.objUrl = objUrl;
         this.mtlUrl = mtlUrl;
         this.objCount = 0;
-        this.mtlCount = 0
+        this.mtlCount = 0;
+        this.GL = GL;
+
         this.facesTexture = GL.createTexture();
         this.AABBsTexture = GL.createTexture();
         this.mtlsTexture = GL.createTexture();
+
+        this.rootNode = new RefFrame();
+        this.parentNode = new RefFrame(this.rootNode);
+        this.cameraNode = new RefFrame(this.parentNode);
+        this.cameraNode.translate(new Vector1x4(0.0, -10.0, 2.0));
     }
 
     async fetchTextFile(url: string): Promise<string> {
@@ -159,7 +181,9 @@ export default class SceneTextures {
         return response.text();
     }
 
-    async init(GL: any): Promise<void> {
+    async init(): Promise<Scene> {
+        this.sceneStatus = SCENE_INITIALIZING;
+
         let wavefrontObj;
         let wavefrontMtl;
         try {
@@ -175,7 +199,7 @@ export default class SceneTextures {
         let posArray = [];
         let nrmArray = [];
 
-        const parsedObjs = wavefrontObj.models.map(({ vertices, vertexNormals, faces }) => {
+        this.parsedObjs = wavefrontObj.models.map(({ vertices, vertexNormals, faces }) => {
             const outFaces = [];
             posArray = posArray.concat(vertices);
             nrmArray = nrmArray.concat(vertexNormals);
@@ -225,7 +249,7 @@ export default class SceneTextures {
             };
         });
 
-        const parsedMtls = wavefrontMtl.map(mtl => {
+        this.parsedMtls = wavefrontMtl.map(mtl => {
             const mat = new Material(new Vector1x4(mtl.Kd.red, mtl.Kd.green, mtl.Kd.blue));
             // 'Metal 0', 0.95, 'Glass 0', 0.00, 1.33
             switch (mtl.name) {
@@ -259,20 +283,23 @@ export default class SceneTextures {
             }
             return mat;
         });
-        console.log(`# mtls ${parsedMtls.length}`);
+        console.log(`# mtls ${this.parsedMtls.length}`);
 
-        this.initTextures(GL, parsedObjs, parsedMtls);
-        this.objCount = parsedObjs.length;
-        this.mtlCount = parsedMtls.length;
+        this.initTextures(this.GL);
+        this.objCount = this.parsedObjs.length;
+        this.mtlCount = this.parsedMtls.length;
+
+        this.sceneStatus = SCENE_INITIALIZED;
+        return this;
     }
 
-    initTextures(GL: any, parsedObjs: Object[], parsedMtls: Object[]) {
-        const maxNumFaces = parsedObjs.reduce((max, obj) => Math.max(max, obj.faces.length), 0); // max number of faces
+    initTextures(GL: WebGL2RenderingContext) {
+        const maxNumFaces = this.parsedObjs.reduce((max, obj) => Math.max(max, obj.faces.length), 0); // max number of faces
         const numTexelsPerFace = 8; // RGBA texel
         const numFloatsPerFace = 24;
 
-        let data = new Float32Array(numFloatsPerFace * maxNumFaces * parsedObjs.length);
-        parsedObjs.forEach((obj, id) => {
+        let data = new Float32Array(numFloatsPerFace * maxNumFaces * this.parsedObjs.length);
+        this.parsedObjs.forEach((obj, id) => {
             let i = numFloatsPerFace * maxNumFaces * id; // index to start of texture slice for object's faces
             obj.faces.forEach(face => {
                 data[i++] = face.fn.x; data[i++] = face.fn.y; data[i++] = face.fn.z; // face unit normal
@@ -295,14 +322,14 @@ export default class SceneTextures {
         GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
         GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
         GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
-        GL.texImage3D(GL.TEXTURE_2D_ARRAY, 0, GL.RGB32F, numTexelsPerFace, maxNumFaces, parsedObjs.length, 0, GL.RGB, GL.FLOAT, data);
+        GL.texImage3D(GL.TEXTURE_2D_ARRAY, 0, GL.RGB32F, numTexelsPerFace, maxNumFaces, this.parsedObjs.length, 0, GL.RGB, GL.FLOAT, data);
 
-        const maxNumBVs = parsedObjs.reduce((val, obj) => Math.max(val, obj.AABBs.length), 0); // max number of BV nodes
+        const maxNumBVs = this.parsedObjs.reduce((val, obj) => Math.max(val, obj.AABBs.length), 0); // max number of BV nodes
         const numTexelsPerBV = 3; // RGBA texel
         const numFloatsPerBV = 12;
 
-        data = new Float32Array(numFloatsPerBV * maxNumBVs * parsedObjs.length);
-        parsedObjs.forEach((obj, id) => {
+        data = new Float32Array(numFloatsPerBV * maxNumBVs * this.parsedObjs.length);
+        this.parsedObjs.forEach((obj, id) => {
             let i = numFloatsPerBV * maxNumBVs * id; // index to start of texture slice for the object's BVH tree
             obj.AABBs.forEach(bv => {
                 data[i++] = bv.min.x;
@@ -327,12 +354,12 @@ export default class SceneTextures {
         GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
         GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
         GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
-        GL.texImage3D(GL.TEXTURE_2D_ARRAY, 0, GL.RGBA32F, numTexelsPerBV, maxNumBVs, parsedObjs.length, 0, GL.RGBA, GL.FLOAT, data);
+        GL.texImage3D(GL.TEXTURE_2D_ARRAY, 0, GL.RGBA32F, numTexelsPerBV, maxNumBVs, this.parsedObjs.length, 0, GL.RGBA, GL.FLOAT, data);
 
         const numTexelsPerMtl = 2;
         const numFloatsPerMtl = 8;
-        data = new Float32Array(numFloatsPerMtl * parsedMtls.length);
-        parsedMtls.forEach((mtl, id) => {
+        data = new Float32Array(numFloatsPerMtl * this.parsedMtls.length);
+        this.parsedMtls.forEach((mtl, id) => {
             let i = numFloatsPerMtl * id;
             data[i++] = mtl.albedo.x;
             data[i++] = mtl.albedo.y;
@@ -350,10 +377,10 @@ export default class SceneTextures {
         GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
         GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
         GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
-        GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32F, numTexelsPerMtl, parsedMtls.length, 0, GL.RGBA, GL.FLOAT, data);
+        GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32F, numTexelsPerMtl, this.parsedMtls.length, 0, GL.RGBA, GL.FLOAT, data);
     }
 
-    bindToSampleShader(GL: any, program: WebGLProgram) {
+    bindToSampleShader(GL: any, program: Webthis.GLProgram) {
         GL.activeTexture(GL.TEXTURE3);
         GL.bindTexture(GL.TEXTURE_2D_ARRAY, this.facesTexture);
         GL.uniform1i(GL.getUniformLocation(program, 'u_face_sampler'), 3);

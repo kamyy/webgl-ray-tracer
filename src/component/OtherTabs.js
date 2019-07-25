@@ -28,19 +28,6 @@ const cssTabBar = css`
     margin: 0px;
     border-style: none;
 `
-const cssTabButton = css`
-    border-style: none ridge none none;
-    border-radius: 5px 5px 0px 0px;
-    border-bottom-color: lightgray;
-    padding: 8px 16px;
-    &:focus {
-        background-color: lightgray;
-        outline: 0;
-    }
-    font-family: 'Roboto';
-    font-weight: bold;
-    font-size: 12px;
-`
 const cssSelectedTabButton = css`
     border-style: none ridge solid none;
     border-radius: 5px 5px 0px 0px;
@@ -53,23 +40,32 @@ const cssSelectedTabButton = css`
     font-weight: bold;
     font-size: 12px;
 `
+const cssUnselectedTabButton = css`
+    border-style: none ridge none none;
+    border-radius: 5px 5px 0px 0px;
+    border-bottom-color: lightgray;
+    padding: 8px 16px;
+    &:focus {
+        background-color: lightgray;
+        outline: 0;
+    }
+    font-family: 'Roboto';
+    font-weight: bold;
+    font-size: 12px;
+`
 
 type Props = {
 };
 
-type State = {
-    currentTab: 0 | 1 | 2;
-};
-
-export default class BottomTabPages extends React.Component<Props, State> {
+export default class OtherTabs extends React.Component<Props, State> {
     state = {
         currentTab: RENDERING_PARAMS_TAB
     };
 
     render() {
-        const renderingParamsTabButtonStyle = this.state.currentTab === RENDERING_PARAMS_TAB ? cx(cssSelectedTabButton) : cx(cssTabButton);
-        const renderingStatusTabButtonStyle = this.state.currentTab === RENDERING_STATUS_TAB ? cx(cssSelectedTabButton) : cx(cssTabButton);
-        const applicationInfoTabButtonStyle = this.state.currentTab === APPLICATION_INFO_TAB ? cx(cssSelectedTabButton) : cx(cssTabButton);
+        const renderingParamsTabButtonStyle = this.state.currentTab === RENDERING_PARAMS_TAB ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);
+        const renderingStatusTabButtonStyle = this.state.currentTab === RENDERING_STATUS_TAB ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);
+        const applicationInfoTabButtonStyle = this.state.currentTab === APPLICATION_INFO_TAB ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);
 
         let tabPage;
         switch(this.state.currentTab) {

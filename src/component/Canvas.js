@@ -11,21 +11,29 @@ import {
 }   from 'react-redux';
 
 import {
+    css
+}   from 'emotion';
+
+import {
+    createScenes,
+}   from './SceneTabs.js';
+
+import {
+    SCENE_INITIALIZED,
+}   from '../texture/Scene.js';
+
+import {
     setRenderingPass,
     setElapsedTime,
     setLoadStatus,
     setEtaTime,
     setAvgTime,
 
-    SPINNER_SHOW,
-    SPINNER_HIDE,
     LOAD_FAILURE,
 }   from '../redux/actions.js';
 
 import Vector1x4 from '../math/Vector1x4.js';
-import RefFrame from '../math/RefFrame.js';
 
-import SceneTextures from '../texture/SceneTextures.js';
 import ColorTextures from '../texture/ColorTextures.js';
 import RandomTexture from '../texture/RandomTexture.js';
 import SampleShader from '../shader/SampleShader.js';
@@ -37,11 +45,6 @@ import {
 
 export const canvasWd = 1280;
 export const canvasHt = 720;
-
-export const rootNode = new RefFrame();
-export const parentNode = new RefFrame(rootNode);
-export const cameraNode = new RefFrame(parentNode);
-cameraNode.translate(new Vector1x4(0.0, -10.0, 2.0));
 
 type Props = {
     loadStatus: number,
@@ -57,6 +60,11 @@ type Props = {
     setAvgTime: (a: string) => void,
 };
 
+const cssCanvas = css`
+    border-style: groove;
+    border-width: thin;
+`
+
 class Canvas extends React.Component<Props> {
     lx: number;
     ly: number;
@@ -66,12 +74,10 @@ class Canvas extends React.Component<Props> {
     rButtonDown: boolean;
 
     restartRenderTimestamp: number;
-    bRendering: boolean;
 
     canvas: any;
     GL:     any;
 
-    sceneTextures: SceneTextures;
     colorTextures: ColorTextures;
     randomTexture: RandomTexture;
     sampleShader: SampleShader;
@@ -86,33 +92,12 @@ class Canvas extends React.Component<Props> {
         this.RXYZ_SCALAR = 0.25;
         this.lButtonDown = false;
         this.rButtonDown = false;
-
-        this.bRendering = false;
     }
 
     render() {
-        let spinner;
-
-        switch (this.props.loadStatus) {
-        case SPINNER_SHOW:
-            spinner = <div className='spinner'/>;
-            break;
-        case LOAD_FAILURE:
-            spinner = <h1>*** Error! WebGL 2 not supported or GPU does not meet minimum requirements! ***</h1>
-            break;
-        case SPINNER_HIDE:
-        default:
-            spinner = null;
-            break;
-        }
-
-        return <div>
-            <canvas id='Canvas' width={canvasWd} height={canvasHt} style={{ borderStyle: 'ridge', borderWidth: 'medium'}}>
-                Please use a GPU and browser that supports WebGL 2
-            </canvas>
-
-            {spinner}
-        </div>
+        return <canvas id='Canvas' className={cssCanvas} width={canvasWd} height={canvasHt}>
+            Please use a GPU and browser that supports WebGL 2
+        </canvas>
     }
 
     refreshTimers() {
@@ -141,30 +126,28 @@ class Canvas extends React.Component<Props> {
         if (this.GL) {
             this.props.setRenderingPass(0);
             this.restartTimers();
-            if(!this.bRendering) {
-                this.bRendering = true;
-                this.executeRenderingPass();
-            }
         }
     }
 
     executeRenderingPass() {
         requestAnimationFrame(() => {
-            let renderPass = reduxStore.getState().renderingPass;
-            let numSamples = reduxStore.getState().numSamples;
+            const scene = reduxStore.getState().scene;
 
-            if (renderPass < numSamples) {
-                if (renderPass === 0 || (!this.lButtonDown && !this.rButtonDown)) { // render 1st pass only if still moving camera around
-                    renderPass ++;
-                    this.sampleShader.draw(this.GL, renderPass, cameraNode.modelMatrix);
-                    this.canvasShader.draw(this.GL, renderPass);
-                    this.props.setRenderingPass(renderPass);
+            if (scene && scene.sceneStatus === SCENE_INITIALIZED) {
+                let renderPass = reduxStore.getState().renderingPass;
+                let numSamples = reduxStore.getState().numSamples;
+
+                if (renderPass < numSamples) {
+                    if (renderPass === 0 || (!this.lButtonDown && !this.rButtonDown)) { // render 1st pass only if still moving camera around
+                        renderPass ++;
+                        this.sampleShader.draw(this.GL, scene, renderPass, scene.cameraNode.modelMatrix);
+                        this.canvasShader.draw(this.GL, renderPass);
+                        this.props.setRenderingPass(renderPass);
+                    }
+                    this.refreshTimers();
                 }
-                this.executeRenderingPass();
-                this.refreshTimers();
-            } else {
-                this.bRendering = false;
             }
+            this.executeRenderingPass();
         });
     }
 
@@ -201,30 +184,29 @@ class Canvas extends React.Component<Props> {
             });
 
             if (this.GL instanceof WebGL2RenderingContext && this.GPU_MeetsRequirements()) {
-
                 this.canvas.oncontextmenu = event => event.preventDefault(); // disable right click context menu
                 this.canvas.onmousedown = e => this.onMouseDown(e);
                 window.onmousemove = e => this.onMouseMove(e);
                 window.onmouseup = e => this.onMouseUp(e);
 
-                this.sceneTextures = new SceneTextures(this.GL, '/suzanne.obj', '/suzanne.mtl');
                 this.colorTextures = new ColorTextures(this.GL, canvasWd, canvasHt);
                 this.randomTexture = new RandomTexture(this.GL, canvasWd, canvasHt);
-                this.sampleShader = new SampleShader(this.GL, this.sceneTextures,
-                                                    this.colorTextures,
-                                                    this.randomTexture,
-                                                    canvasWd,
-                                                    canvasHt);
+
+                this.sampleShader  = new SampleShader(this.GL,
+                                                      this.colorTextures,
+                                                      this.randomTexture,
+                                                      canvasWd,
+                                                      canvasHt);
                 this.canvasShader = new CanvasShader(this.colorTextures);
 
-                this.sceneTextures.init(this.GL)
-                    .then(() => this.sampleShader.init(this.GL, '/sample-vs.glsl', '/sample-fs.glsl'))
-                    .then(() => this.canvasShader.init(this.GL, '/canvas-vs.glsl', '/canvas-fs.glsl'))
-                    .then(() => {
-                        this.props.setLoadStatus(SPINNER_HIDE);
-                        this.restartRender();
-                    });
-
+                Promise.all([
+                    this.sampleShader.init(this.GL, '/sample-vs.glsl', '/sample-fs.glsl'),
+                    this.canvasShader.init(this.GL, '/canvas-vs.glsl', '/canvas-fs.glsl'),
+                ])
+                .then(() => {
+                    this.executeRenderingPass();
+                    createScenes(this.GL);
+                });
                 return;
             }
             this.props.setLoadStatus(LOAD_FAILURE);
@@ -271,10 +253,11 @@ class Canvas extends React.Component<Props> {
 
             const x = event.clientX;
             const y = event.clientY;
+            const scene = reduxStore.getState().scene;
 
             if ((this.lButtonDown && this.rButtonDown) || (this.lButtonDown && event.shiftKey)) { // dolly
                 if (x !== this.lx) {
-                    cameraNode.translate(new Vector1x4(0, (x - this.lx) * this.TXYZ_SCALAR, 0));
+                    scene.cameraNode.translate(new Vector1x4(0, (x - this.lx) * this.TXYZ_SCALAR, 0));
                     this.lx = x;
                     this.ly = y;
                     this.restartRender();
@@ -283,16 +266,16 @@ class Canvas extends React.Component<Props> {
                 if (x !== this.lx || y !== this.ly) {
                     const dx = (this.lx - x) * this.TXYZ_SCALAR;
                     const dz = (y - this.ly) * this.TXYZ_SCALAR;
-                    const dv = cameraNode.mapPos(new Vector1x4(dx, 0, dz, 0), parentNode);
-                    parentNode.translate(dv) // move parent in camera space
+                    const dv = scene.cameraNode.mapPos(new Vector1x4(dx, 0, dz, 0), scene.parentNode);
+                    scene.parentNode.translate(dv) // move parent in camera space
                     this.lx = x;
                     this.ly = y;
                     this.restartRender();
                 }
             } else if (this.lButtonDown) { // rotate
                 if (x !== this.lx || y !== this.ly) {
-                    parentNode.rotateZ(this.degreesToRadians(this.lx - x) * this.RXYZ_SCALAR); // yaw camera target around it's own z-axis
-                    cameraNode.rotateX(this.degreesToRadians(this.ly - y) * this.RXYZ_SCALAR, parentNode); // pitch around camera's parent x-axis
+                    scene.parentNode.rotateZ(this.degreesToRadians(this.lx - x) * this.RXYZ_SCALAR); // yaw camera target around it's own z-axis
+                    scene.cameraNode.rotateX(this.degreesToRadians(this.ly - y) * this.RXYZ_SCALAR, scene.parentNode); // pitch around camera's parent x-axis
                     this.lx = x;
                     this.ly = y;
                     this.restartRender();
@@ -304,6 +287,7 @@ class Canvas extends React.Component<Props> {
 
 function mapStateToProps(state) {
     const props = {
+        scene: state.scene,
         loadStatus: state.loadStatus,
         numSamples: state.numSamples,
         numBounces: state.numBounces,

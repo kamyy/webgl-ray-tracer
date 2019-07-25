@@ -6,6 +6,7 @@ import {
 }   from 'redux';
 
 import {
+    SET_SCENE,
     SET_LOAD_STATUS,
     SET_NUM_SAMPLES,
     SET_NUM_BOUNCES,
@@ -23,6 +24,7 @@ import {
 // ----------------------------------------------------------------
 // default states
 //
+const defaultScene         = null;
 const defaultLoadStatus    = SPINNER_SHOW;
 const defaultNumSamples    = 100;
 const defaultNumBounces    = 12;
@@ -36,6 +38,14 @@ const defaultAvgTime = 0;
 // ----------------------------------------------------------------
 // reducers
 //
+
+function scene(state = defaultScene, action) {
+    if (action.type === SET_SCENE) {
+        return action.scene;
+    }
+    return state;
+}
+
 function loadStatus(state = defaultLoadStatus, action) {
     if (action.type === SET_LOAD_STATUS) {
         return action.loadStatus;
@@ -104,6 +114,7 @@ function avgTime(state = defaultAvgTime, action) {
 //
 export const reduxStore = createStore(
     combineReducers({
+        scene,
         loadStatus,
         numSamples,
         numBounces,
