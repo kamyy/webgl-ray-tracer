@@ -47,7 +47,7 @@ input[type=range]::-moz-range-thumb {
     border: none;
     width: 12px;
     height: 12px;
-    background: darkgray;
+    background: darkgreen;
     box-shadow: 2px 2px 2px #000000, 0px 0px 2px #0d0d0d;
 }
 

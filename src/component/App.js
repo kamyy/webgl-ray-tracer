@@ -24,7 +24,7 @@ type Props = {
 
 const cssApp = css`
     font-family: 'Roboto';
-    background-color: '#f5f5f5';
+    background-color: #f5f5f5;
     position: relative;
     width: ${canvasWd + 4}px;
     margin: auto;

@@ -40,6 +40,7 @@ const cssSelectedTabButton = css`
     border-radius: 5px 5px 0px 0px;
     border-bottom-color: darkgreen;
     padding: 8px 24px;
+    background-color: #dddddd;
     &:focus {
         outline: 0;
     }
@@ -52,8 +53,9 @@ const cssUnselectedTabButton = css`
     border-radius: 5px 5px 0px 0px;
     border-bottom-color: lightgray;
     padding: 8px 24px;
+    background-color: #dddddd;
     &:focus {
-        background-color: lightgray;
+        background-color: #dddddd;
         outline: 0;
     }
     font-family: 'Roboto';
