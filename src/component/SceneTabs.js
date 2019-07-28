@@ -63,7 +63,7 @@ const cssUnselectedTabButton = css`
     font-size: 12px;
 `
 
-const scenes = [
+const scenes: Array<null | Scene> = [
     null,
     null,
     null,
