@@ -380,7 +380,7 @@ export default class Scene {
         GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32F, numTexelsPerMtl, this.parsedMtls.length, 0, GL.RGBA, GL.FLOAT, data);
     }
 
-    bindToSampleShader(GL: any, program: Webthis.GLProgram) {
+    bindToSampleShader(GL: any, program: WebGLProgram) {
         GL.activeTexture(GL.TEXTURE3);
         GL.bindTexture(GL.TEXTURE_2D_ARRAY, this.facesTexture);
         GL.uniform1i(GL.getUniformLocation(program, 'u_face_sampler'), 3);
