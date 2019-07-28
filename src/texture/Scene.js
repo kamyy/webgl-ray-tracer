@@ -1,9 +1,9 @@
 // @flow
 
+import wavefrontMtlParser from '../material/MTLFile.js';
 import wavefrontObjParser from 'obj-file-parser';
-import wavefrontMtlParser from 'mtl-file-parser';
-
 import Material from '../material/Material.js';
+
 import {
     EMISSIVE_MATERIAL,
     DIELECTRIC_MATERIAL,
