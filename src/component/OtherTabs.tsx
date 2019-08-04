@@ -50,14 +50,15 @@ const cssUnselectedTabButton = css`
     font-size: 12px;
 `
 
-type Props = {
+interface IProps {
 };
-type State = {
+
+interface IState {
     currentTab: number
 };
 
-export default class OtherTabs extends React.Component<Props, State> {
-    state: State = {
+export default class OtherTabs extends React.Component<IProps, IState> {
+    state: IState = {
         currentTab: RENDERING_PARAMS_TAB
     };
 

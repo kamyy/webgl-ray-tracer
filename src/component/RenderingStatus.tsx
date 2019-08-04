@@ -33,7 +33,7 @@ const cssTimeFieldset = css`
     text-align: center;
 `
 
-type Props = {
+interface IProps {
     numSamples: number,
     renderingPass: number,
     elapsedTime: string,
@@ -41,7 +41,7 @@ type Props = {
     avgTime: string,
 };
 
-function RenderingStatus(props: Props) {
+function RenderingStatus(props: IProps) {
     return <div className={cssTabPage}>
         <fieldset className={cssPassFieldset}>
             <legend className={cssLegend}>Rendering Pass</legend>

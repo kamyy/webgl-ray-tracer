@@ -87,7 +87,7 @@ const cssShadingMethodButtons = css`
     margin-right: 4px;
 `
 
-type Props = {
+interface IProps {
     numSamples: number,
     numBounces: number,
     cameraFov: number,
@@ -98,7 +98,7 @@ type Props = {
     setShadingMethod: (n: number) => void,
 };
 
-function RenderingParams(props: Props) {
+function RenderingParams(props: IProps) {
     return <div className={cssTabPage}>
         <div className={cssLtSection}>
 
