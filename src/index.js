@@ -1,17 +1,19 @@
 import * as serviceWorker from './serviceWorker';
 import ReactDOM from 'react-dom';
 import React from 'react';
-import { 
-    Provider 
-}   from 'react-redux';
-import { 
-    reduxStore 
-}   from './redux/reducers.js';
 
-import App from './component/App.js';
+import {
+    Provider
+}   from 'react-redux';
+
+import {
+    reduxStore
+}   from './redux/reducers';
+
+import App from './component/App';
 
 ReactDOM.render(
-    <Provider store={reduxStore}><App/></Provider>, 
+    <Provider store={reduxStore}><App/></Provider>,
     document.getElementById('root')
 );
 

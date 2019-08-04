@@ -1,15 +1,9 @@
-// @flow
-
 import React from 'react';
+import { cx, css }  from 'emotion';
 
-import {
-    cx,
-    css
-}   from 'emotion';
-
-import RenderingParams from './RenderingParams.js';
-import RenderingStatus from './RenderingStatus.js';
-import ApplicationInfo from './ApplicationInfo.js';
+import RenderingParams from './RenderingParams';
+import RenderingStatus from './RenderingStatus';
+import ApplicationInfo from './ApplicationInfo';
 
 const RENDERING_PARAMS_TAB = 0;
 const RENDERING_STATUS_TAB = 1;
@@ -58,9 +52,12 @@ const cssUnselectedTabButton = css`
 
 type Props = {
 };
+type State = {
+    currentTab: number
+};
 
 export default class OtherTabs extends React.Component<Props, State> {
-    state = {
+    state: State = {
         currentTab: RENDERING_PARAMS_TAB
     };
 

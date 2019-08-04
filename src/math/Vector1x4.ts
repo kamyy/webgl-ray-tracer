@@ -1,11 +1,10 @@
-// @flow
 import Matrix4x4, {
-    _00, _01, _02, _03, 
-    _10, _11, _12, _13, 
-    _20, _21, _22, _23, 
-    _30, _31, _32, _33 
-} 
-from './Matrix4x4.js';
+    _00, _01, _02, _03,
+    _10, _11, _12, _13,
+    _20, _21, _22, _23,
+    _30, _31, _32, _33
+}
+from './Matrix4x4';
 
 export default class Vector1x4 {
     elements: number[];
@@ -14,9 +13,9 @@ export default class Vector1x4 {
         this.elements = [x, y, z, w];
     }
 
-    get xyzw(): number[] { return this.elements; } 
+    get xyzw(): number[] { return this.elements; }
     get rgba(): number[] { return this.elements; }
-    get xyz(): number[] { return this.elements.slice(0, 3); } 
+    get xyz(): number[] { return this.elements.slice(0, 3); }
     get rgb(): number[] { return this.elements.slice(0, 3); }
 
     get x(): number { return this.elements[0]; }
@@ -54,7 +53,7 @@ export default class Vector1x4 {
     mul(rhs: number | Matrix4x4) {
         if (typeof rhs === 'number') {
             return new Vector1x4(this.x * rhs, this.y * rhs, this.z * rhs);
-        } 
+        }
         const x = this.x * rhs._m[_00] + this.y * rhs._m[_10] + this.z * rhs._m[_20] + this.w * rhs._m[_30];
         const y = this.x * rhs._m[_01] + this.y * rhs._m[_11] + this.z * rhs._m[_21] + this.w * rhs._m[_31];
         const z = this.x * rhs._m[_02] + this.y * rhs._m[_12] + this.z * rhs._m[_22] + this.w * rhs._m[_32];
@@ -86,6 +85,6 @@ export default class Vector1x4 {
     }
 
     toString(): string {
-        return "[Vector1x4 " + this.x + ", " + this.y + ", " + this.z + ", " + this.w + "]"; 
+        return "[Vector1x4 " + this.x + ", " + this.y + ", " + this.z + ", " + this.w + "]";
     }
 }

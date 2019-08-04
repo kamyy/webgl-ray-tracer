@@ -1,13 +1,8 @@
-
-// @flow
-
 export default class Shader {
-    vs: WebGLShader;
-    fs: WebGLShader;
-    va: any;
-    program: WebGLProgram;
+    program?: WebGLProgram;
+    va?: WebGLVertexArrayObject;
 
-    async fetchShader(url: string): Promise<string> {
+    private async fetchShader(url: string): Promise<string> {
         const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`Cannot GET ${url} status=${response.status}`);
@@ -15,11 +10,11 @@ export default class Shader {
         return response.text();
     }
 
-    initVSData(GL: any) {
-        this.va = GL.createVertexArray(); // begin vertex array object
+    private initVSData(GL: WebGL2RenderingContext): void {
+        this.va = <WebGLVertexArrayObject>GL.createVertexArray(); // begin vertex array object
         GL.bindVertexArray(this.va);
 
-        const vtxBuf = GL.createBuffer();
+        const vtxBuf = <WebGLBuffer>GL.createBuffer();
         GL.bindBuffer(GL.ARRAY_BUFFER, vtxBuf);
         GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([ // vertices for clip space rectangle covering entire canvas
             -1, -1,
@@ -34,7 +29,8 @@ export default class Shader {
             stride: 8,
             offset: 0
         };
-        const loc = GL.getAttribLocation(this.program, 'a_vert_data');
+
+        const loc = GL.getAttribLocation(<WebGLProgram>this.program, 'a_vert_data');
         GL.vertexAttribPointer(
             loc,
             desc.length,
@@ -43,35 +39,40 @@ export default class Shader {
             desc.stride,
             desc.offset,
         );
-
         GL.enableVertexAttribArray(loc);
+
         GL.bindVertexArray(null); // end vertex array object
     }
 
-    async init(GL: any, vsURL:string, fsURL: string): Promise<void> {
+    async init(
+        GL: WebGL2RenderingContext,
+        vsURL: string,
+        fsURL: string
+    ): Promise<void> {
         try {
             const responses = await Promise.all([
                 this.fetchShader(vsURL),
                 this.fetchShader(fsURL),
             ]);
 
-            this.vs = GL.createShader(GL.VERTEX_SHADER);
-            this.fs = GL.createShader(GL.FRAGMENT_SHADER);
-            GL.shaderSource(this.vs, responses[0]);
-            GL.shaderSource(this.fs, responses[1]);
-            GL.compileShader(this.vs);
-            GL.compileShader(this.fs);
+            this.program = <WebGLProgram>GL.createProgram();
+            const vs = <WebGLShader>GL.createShader(GL.VERTEX_SHADER);
+            const fs = <WebGLShader>GL.createShader(GL.FRAGMENT_SHADER);
 
-            if (!GL.getShaderParameter(this.vs, GL.COMPILE_STATUS)) {
-                throw new Error(`Error compiling ${vsURL} !\n ${GL.getShaderInfoLog(this.vs)}\n`);
+            GL.shaderSource(vs, responses[0]);
+            GL.shaderSource(fs, responses[1]);
+            GL.compileShader(vs);
+            GL.compileShader(fs);
+
+            if (!GL.getShaderParameter(vs, GL.COMPILE_STATUS)) {
+                throw new Error(`Error compiling ${vsURL} !\n ${GL.getShaderInfoLog(vs)}\n`);
             }
-            if (!GL.getShaderParameter(this.fs, GL.COMPILE_STATUS)) {
-                throw new Error(`Error compiling ${fsURL} !\n ${GL.getShaderInfoLog(this.fs)}\n`);
+            if (!GL.getShaderParameter(fs, GL.COMPILE_STATUS)) {
+                throw new Error(`Error compiling ${fsURL} !\n ${GL.getShaderInfoLog(fs)}\n`);
             }
 
-            this.program = GL.createProgram();
-            GL.attachShader(this.program, this.vs);
-            GL.attachShader(this.program, this.fs);
+            GL.attachShader(this.program, vs);
+            GL.attachShader(this.program, fs);
             GL.linkProgram(this.program);
             if (!GL.getProgramParameter(this.program, GL.LINK_STATUS)) {
                 const log = GL.getProgramInfoLog(this.program);

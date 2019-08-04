@@ -1,26 +1,10 @@
-// @flow
-
 import React from 'react';
-import Canvas from './Canvas.js';
-import SceneTabs from './SceneTabs.js';
-import OtherTabs from './OtherTabs.js';
+import { css } from 'emotion';
+import { connect }  from 'react-redux';
 
-import {
-    css
-}   from 'emotion';
-
-import {
-    connect
-}   from 'react-redux';
-
-import {
-    canvasWd,
-}   from './Canvas.js';
-
-type Props = {
-    renderingPass: number,
-    numSamples: number
-};
+import SceneTabs from './SceneTabs';
+import OtherTabs from './OtherTabs';
+import Canvas, { canvasWd }  from './Canvas';
 
 const cssApp = css`
     font-family: 'Roboto';
@@ -42,7 +26,7 @@ const cssProgressPercentage = css`
     font-weight: bold;
 `
 
-function App(props: Props) {
+function App(props: { renderingPass: number, numSamples: number }) {
     const ratio = props.renderingPass / props.numSamples;
     const width = ratio * canvasWd;
 
@@ -67,7 +51,7 @@ function App(props: Props) {
     </div>
 }
 
-function mapStateToProps(state) {
+function mapStateToProps(state: any) {
     return {
         numSamples: state.numSamples,
         renderingPass: state.renderingPass,

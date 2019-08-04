@@ -1,6 +1,5 @@
-// @flow
-import Vector1x4 from './Vector1x4.js';
-import Ray from './Ray.js';
+import Vector1x4 from './Vector1x4';
+import Ray from './Ray';
 
 export class RayIntersectSphereResult {
     t0: number;
@@ -41,7 +40,7 @@ export default class Sphere {
         const discriminant = (b * b) - (4 * a * c);
         if (discriminant > 0) {
             const aa = 1 / (2 * a);
-            const sq = Math.sqrt(discriminant); 
+            const sq = Math.sqrt(discriminant);
             const t0 = (-b - sq) * aa;
             const t1 = (-b + sq) * aa;
             const pos0 = ray.getPos(t0);

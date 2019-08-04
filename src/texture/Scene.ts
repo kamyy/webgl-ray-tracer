@@ -1,27 +1,21 @@
-// @flow
-
-import wavefrontMtlParser from '../material/MTLFile.js';
+import wavefrontMtlParser from '../material/MTLFile';
 import wavefrontObjParser from 'obj-file-parser';
-import Material from '../material/Material.js';
 
-import {
-    EMISSIVE_MATERIAL,
-    DIELECTRIC_MATERIAL,
-}   from '../material/Material.js';
+import Material, { MaterialType, } from '../material/Material';
+import Vector1x4 from '../math/Vector1x4';
+import RefFrame from '../math/RefFrame';
 
-import Vector1x4 from '../math/Vector1x4.js';
-import RefFrame from '../math/RefFrame.js';
+export enum SceneState {
+    UNINITIALIZED,
+    INITIALIZING,
+    INITIALIZED,
+};
 
-const X_AXIS = 0;
-const Y_AXIS = 1;
-const Z_AXIS = 2;
+enum Axis { X, Y, Z }
+
 const BV_MIN_DELTA = 0.01;
 
-export const SCENE_UNINITIALIZED = 0;
-export const SCENE_INITIALIZING = 1;
-export const SCENE_INITIALIZED = 2;
-
-type Face = {
+interface Face {
     p0: Vector1x4, // vertex position 0
     p1: Vector1x4, // vertex position 1
     p2: Vector1x4, // vertex position 2
@@ -60,12 +54,12 @@ class BV { // AABB bounding volume
             const largestDelta = Math.max(dx, dy, dz);
 
             if (largestDelta === dx) {
-                this.splitAcross(X_AXIS, faces, AABBs); // split BV AABB across x axis
+                this.splitAcross(Axis.X, faces, AABBs); // split BV AABB across x axis
             } else {
                 if (largestDelta === dy) {
-                    this.splitAcross(Y_AXIS, faces, AABBs); // split BV AABB across y axis
+                    this.splitAcross(Axis.Y, faces, AABBs); // split BV AABB across y axis
                 } else {
-                    this.splitAcross(Z_AXIS, faces, AABBs); // split BV AABB across z axis
+                    this.splitAcross(Axis.Z, faces, AABBs); // split BV AABB across z axis
                 }
             }
         }
@@ -136,15 +130,19 @@ class BV { // AABB bounding volume
     }
 }
 
+interface ParsedObj {
+    faces: Face[],
+    AABBs: BV[],
+}
 
 export default class Scene {
-    sceneStatus: number;
+    state: SceneState;
     objUrl: string;
     mtlUrl: string;
     objCount: number;
     mtlCount: number;
-    parsedObjs: Object;
-    parsedMtls: Object;
+    parsedObjs: ParsedObj[] = [];
+    parsedMtls: Material[] = [];
 
     rootNode: RefFrame;
     parentNode: RefFrame;
@@ -156,16 +154,16 @@ export default class Scene {
     mtlsTexture: WebGLTexture;
 
     constructor(GL: WebGL2RenderingContext, objUrl: string, mtlUrl: string) {
-        this.sceneStatus = SCENE_UNINITIALIZED;
+        this.state = SceneState.UNINITIALIZED;
         this.objUrl = objUrl;
         this.mtlUrl = mtlUrl;
         this.objCount = 0;
         this.mtlCount = 0;
         this.GL = GL;
 
-        this.facesTexture = GL.createTexture();
-        this.AABBsTexture = GL.createTexture();
-        this.mtlsTexture = GL.createTexture();
+        this.facesTexture = <WebGLTexture>GL.createTexture();
+        this.AABBsTexture = <WebGLTexture>GL.createTexture();
+        this.mtlsTexture = <WebGLTexture>GL.createTexture();
 
         this.rootNode = new RefFrame();
         this.parentNode = new RefFrame(this.rootNode);
@@ -182,10 +180,10 @@ export default class Scene {
     }
 
     async init(): Promise<Scene> {
-        this.sceneStatus = SCENE_INITIALIZING;
+        this.state = SceneState.INITIALIZING;
 
         let wavefrontObj;
-        let wavefrontMtl;
+        let wavefrontMtl: any;
         try {
             const _wavefrontObjParser = new wavefrontObjParser(await this.fetchTextFile(this.objUrl));
             const _wavefrontMtlParser = new wavefrontMtlParser(await this.fetchTextFile(this.mtlUrl));
@@ -196,25 +194,32 @@ export default class Scene {
             throw e;
         }
 
-        let posArray = [];
-        let nrmArray = [];
+        let posArray: {x: number, y: number, z: number}[] = [];
+        let nrmArray: {x: number, y: number, z: number}[] = [];
 
-        this.parsedObjs = wavefrontObj.models.map(({ vertices, vertexNormals, faces }) => {
-            const outFaces = [];
+        this.parsedObjs = wavefrontObj.models.map((model: any): ParsedObj => {
+            const vertices      = model.vertices;
+            const vertexNormals = model.vertexNormals;
+            const faces         = model.faces;
+
+            const outFaces: Face[] = [];
             posArray = posArray.concat(vertices);
             nrmArray = nrmArray.concat(vertexNormals);
 
-            faces.forEach((f, i) => {
-                let p0 = (f.vertices[0].vertexIndex - 1); p0 = posArray[p0]; p0 = new Vector1x4(p0.x, p0.y, p0.z);
-                let p1 = (f.vertices[1].vertexIndex - 1); p1 = posArray[p1]; p1 = new Vector1x4(p1.x, p1.y, p1.z);
-                let p2 = (f.vertices[2].vertexIndex - 1); p2 = posArray[p2]; p2 = new Vector1x4(p2.x, p2.y, p2.z);
+            faces.forEach((f: any) => {
+                let i;
+                let p;
+                let n;
+                i = (f.vertices[0].vertexIndex - 1); p = posArray[i]; let p0 = new Vector1x4(p.x, p.y, p.z);
+                i = (f.vertices[1].vertexIndex - 1); p = posArray[i]; let p1 = new Vector1x4(p.x, p.y, p.z);
+                i = (f.vertices[2].vertexIndex - 1); p = posArray[i]; let p2 = new Vector1x4(p.x, p.y, p.z);
 
-                let n0 = (f.vertices[0].vertexNormalIndex - 1); n0 = nrmArray[n0]; n0 = new Vector1x4(n0.x, n0.y, n0.z);
-                let n1 = (f.vertices[1].vertexNormalIndex - 1); n1 = nrmArray[n1]; n1 = new Vector1x4(n1.x, n1.y, n1.z);
-                let n2 = (f.vertices[2].vertexNormalIndex - 1); n2 = nrmArray[n2]; n2 = new Vector1x4(n2.x, n2.y, n2.z);
+                i = (f.vertices[0].vertexNormalIndex - 1); n = nrmArray[i]; let n0 = new Vector1x4(n.x, n.y, n.z);
+                i = (f.vertices[1].vertexNormalIndex - 1); n = nrmArray[i]; let n1 = new Vector1x4(n.x, n.y, n.z);
+                i = (f.vertices[2].vertexNormalIndex - 1); n = nrmArray[i]; let n2 = new Vector1x4(n.x, n.y, n.z);
 
                 const fn = p1.sub(p0).cross(p2.sub(p0)).normalize(); // face normal
-                const mi = wavefrontMtl.findIndex(m => m.name === f.material); // material index
+                const mi = wavefrontMtl.findIndex((m: any) => m.name === f.material); // material index
                 const fi = outFaces.length; // face index
 
                 outFaces.push({
@@ -223,7 +228,8 @@ export default class Scene {
                     fn, mi, fi,
                 });
             });
-            const outAABBs = [];
+
+            const outAABBs: BV[] = [];
             const min = new Vector1x4(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
             const max = new Vector1x4(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER);
             outFaces.forEach(f => { // calculate min/max for root AABB bounding volume
@@ -249,18 +255,18 @@ export default class Scene {
             };
         });
 
-        this.parsedMtls = wavefrontMtl.map(mtl => {
+        this.parsedMtls = wavefrontMtl.map((mtl: any): Material => {
             const mat = new Material(new Vector1x4(mtl.Kd.red, mtl.Kd.green, mtl.Kd.blue));
             // 'Metal 0', 0.95, 'Glass 0', 0.00, 1.33
             switch (mtl.name) {
             case 'light':
-                mat.mtlCls = EMISSIVE_MATERIAL;
+                mat.mtlCls = MaterialType.EMISSIVE;
                 mat.albedo.r = 3.0;
                 mat.albedo.g = 3.0;
                 mat.albedo.b = 3.0;
                 break;
             case 'glass':
-                mat.mtlCls = DIELECTRIC_MATERIAL;
+                mat.mtlCls = MaterialType.DIELECTRIC;
                 mat.refractionIndex = 1.52;
                 mat.albedo.r = 1.0;
                 mat.albedo.g = 1.0;
@@ -289,7 +295,7 @@ export default class Scene {
         this.objCount = this.parsedObjs.length;
         this.mtlCount = this.parsedMtls.length;
 
-        this.sceneStatus = SCENE_INITIALIZED;
+        this.state = SceneState.INITIALIZED;
         return this;
     }
 
@@ -380,7 +386,7 @@ export default class Scene {
         GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32F, numTexelsPerMtl, this.parsedMtls.length, 0, GL.RGBA, GL.FLOAT, data);
     }
 
-    bindToSampleShader(GL: any, program: WebGLProgram) {
+    bindToSampleShader(GL: WebGL2RenderingContext, program: WebGLProgram) {
         GL.activeTexture(GL.TEXTURE3);
         GL.bindTexture(GL.TEXTURE_2D_ARRAY, this.facesTexture);
         GL.uniform1i(GL.getUniformLocation(program, 'u_face_sampler'), 3);

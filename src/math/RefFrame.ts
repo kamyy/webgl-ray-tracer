@@ -1,13 +1,11 @@
-// @flow
-
-import Matrix4x4, {_00, _01, _02, _10, _22, _12, _20, _21, _33, _30, _31, _32 } from './Matrix4x4.js';
-import Vector1x4 from './Vector1x4.js';
+import Matrix4x4, {_00, _01, _02, _10, _22, _12, _20, _21, _33, _30, _31, _32 } from './Matrix4x4';
+import Vector1x4 from './Vector1x4';
 
 export default class RefFrame {
     validSubtree: boolean;
-    parent: any;
-    child:  any;
-    next:   any;
+    parent: RefFrame | null;
+    child:  RefFrame | null;
+    next:   RefFrame | null;
     localM: Matrix4x4;
     modelM: Matrix4x4;
 
@@ -50,7 +48,7 @@ export default class RefFrame {
         }
     }
 
-    *children(): Generator<any, any, any> {
+    *children() {
         for (let sibling = this.child; sibling !== null; sibling = sibling.next) { yield sibling; }
     }
 
@@ -86,18 +84,18 @@ export default class RefFrame {
             this.localM._m[_31] = y + (v.x * this.localM._m[_01]) + (v.y * this.localM._m[_22]) + (v.z * this.localM._m[_21]);
             this.localM._m[_32] = z + (v.x * this.localM._m[_02]) + (v.y * this.localM._m[_12]) + (v.z * this.localM._m[_33]);
 
-        } else if (relative2.parent === null) { // relative to root axes
+        } else if (this.parent && relative2.parent === null) { // relative to root axes
             const d = relative2.mapPos(new Vector1x4(v.x, v.y, v.z, 0.0), this.parent);
             this.localM._m[_30] += d.x;
             this.localM._m[_31] += d.y;
             this.localM._m[_32] += d.z;
 
-        } else if (relative2 === this.parent) { // relative to parent axes
+        } else if (this.parent && relative2 === this.parent) { // relative to parent axes
             this.localM._m[_30] += v.x;
             this.localM._m[_31] += v.y;
             this.localM._m[_32] += v.z;
 
-        } else { // relative to arbitrary axes
+        } else if (this.parent) { // relative to arbitrary axes
             const d = relative2.mapPos(new Vector1x4(v.x, v.y, v.z, 0.0), this.parent);
             this.localM._m[_30] += d.x;
             this.localM._m[_31] += d.y;

@@ -1,10 +1,5 @@
-// @flow
-
 import React from 'react';
-
-import {
-    css
-}   from 'emotion';
+import { css }  from 'emotion';
 
 const cssApplicationInfo = css`
     display: flex;

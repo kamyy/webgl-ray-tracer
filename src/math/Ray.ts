@@ -1,5 +1,5 @@
 // @flow
-import Vector1x4 from './Vector1x4.js';
+import Vector1x4 from './Vector1x4';
 
 export default class Ray {
     origin: Vector1x4;

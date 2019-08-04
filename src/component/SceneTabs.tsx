@@ -1,32 +1,17 @@
-// @flow
-
 import React from 'react';
+import { cx, css } from 'emotion';
+
+import { reduxStore } from '../redux/reducers';
 
 import {
-    reduxStore
-}   from '../redux/reducers.js';
-
-import {
-    cx,
-    css
-}   from 'emotion';
-
-import {
-    SCENE_UNINITIALIZED,
-    SCENE_INITIALIZING,
-    SCENE_INITIALIZED,
-}   from '../texture/Scene.js';
-
-import {
+    SpinnerState,
     setScene,
     setLoadStatus,
+}   from '../redux/actions';
 
-    SPINNER_SHOW,
-    SPINNER_HIDE,
-    LOAD_FAILURE,
-}   from '../redux/actions.js';
-
-import Scene from '../texture/Scene.js';
+import Scene, {
+    SceneState,
+}   from '../texture/Scene';
 
 const cssTabBar = css`
     display: flex;
@@ -63,42 +48,39 @@ const cssUnselectedTabButton = css`
     font-size: 12px;
 `
 
-const scenes: Array<null | Scene> = [
-    null,
-    null,
-    null,
-];
+const scenes: Array<Scene> = [];
 
 export function createScenes(GL: WebGL2RenderingContext) {
     scenes[0] = new Scene(GL, '/suzanne.obj', '/suzanne.mtl');
-    scenes[1] = new Scene(GL, '/suzanne.obj', '/suzanne.mtl');
+    scenes[1] = new Scene(GL, '/crazy.obj', '/crazy.mtl');
     scenes[2] = new Scene(GL, '/suzanne.obj', '/suzanne.mtl');
 
-    scenes[0].init().then(() => reduxStore.dispatch(setLoadStatus(SPINNER_HIDE)));
-    reduxStore.dispatch(setLoadStatus(SPINNER_SHOW));
+    scenes[0].init().then(() => reduxStore.dispatch(setLoadStatus(SpinnerState.HIDE)));
+    reduxStore.dispatch(setLoadStatus(SpinnerState.SHOW))
     reduxStore.dispatch(setScene(scenes[0]));
 }
 
 function onClick(index: number) {
     const scene = scenes[index];
+    if (scene !== undefined &&
+        scene !== reduxStore.getState().scene) {
 
-    if (scene && scene !== reduxStore.getState().scene) {
-        switch (scene.sceneStatus) {
-        case SCENE_UNINITIALIZED:
+        switch (scene.state) {
+        case SceneState.UNINITIALIZED:
             scene.init().then(scene => {
                 if (scene === reduxStore.getState().scene) {
-                    reduxStore.dispatch(setLoadStatus(SPINNER_HIDE))
+                    reduxStore.dispatch(setLoadStatus(SpinnerState.HIDE))
                 }
             });
-            reduxStore.dispatch(setLoadStatus(SPINNER_SHOW));
+            reduxStore.dispatch(setLoadStatus(SpinnerState.SHOW));
             reduxStore.dispatch(setScene(scene));
             break;
-        case SCENE_INITIALIZING:
-            reduxStore.dispatch(setLoadStatus(SPINNER_SHOW));
+        case SceneState.INITIALIZING:
+            reduxStore.dispatch(setLoadStatus(SpinnerState.SHOW));
             reduxStore.dispatch(setScene(scene));
             break;
-        case SCENE_INITIALIZED:
-            reduxStore.dispatch(setLoadStatus(SPINNER_HIDE));
+        case SceneState.INITIALIZED:
+            reduxStore.dispatch(setLoadStatus(SpinnerState.HIDE));
             reduxStore.dispatch(setScene(scene));
             break;
         default:
@@ -116,13 +98,13 @@ export default function SceneTabs(props: {}) {
     let spinner;
 
     switch (reduxStore.getState().loadStatus) {
-    case LOAD_FAILURE:
+    case SpinnerState.FAIL:
         spinner = <h1>*** Error! WebGL 2 not supported or GPU does not meet minimum requirements! ***</h1>
         break;
-    case SPINNER_SHOW:
+    case SpinnerState.SHOW:
         spinner = <div className='spinner'/>;
         break;
-    case SPINNER_HIDE:
+    case SpinnerState.HIDE:
     default:
         spinner = null;
         break;
@@ -135,7 +117,7 @@ export default function SceneTabs(props: {}) {
             </button>
 
             <button type='button' className={styleTabButton1} onClick={() => onClick(1)}>
-                Marble
+                Crazy Dog
             </button>
 
             <button type='button' className={styleTabButton2} onClick={() => onClick(2)}>

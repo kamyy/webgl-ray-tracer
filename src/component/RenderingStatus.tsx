@@ -1,14 +1,6 @@
-// @flow
-
 import React from 'react';
-
-import {
-    connect
-}   from 'react-redux';
-
-import {
-    css
-}   from 'emotion';
+import { connect } from 'react-redux';
+import { css } from 'emotion';
 
 const cssTabPage = css`
     display: flex;
@@ -41,7 +33,15 @@ const cssTimeFieldset = css`
     text-align: center;
 `
 
-function RenderingStatus(props) {
+type Props = {
+    numSamples: number,
+    renderingPass: number,
+    elapsedTime: string,
+    etaTime: string,
+    avgTime: string,
+};
+
+function RenderingStatus(props: Props) {
     return <div className={cssTabPage}>
         <fieldset className={cssPassFieldset}>
             <legend className={cssLegend}>Rendering Pass</legend>
@@ -65,7 +65,7 @@ function RenderingStatus(props) {
     </div>
 }
 
-function mapStateToProps(state) {
+function mapStateToProps(state: any) {
     return {
         numSamples: state.numSamples,
         renderingPass: state.renderingPass,

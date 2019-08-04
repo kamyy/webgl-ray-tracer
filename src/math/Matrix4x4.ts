@@ -1,22 +1,21 @@
-// @flow
-export const _00 = 0; 
-export const _01 = 1; 
-export const _02 = 2; 
+export const _00 = 0;
+export const _01 = 1;
+export const _02 = 2;
 export const _03 = 3;
 
-export const _10 = 4; 
-export const _11 = 5; 
-export const _12 = 6; 
+export const _10 = 4;
+export const _11 = 5;
+export const _12 = 6;
 export const _13 = 7;
 
-export const _20 = 8; 
-export const _21 = 9; 
-export const _22 = 10; 
+export const _20 = 8;
+export const _21 = 9;
+export const _22 = 10;
 export const _23 = 11;
 
-export const _30 = 12; 
-export const _31 = 13; 
-export const _32 = 14; 
+export const _30 = 12;
+export const _31 = 13;
+export const _32 = 14;
 export const _33 = 15;
 
 export default class Matrix4x4 {
@@ -129,9 +128,9 @@ export default class Matrix4x4 {
     }
 
     toString(): string {
-        return "[Matrix4x4 " + 
-                this._m[_00] + ", " + this._m[_01] + ", " + this._m[_02] + ", " + this._m[_03] + ", " + 
-                this._m[_10] + ", " + this._m[_11] + ", " + this._m[_12] + ", " + this._m[_13] + ", " + 
+        return "[Matrix4x4 " +
+                this._m[_00] + ", " + this._m[_01] + ", " + this._m[_02] + ", " + this._m[_03] + ", " +
+                this._m[_10] + ", " + this._m[_11] + ", " + this._m[_12] + ", " + this._m[_13] + ", " +
                 this._m[_20] + ", " + this._m[_21] + ", " + this._m[_22] + ", " + this._m[_23] + ", " +
                 this._m[_30] + ", " + this._m[_31] + ", " + this._m[_32] + ", " + this._m[_33] + "]";
     }

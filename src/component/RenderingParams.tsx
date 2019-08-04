@@ -1,27 +1,15 @@
-// @flow
-
 import React from 'react';
-import {
-    bindActionCreators
-}   from 'redux';
+import { bindActionCreators } from 'redux';
+import { connect } from 'react-redux';
+import { css } from 'emotion';
 
 import {
-    connect
-}   from 'react-redux';
-
-import {
-    css
-}   from 'emotion';
-
-import {
+    ShadingMethod,
     setNumSamples,
     setNumBounces,
     setCameraFov,
     setShadingMethod,
-
-    FLAT_SHADING,
-    PHONG_SHADING,
-}   from '../redux/actions.js';
+}   from '../redux/actions';
 
 const minSamples = 1;
 const maxSamples = 10000;
@@ -99,7 +87,18 @@ const cssShadingMethodButtons = css`
     margin-right: 4px;
 `
 
-function RenderingParams(props) {
+type Props = {
+    numSamples: number,
+    numBounces: number,
+    cameraFov: number,
+    shadingMethod: number,
+    setNumSamples: (n: number) => void,
+    setNumBounces: (n: number) => void,
+    setCameraFov: (n: number) => void,
+    setShadingMethod: (n: number) => void,
+};
+
+function RenderingParams(props: Props) {
     return <div className={cssTabPage}>
         <div className={cssLtSection}>
 
@@ -158,8 +157,8 @@ function RenderingParams(props) {
             <div className={cssShadingMethodSection}>
                 <label className={cssShadingMethodButtons}>
                     <input type='radio'
-                        value={FLAT_SHADING}
-                        checked={props.shadingMethod === FLAT_SHADING}
+                        value={ShadingMethod.FLAT}
+                        checked={props.shadingMethod === ShadingMethod.FLAT}
                         onChange={event => props.setShadingMethod(parseInt(event.target.value))}
                     />
                     Flat
@@ -167,8 +166,8 @@ function RenderingParams(props) {
 
                 <label className={cssShadingMethodButtons}>
                     <input type='radio'
-                        value={PHONG_SHADING}
-                        checked={props.shadingMethod === PHONG_SHADING}
+                        value={ShadingMethod.PHONG}
+                        checked={props.shadingMethod === ShadingMethod.PHONG}
                         onChange={event => props.setShadingMethod(parseInt(event.target.value))}
                     />
                     Phong
@@ -178,7 +177,7 @@ function RenderingParams(props) {
     </div>
 }
 
-function mapStateToProps(state) {
+function mapStateToProps(state: any) {
     return {
         numSamples: state.numSamples,
         numBounces: state.numBounces,
@@ -187,7 +186,7 @@ function mapStateToProps(state) {
     };
 }
 
-function mapDispatchToProps(dispatch) {
+function mapDispatchToProps(dispatch: any) {
     return bindActionCreators({
         setNumSamples,
         setNumBounces,
