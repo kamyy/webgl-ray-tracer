@@ -2,7 +2,7 @@
 
 ## Requirements
 
-You can view this app live at [https://webgl-ray-tracer.herokuapp.com](https://webgl-ray-tracer.herokuapp.com). Be warned it does require a reasonably powerful GPU that supports WebGL 2. Your smart phone or tablet isn't going to cut it. Works great on my 2016 edition MacBook Pro hosting a AMD Radeon GPU and a PC hosting an Nvidia GTX 1080.
+You can view this app live at [https://webgl-ray-tracer.herokuapp.com](https://webgl-ray-tracer.herokuapp.com). Be warned it does require a reasonably powerful GPU and browser that supports WebGL 2 (Firefox and Chrome only). Your smart phone or tablet isn't going to cut it and your high end MacBook Pro with discrete graphics is going to feel sluggish. Should work well on a PC hosting a Nvidia 1060 GPU and up.
 
 ## Summary
 
