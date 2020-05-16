@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Canvas from './Canvas.js';
-import SceneTabs from './SceneTabs.js';
+//import SceneTabs from './SceneTabs.js';
 import OtherTabs from './OtherTabs.js';
 
 import {
@@ -57,7 +57,6 @@ function App(props: Props) {
     const percentage = Math.floor(ratio * 100 + 0.5);
 
     return <div className={cssApp}>
-        <SceneTabs/>
         <Canvas/>
         <div className={cssProgressRow}>
             <div className={cssProgressBar}/>
