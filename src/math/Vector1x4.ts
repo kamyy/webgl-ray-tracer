@@ -1,82 +1,82 @@
 import Matrix4x4, { i00, i01, i02, i03, i10, i11, i12, i13, i20, i21, i22, i23, i30, i31, i32, i33 } from "./Matrix4x4";
 
 export default class Vector1x4 {
-  elements: number[];
+  v: number[];
 
   constructor(x = 0.0, y = 0.0, z = 0.0, w = 1.0) {
-    this.elements = [x, y, z, w];
+    this.v = [x, y, z, w];
   }
 
   get xyzw(): number[] {
-    return this.elements;
+    return this.v;
   }
 
   get rgba(): number[] {
-    return this.elements;
+    return this.v;
   }
 
   get xyz(): number[] {
-    return this.elements.slice(0, 3);
+    return this.v.slice(0, 3);
   }
 
   get rgb(): number[] {
-    return this.elements.slice(0, 3);
+    return this.v.slice(0, 3);
   }
 
   get x(): number {
-    return this.elements[0];
+    return this.v[0];
   }
   set x(x: number) {
-    this.elements[0] = x;
+    this.v[0] = x;
   }
 
   get y(): number {
-    return this.elements[1];
+    return this.v[1];
   }
   set y(a: number) {
-    this.elements[1] = y;
+    this.v[1] = y;
   }
 
   get z(): number {
-    return this.elements[2];
+    return this.v[2];
   }
   set z(z: number) {
-    this.elements[2] = z;
+    this.v[2] = z;
   }
 
   get w(): number {
-    return this.elements[3];
+    return this.v[3];
   }
   set w(w: number) {
-    this.elements[3] = w;
+    this.v[3] = w;
   }
 
   get r(): number {
-    return this.elements[0];
+    return this.v[0];
   }
   set r(r: number) {
-    this.elements[0] = r;
+    this.v[0] = r;
   }
 
   get g(): number {
-    return this.elements[1];
+    return this.v[1];
   }
   set g(g: number) {
-    this.elements[1] = g;
+    this.v[1] = g;
   }
 
   get b(): number {
-    return this.elements[2];
+    return this.v[2];
   }
   set b(b: number) {
-    this.elements[2] = b;
+    this.v[2] = b;
   }
 
   get a(): number {
-    return this.elements[3];
+    return this.v[3];
   }
   set a(a: number) {
-    this.elements[3] = a;
+    this.v[3] = a;
   }
 
   add(rhs: Vector1x4): Vector1x4 {
