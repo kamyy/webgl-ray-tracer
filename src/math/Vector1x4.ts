@@ -1,26 +1,9 @@
-import Matrix4x4, {
-  _00,
-  _01,
-  _02,
-  _03,
-  _10,
-  _11,
-  _12,
-  _13,
-  _20,
-  _21,
-  _22,
-  _23,
-  _30,
-  _31,
-  _32,
-  _33,
-} from "./Matrix4x4.js";
+import Matrix4x4, { i00, i01, i02, i03, i10, i11, i12, i13, i20, i21, i22, i23, i30, i31, i32, i33 } from "./Matrix4x4";
 
 export default class Vector1x4 {
   elements: number[];
 
-  constructor(x: number = 0.0, y: number = 0.0, z: number = 0.0, w: number = 1.0) {
+  constructor(x = 0.0, y = 0.0, z = 0.0, w = 1.0) {
     this.elements = [x, y, z, w];
   }
 
@@ -43,31 +26,27 @@ export default class Vector1x4 {
   get x(): number {
     return this.elements[0];
   }
+  set x(x: number) {
+    this.elements[0] = x;
+  }
 
   get y(): number {
     return this.elements[1];
+  }
+  set y(a: number) {
+    this.elements[1] = y;
   }
 
   get z(): number {
     return this.elements[2];
   }
-
-  get w(): number {
-    return this.elements[3];
-  }
-
-  set x(x: number) {
-    this.elements[0] = x;
-  }
-
-  set y(y: number) {
-    this.elements[1] = y;
-  }
-
   set z(z: number) {
     this.elements[2] = z;
   }
 
+  get w(): number {
+    return this.elements[3];
+  }
   set w(w: number) {
     this.elements[3] = w;
   }
@@ -75,31 +54,27 @@ export default class Vector1x4 {
   get r(): number {
     return this.elements[0];
   }
+  set r(r: number) {
+    this.elements[0] = r;
+  }
 
   get g(): number {
     return this.elements[1];
+  }
+  set g(g: number) {
+    this.elements[1] = g;
   }
 
   get b(): number {
     return this.elements[2];
   }
-
-  get a(): number {
-    return this.elements[3];
-  }
-
-  set r(r: number) {
-    this.elements[0] = r;
-  }
-
-  set g(g: number) {
-    this.elements[1] = g;
-  }
-
   set b(b: number) {
     this.elements[2] = b;
   }
 
+  get a(): number {
+    return this.elements[3];
+  }
   set a(a: number) {
     this.elements[3] = a;
   }
@@ -116,14 +91,14 @@ export default class Vector1x4 {
     return new Vector1x4(-this.x, -this.y, -this.z);
   }
 
-  mul(rhs: number | Matrix4x4) {
+  mul(rhs: number | Matrix4x4): Vector1x4 {
     if (typeof rhs === "number") {
       return new Vector1x4(this.x * rhs, this.y * rhs, this.z * rhs);
     }
-    const x = this.x * rhs._m[_00] + this.y * rhs._m[_10] + this.z * rhs._m[_20] + this.w * rhs._m[_30];
-    const y = this.x * rhs._m[_01] + this.y * rhs._m[_11] + this.z * rhs._m[_21] + this.w * rhs._m[_31];
-    const z = this.x * rhs._m[_02] + this.y * rhs._m[_12] + this.z * rhs._m[_22] + this.w * rhs._m[_32];
-    const w = this.x * rhs._m[_03] + this.y * rhs._m[_13] + this.z * rhs._m[_23] + this.w * rhs._m[_33];
+    const x = this.x * rhs.m[i00] + this.y * rhs.m[i10] + this.z * rhs.m[i20] + this.w * rhs.m[i30];
+    const y = this.x * rhs.m[i01] + this.y * rhs.m[i11] + this.z * rhs.m[i21] + this.w * rhs.m[i31];
+    const z = this.x * rhs.m[i02] + this.y * rhs.m[i12] + this.z * rhs.m[i22] + this.w * rhs.m[i32];
+    const w = this.x * rhs.m[i03] + this.y * rhs.m[i13] + this.z * rhs.m[i23] + this.w * rhs.m[i33];
     return new Vector1x4(x, y, z, w);
   }
 
