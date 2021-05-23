@@ -1,10 +1,10 @@
 import wavefrontObjParser from "obj-file-parser";
 import wavefrontMtlParser from "mtl-file-parser";
 
-import Material, { EMISSIVE_MATERIAL, DIELECTRIC_MATERIAL } from "../material/Material.js";
+import Material, { EMISSIVE_MATERIAL, DIELECTRIC_MATERIAL } from "../material/Material";
 
-import Vector1x4 from "../math/Vector1x4.js";
-import RefFrame from "../math/RefFrame.js";
+import Vector1x4 from "../math/Vector1x4";
+import RefFrame from "../math/RefFrame";
 
 const X_AXIS = 0;
 const Y_AXIS = 1;
@@ -16,29 +16,25 @@ export const SCENE_INITIALIZING = 1;
 export const SCENE_INITIALIZED = 2;
 
 type Face = {
-  p0: Vector1x4, // vertex position 0
-  p1: Vector1x4, // vertex position 1
-  p2: Vector1x4, // vertex position 2
+  p0: Vector1x4; // vertex position 0
+  p1: Vector1x4; // vertex position 1
+  p2: Vector1x4; // vertex position 2
 
-  n0: Vector1x4, // vertex normal 0
-  n1: Vector1x4, // vertex normal 1
-  n2: Vector1x4, // vertex normal 2
+  n0: Vector1x4; // vertex normal 0
+  n1: Vector1x4; // vertex normal 1
+  n2: Vector1x4; // vertex normal 2
 
-  fn: Vector1x4, // face normal
-  fi: number, // index into root face array
-  mi: number, // index into material array
+  fn: Vector1x4; // face normal
+  fi: number; // index into root face array
+  mi: number; // index into material array
 };
 
 class BV {
   // AABB bounding volume
   min: Vector1x4; // min corner
-
   max: Vector1x4; // max corner
-
   lt: number; // lt child BV index
-
   rt: number; // rt child BV index
-
   fi: number[]; // face indices
 
   constructor(min: Vector1x4, max: Vector1x4) {
@@ -153,31 +149,18 @@ class BV {
 
 export default class Scene {
   sceneStatus: number;
-
   objUrl: string;
-
   mtlUrl: string;
-
   objCount: number;
-
   mtlCount: number;
-
-  parsedObjs: Object;
-
-  parsedMtls: Object;
-
+  parsedObjs: any;
+  parsedMtls: any;
   rootNode: RefFrame;
-
   parentNode: RefFrame;
-
   cameraNode: RefFrame;
-
   GL: WebGL2RenderingContext;
-
   facesTexture: WebGLTexture;
-
   AABBsTexture: WebGLTexture;
-
   mtlsTexture: WebGLTexture;
 
   constructor(GL: WebGL2RenderingContext, objUrl: string, mtlUrl: string) {
@@ -344,7 +327,7 @@ export default class Scene {
     return this;
   }
 
-  initTextures(GL: WebGL2RenderingContext) {
+  initTextures(GL: WebGL2RenderingContext): void {
     const maxNumFaces = this.parsedObjs.reduce((max, obj) => Math.max(max, obj.faces.length), 0); // max number of faces
     const numTexelsPerFace = 8; // RGBA texel
     const numFloatsPerFace = 24;
@@ -400,7 +383,7 @@ export default class Scene {
       data
     );
 
-    const maxNumBVs = this.parsedObjs.reduce((val, obj) => Math.max(val, obj.AABBs.length), 0); // max number of BV nodes
+    const maxNumBVs = this.parsedObjs.reduce((val: number, obj) => Math.max(val, obj.AABBs.length), 0); // max number of BV nodes
     const numTexelsPerBV = 3; // RGBA texel
     const numFloatsPerBV = 12;
 

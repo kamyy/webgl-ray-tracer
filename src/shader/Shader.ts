@@ -1,9 +1,7 @@
 export default class Shader {
   vs: WebGLShader;
-
   fs: WebGLShader;
-
-  va: any;
+  va: WebGLVertexArrayObject;
 
   program: WebGLProgram;
 
@@ -15,7 +13,7 @@ export default class Shader {
     return response.text();
   }
 
-  initVSData(GL: any) {
+  initVSData(GL: WebGL2RenderingContext): void {
     this.va = GL.createVertexArray(); // begin vertex array object
     GL.bindVertexArray(this.va);
 
@@ -41,7 +39,7 @@ export default class Shader {
     GL.bindVertexArray(null); // end vertex array object
   }
 
-  async init(GL: any, vsURL: string, fsURL: string): Promise<void> {
+  async init(GL: WebGL2RenderingContext, vsURL: string, fsURL: string): Promise<void> {
     try {
       const responses = await Promise.all([this.fetchShader(vsURL), this.fetchShader(fsURL)]);
 

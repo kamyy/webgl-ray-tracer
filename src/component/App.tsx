@@ -1,14 +1,8 @@
 import React from "react";
-import { css } from "emotion";
+import { css } from "@emotion/css";
 import { connect } from "react-redux";
-import Canvas, { canvasWd } from "./Canvas.js";
-// import SceneTabs from './SceneTabs.js';
-import OtherTabs from "./OtherTabs.js";
-
-type Props = {
-  renderingPass: number,
-  numSamples: number,
-};
+import Canvas, { canvasWd } from "./Canvas";
+import OtherTabs from "./OtherTabs";
 
 const cssApp = css`
   font-family: "Roboto";
@@ -30,8 +24,13 @@ const cssProgressPercentage = css`
   font-weight: bold;
 `;
 
-function App(props: Props) {
-  const ratio = props.renderingPass / props.numSamples;
+interface AppProps {
+  renderingPass: number;
+  numSamples: number;
+}
+
+function App({ renderingPass, numSamples }: AppProps) {
+  const ratio = renderingPass / numSamples;
   const width = ratio * canvasWd;
 
   const cssProgressBar = css`
@@ -42,14 +41,12 @@ function App(props: Props) {
     background-color: darkgreen;
   `;
 
-  const percentage = Math.floor(ratio * 100 + 0.5);
-
   return (
     <div className={cssApp}>
       <Canvas />
       <div className={cssProgressRow}>
         <div className={cssProgressBar} />
-        <div className={cssProgressPercentage}>{percentage}%</div>
+        <div className={cssProgressPercentage}>{Math.floor(ratio * 100 + 0.5)}%</div>
       </div>
       <OtherTabs />
     </div>

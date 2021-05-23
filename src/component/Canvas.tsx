@@ -1,13 +1,9 @@
 import React from "react";
 
 import { bindActionCreators } from "redux";
-
 import { connect } from "react-redux";
-
-import { css } from "emotion";
-
+import { css } from "@emotion/css";
 import { createScenes } from "./SceneTabs.js";
-
 import { SCENE_INITIALIZED } from "../texture/Scene.js";
 
 import {
@@ -31,53 +27,43 @@ import { reduxStore } from "../redux/reducers.js";
 export const canvasWd = 1280;
 export const canvasHt = 720;
 
-type Props = {
-  loadStatus: number,
-  numSamples: number,
-  numBounces: number,
-  cameraFov: number,
-  shadingMethod: number,
+interface CanvasProps {
+  loadStatus: number;
+  numSamples: number;
+  numBounces: number;
+  cameraFov: number;
+  shadingMethod: number;
 
-  setRenderingPass: (a: number) => void,
-  setElapsedTime: (a: string) => void,
-  setLoadStatus: (a: number) => void,
-  setEtaTime: (a: string) => void,
-  setAvgTime: (a: string) => void,
-};
+  setRenderingPass: (a: number) => void;
+  setElapsedTime: (a: string) => void;
+  setLoadStatus: (a: number) => void;
+  setEtaTime: (a: string) => void;
+  setAvgTime: (a: string) => void;
+}
 
 const cssCanvas = css`
   border-style: groove;
   border-width: thin;
 `;
 
-class Canvas extends React.Component<Props> {
+class Canvas extends React.Component<CanvasProps> {
   lx: number;
-
   ly: number;
 
   TXYZ_SCALAR: number;
-
   RXYZ_SCALAR: number;
-
   lButtonDown: boolean;
-
   rButtonDown: boolean;
-
   restartRenderTimestamp: number;
 
-  canvas: any;
-
-  GL: any;
-
+  canvas: HTMLCanvasElement;
+  GL: WebGL2RenderingContext;
   colorTextures: ColorTextures;
-
   randomTexture: RandomTexture;
-
   sampleShader: SampleShader;
-
   canvasShader: CanvasShader;
 
-  constructor(props) {
+  constructor(props: CanvasProps) {
     super(props);
 
     this.lx = 0;
@@ -175,7 +161,7 @@ class Canvas extends React.Component<Props> {
   }
 
   componentDidMount() {
-    this.canvas = document.getElementById("Canvas");
+    this.canvas = document.getElementById("Canvas") as HTMLCanvasElement;
     if (this.canvas instanceof HTMLCanvasElement) {
       this.GL = this.canvas.getContext("webgl2", {
         depth: false,
@@ -213,11 +199,11 @@ class Canvas extends React.Component<Props> {
     return true;
   }
 
-  degreesToRadians(degrees) {
+  degreesToRadians(degrees: number) {
     return (degrees * Math.PI) / 180.0;
   }
 
-  onMouseUp(event) {
+  onMouseUp(event: MouseEvent) {
     switch (event.button) {
       case 0:
         this.lButtonDown = false;
@@ -230,7 +216,7 @@ class Canvas extends React.Component<Props> {
     }
   }
 
-  onMouseDown(event) {
+  onMouseDown(event: MouseEvent) {
     const rect = this.canvas.getBoundingClientRect();
     const x = event.clientX;
     const y = event.clientY;
@@ -251,7 +237,7 @@ class Canvas extends React.Component<Props> {
     }
   }
 
-  onMouseMove(event) {
+  onMouseMove(event: MouseEvent) {
     if (this.lButtonDown || this.rButtonDown) {
       const x = event.clientX;
       const y = event.clientY;

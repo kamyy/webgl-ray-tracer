@@ -42,7 +42,7 @@ const cssUnselectedTabButton = css`
 
 const scenes = [null, null, null];
 
-export function createScenes(GL: WebGL2RenderingContext) {
+export function createScenes(GL: WebGL2RenderingContext): void {
   scenes[0] = new Scene(GL, "/suzanne.obj", "/suzanne.mtl");
   scenes[1] = new Scene(GL, "/suzanne.obj", "/suzanne.mtl");
   scenes[2] = new Scene(GL, "/suzanne.obj", "/suzanne.mtl");
@@ -80,7 +80,7 @@ function onClick(index: number) {
   }
 }
 
-export default function SceneTabs(props: {}) {
+export default function SceneTabs() {
   const { scene } = reduxStore.getState();
   const styleTabButton0 = scene === scenes[0] ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);
   const styleTabButton1 = scene === scenes[1] ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);

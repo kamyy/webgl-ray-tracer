@@ -1,6 +1,5 @@
 import React from "react";
-
-import { css } from "emotion";
+import { css } from "@emotion/css";
 
 const cssApplicationInfo = css`
   display: flex;
@@ -28,7 +27,7 @@ const cssMouseBold = css`
   font-weight: bold;
 `;
 
-export default function ApplicationInfo() {
+export default function ApplicationInfo(): JSX.Element {
   return (
     <div className={cssApplicationInfo}>
       <div>

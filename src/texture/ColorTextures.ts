@@ -1,9 +1,8 @@
 export default class ColorTextures {
   source: WebGLTexture;
-
   target: WebGLTexture;
 
-  constructor(GL: any, wd: number, ht: number) {
+  constructor(GL: WebGL2RenderingContext, wd: number, ht: number) {
     GL.activeTexture(GL.TEXTURE0);
 
     this.source = GL.createTexture();
@@ -23,7 +22,7 @@ export default class ColorTextures {
     GL.texStorage2D(GL.TEXTURE_2D, 1, GL.RGBA32F, wd, ht);
   }
 
-  bindToSampleShader(GL: any, program: WebGLProgram) {
+  bindToSampleShader(GL: WebGL2RenderingContext, program: WebGLProgram): void {
     const textureSwap = this.source;
     this.source = this.target;
     this.target = textureSwap;
@@ -39,7 +38,7 @@ export default class ColorTextures {
     GL.uniform1i(GL.getUniformLocation(program, "u_color_sampler"), 1);
   }
 
-  bindToCanvasShader(GL: any, program: WebGLProgram) {
+  bindToCanvasShader(GL: WebGL2RenderingContext, program: WebGLProgram): void {
     // using texture unit 0
     GL.activeTexture(GL.TEXTURE0);
     GL.bindTexture(GL.TEXTURE_2D, this.target);

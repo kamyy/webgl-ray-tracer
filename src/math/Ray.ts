@@ -2,7 +2,6 @@ import Vector1x4 from "./Vector1x4";
 
 export default class Ray {
   origin: Vector1x4;
-
   dir: Vector1x4;
 
   constructor(origin: Vector1x4, dir: Vector1x4) {

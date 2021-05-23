@@ -1,13 +1,10 @@
-import Vector1x4 from "./Vector1x4.js";
-import Ray from "./Ray.js";
+import Vector1x4 from "./Vector1x4";
+import Ray from "./Ray";
 
 export class RayIntersectSphereResult {
   t0: number;
-
   t1: number;
-
   pos0: Vector1x4;
-
   pos1: Vector1x4;
 
   constructor(t0: number, t1: number, pos0: Vector1x4, pos1: Vector1x4) {
@@ -17,14 +14,12 @@ export class RayIntersectSphereResult {
     this.pos1 = pos1;
   }
 }
+
 export default class Sphere {
-  id: string;
-
-  center: Vector1x4;
-
-  radius: number;
-
   materialId: string;
+  center: Vector1x4;
+  radius: number;
+  id: string;
 
   constructor(id: string, center: Vector1x4, radius: number, materialId: string) {
     this.id = id;

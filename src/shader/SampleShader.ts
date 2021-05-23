@@ -1,24 +1,26 @@
-import { reduxStore } from "../redux/reducers.js";
+import { reduxStore } from "../redux/reducers";
 
-import Scene from "../texture/Scene.js";
-import ColorTextures from "../texture/ColorTextures.js";
-import RandomTexture from "../texture/RandomTexture.js";
-import Matrix4x4 from "../math/Matrix4x4.js";
-import Vector1x4 from "../math/Vector1x4.js";
-import Shader from "./Shader.js";
+import Scene from "../texture/Scene";
+import ColorTextures from "../texture/ColorTextures";
+import RandomTexture from "../texture/RandomTexture";
+import Matrix4x4 from "../math/Matrix4x4";
+import Vector1x4 from "../math/Vector1x4";
+import Shader from "./Shader";
 
 export default class SampleShader extends Shader {
   colorTextures: ColorTextures;
-
   randomTexture: RandomTexture;
-
   wd: number;
-
   ht: number;
-
   frameBuffer: WebGLFramebuffer;
 
-  constructor(GL: any, colorTextures: ColorTextures, randomTexture: RandomTexture, wd: number, ht: number) {
+  constructor(
+    GL: WebGL2RenderingContext,
+    colorTextures: ColorTextures,
+    randomTexture: RandomTexture,
+    wd: number,
+    ht: number
+  ) {
     super();
 
     this.colorTextures = colorTextures;
@@ -32,7 +34,7 @@ export default class SampleShader extends Shader {
     GL.bindFramebuffer(GL.FRAMEBUFFER, null);
   }
 
-  draw(GL: any, scene: Scene, renderPass: number, invViewMatrix: Matrix4x4) {
+  draw(GL: WebGL2RenderingContext, scene: Scene, renderPass: number, invViewMatrix: Matrix4x4): void {
     const { numBounces, cameraFov, shadingMethod } = reduxStore.getState();
 
     const origin = new Vector1x4(0.0, 0.0, 0.0); // in view space

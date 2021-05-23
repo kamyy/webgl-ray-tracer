@@ -1,9 +1,8 @@
 export default class RandomTexture {
   source: WebGLTexture;
-
   target: WebGLTexture;
 
-  constructor(GL: any, wd: number, ht: number) {
+  constructor(GL: WebGL2RenderingContext, wd: number, ht: number) {
     const data = new Uint32Array(wd * ht * 4); // require 4 random values for each fragment to seed
     for (let i = 0; i < data.length; ++i) {
       // tausworthe/LCG random number generator
@@ -26,7 +25,7 @@ export default class RandomTexture {
     GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32UI, wd, ht, 0, GL.RGBA_INTEGER, GL.UNSIGNED_INT, data);
   }
 
-  bindToSampleShader(GL: any, program: WebGLProgram) {
+  bindToSampleShader(GL: WebGL2RenderingContext, program: WebGLProgram): void {
     // using texture unit 2
     GL.activeTexture(GL.TEXTURE2);
     GL.bindTexture(GL.TEXTURE_2D, this.source);
