@@ -1,15 +1,15 @@
-import Scene from '../texture/Scene.js';
+import Scene from "../texture/Scene.js";
 
-export const SET_SCENE = 'SET_SCENE';
-export const SET_LOAD_STATUS = 'SET_LOAD_STATUS';
-export const SET_NUM_SAMPLES = 'SET_NUM_SAMPLES';
-export const SET_NUM_BOUNCES = 'SET_NUM_BOUNCES';
-export const SET_CAMERA_FOV = 'SET_CAMERA_FOV';
-export const SET_SHADING_METHOD = 'SET_SHADING_METHOD';
-export const SET_RENDERING_PASS = 'SET_RENDERING_PASS';
-export const SET_ELAPSED_TIME = 'SET_ELAPSED_TIME';
-export const SET_ETA_TIME = 'SET_ETA_TIME';
-export const SET_AVG_TIME = 'SET_AVG_TIME';
+export const SET_SCENE = "SET_SCENE";
+export const SET_LOAD_STATUS = "SET_LOAD_STATUS";
+export const SET_NUM_SAMPLES = "SET_NUM_SAMPLES";
+export const SET_NUM_BOUNCES = "SET_NUM_BOUNCES";
+export const SET_CAMERA_FOV = "SET_CAMERA_FOV";
+export const SET_SHADING_METHOD = "SET_SHADING_METHOD";
+export const SET_RENDERING_PASS = "SET_RENDERING_PASS";
+export const SET_ELAPSED_TIME = "SET_ELAPSED_TIME";
+export const SET_ETA_TIME = "SET_ETA_TIME";
+export const SET_AVG_TIME = "SET_AVG_TIME";
 
 export const SPINNER_SHOW = 0;
 export const SPINNER_HIDE = 1;

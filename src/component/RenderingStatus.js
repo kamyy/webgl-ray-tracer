@@ -1,42 +1,38 @@
-import React from 'react';
+import React from "react";
 
-import {
-  connect,
-} from 'react-redux';
+import { connect } from "react-redux";
 
-import {
-  css,
-} from 'emotion';
+import { css } from "emotion";
 
 const cssTabPage = css`
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    border-style: groove;
-    border-width: thin;
-    padding: 24px;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  border-style: groove;
+  border-width: thin;
+  padding: 24px;
 `;
 
 const cssLegend = css`
-    margin: 0px;
-    font-weight: bold;
-    font-size: 12px;
+  margin: 0px;
+  font-weight: bold;
+  font-size: 12px;
 `;
 
 const cssPassFieldset = css`
-    border-style: none groove none groove;
-    border-width: thin;
-    padding: 8px;
-    width: 280px;
-    text-align: center;
+  border-style: none groove none groove;
+  border-width: thin;
+  padding: 8px;
+  width: 280px;
+  text-align: center;
 `;
 
 const cssTimeFieldset = css`
-    border-style: none groove none none;
-    border-width: thin;
-    padding: 8px;
-    width: 280px;
-    text-align: center;
+  border-style: none groove none none;
+  border-width: thin;
+  padding: 8px;
+  width: 280px;
+  text-align: center;
 `;
 
 function RenderingStatus(props) {
@@ -45,13 +41,8 @@ function RenderingStatus(props) {
       <fieldset className={cssPassFieldset}>
         <legend className={cssLegend}>Rendering Pass</legend>
         <div>
-          {' '}
-          { props.renderingPass}
-          {' '}
-          /
-          {' '}
-          {props.numSamples}
-          {' '}
+          {" "}
+          {props.renderingPass} / {props.numSamples}{" "}
         </div>
       </fieldset>
 

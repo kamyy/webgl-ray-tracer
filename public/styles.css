@@ -1,54 +1,52 @@
 /* input range */
-input[type=range] {
-    -webkit-appearance: none;
-    width: 100%; /* required for Firefox. */
-    background: transparent; /* otherwise white in Chrome */
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%; /* required for Firefox. */
+  background: transparent; /* otherwise white in Chrome */
 }
 
-input[type=range]:focus {
-    outline: none; /* remove blue border */
+input[type="range"]:focus {
+  outline: none; /* remove blue border */
 }
 
-
-input[type=range]::-webkit-slider-runnable-track {
-    cursor: pointer;
-    border-radius: 3px;
-    border: none;
-    width: 100%;
-    height: 2px;
-    background: lightgray;
+input[type="range"]::-webkit-slider-runnable-track {
+  cursor: pointer;
+  border-radius: 3px;
+  border: none;
+  width: 100%;
+  height: 2px;
+  background: lightgray;
 }
 
-input[type=range]::-moz-range-track {
-    cursor: pointer;
-    border-radius: 3px;
-    border: none;
-    width: 100%;
-    height: 2px;
-    background: lightgray;
+input[type="range"]::-moz-range-track {
+  cursor: pointer;
+  border-radius: 3px;
+  border: none;
+  width: 100%;
+  height: 2px;
+  background: lightgray;
 }
 
-
-input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    cursor: pointer;
-    margin-top: -5px; /* specify margin in Chrome, in Firefox and IE it is automatic */
-    border-radius: 50%;
-    border: none;
-    width: 12px;
-    height: 12px;
-    background: darkgreen;
-    box-shadow: 2px 2px 2px #000000, 0px 0px 2px #0d0d0d;
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  cursor: pointer;
+  margin-top: -5px; /* specify margin in Chrome, in Firefox and IE it is automatic */
+  border-radius: 50%;
+  border: none;
+  width: 12px;
+  height: 12px;
+  background: darkgreen;
+  box-shadow: 2px 2px 2px #000000, 0px 0px 2px #0d0d0d;
 }
 
-input[type=range]::-moz-range-thumb {
-    cursor: pointer;
-    border-radius: 50%;
-    border: none;
-    width: 12px;
-    height: 12px;
-    background: darkgray;
-    box-shadow: 2px 2px 2px #000000, 0px 0px 2px #0d0d0d;
+input[type="range"]::-moz-range-thumb {
+  cursor: pointer;
+  border-radius: 50%;
+  border: none;
+  width: 12px;
+  height: 12px;
+  background: darkgray;
+  box-shadow: 2px 2px 2px #000000, 0px 0px 2px #0d0d0d;
 }
 
 /* loading spinner */
@@ -69,11 +67,19 @@ input[type=range]::-moz-range-thumb {
 }
 
 @-webkit-keyframes spin {
-  0% { -webkit-transform: rotate(0deg); }
-  100% { -webkit-transform: rotate(360deg); }
+  0% {
+    -webkit-transform: rotate(0deg);
+  }
+  100% {
+    -webkit-transform: rotate(360deg);
+  }
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }

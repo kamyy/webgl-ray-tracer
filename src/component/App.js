@@ -1,39 +1,33 @@
-import React from 'react';
-import {
-  css,
-} from 'emotion';
-import {
-  connect,
-} from 'react-redux';
-import Canvas, {
-  canvasWd,
-} from './Canvas.js';
+import React from "react";
+import { css } from "emotion";
+import { connect } from "react-redux";
+import Canvas, { canvasWd } from "./Canvas.js";
 // import SceneTabs from './SceneTabs.js';
-import OtherTabs from './OtherTabs.js';
+import OtherTabs from "./OtherTabs.js";
 
 type Props = {
-    renderingPass: number,
-    numSamples: number
+  renderingPass: number,
+  numSamples: number,
 };
 
 const cssApp = css`
-    font-family: 'Roboto';
-    background-color: '#f5f5f5';
-    position: relative;
-    width: ${canvasWd + 4}px;
-    margin: auto;
+  font-family: "Roboto";
+  background-color: "#f5f5f5";
+  position: relative;
+  width: ${canvasWd + 4}px;
+  margin: auto;
 `;
 
 const cssProgressRow = css`
-    display: flex;
-    flex-direction: row;
-    justify-content: flex-start;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
 `;
 
 const cssProgressPercentage = css`
-    margin: 0px 0px 0px 4px;
-    font-size: 12px;
-    font-weight: bold;
+  margin: 0px 0px 0px 4px;
+  font-size: 12px;
+  font-weight: bold;
 `;
 
 function App(props: Props) {
@@ -41,12 +35,12 @@ function App(props: Props) {
   const width = ratio * canvasWd;
 
   const cssProgressBar = css`
-        margin: 6px 0px 12px 2px;
-        border-radius: 6px;
-        width: ${width - 8}px;
-        height: 3px;
-        background-color: darkgreen;
-    `;
+    margin: 6px 0px 12px 2px;
+    border-radius: 6px;
+    width: ${width - 8}px;
+    height: 3px;
+    background-color: darkgreen;
+  `;
 
   const percentage = Math.floor(ratio * 100 + 0.5);
 
@@ -55,10 +49,7 @@ function App(props: Props) {
       <Canvas />
       <div className={cssProgressRow}>
         <div className={cssProgressBar} />
-        <div className={cssProgressPercentage}>
-          {percentage}
-          %
-        </div>
+        <div className={cssProgressPercentage}>{percentage}%</div>
       </div>
       <OtherTabs />
     </div>

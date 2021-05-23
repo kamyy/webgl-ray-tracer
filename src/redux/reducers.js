@@ -1,7 +1,4 @@
-import {
-  createStore,
-  combineReducers,
-} from 'redux';
+import { createStore, combineReducers } from "redux";
 
 import {
   SET_SCENE,
@@ -14,10 +11,9 @@ import {
   SET_ELAPSED_TIME,
   SET_ETA_TIME,
   SET_AVG_TIME,
-
   SPINNER_SHOW,
   FLAT_SHADING,
-} from './actions.js';
+} from "./actions.js";
 
 // ----------------------------------------------------------------
 // default states
@@ -122,5 +118,5 @@ export const reduxStore = createStore(
     elapsedTime,
     etaTime,
     avgTime,
-  }),
+  })
 );

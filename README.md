@@ -12,22 +12,20 @@ I attended a talk given by Eric Haines at GDC 2019 titled 'A Fast Forward Throug
 
 ![shot2](./screenshots/shot2.png)
 
-
 At the end of the day I ended up with what's called a path tracer. It requires a large quantity of rays to be fired through each pixel in a stochastic manner for convergence thus removing noise from the rendered image. It's a brute force technique and you pay for it in terms of time and compute power but it does produce incredibly accurate visuals like soft shadows, ambient occlusion and blurred reflections. These effects are difficult to achieve using a real-time 3D rasterizer but here you essentially get them for free with little to no rendering tricks involved.
 
-To allow my handiwork to be easily accesible to anyone with a web browser, it made sense again to use react.js/redux, WebGL and GLSL. There's no install requirement in the traditional sense, which is definitely a plus. 
+To allow my handiwork to be easily accesible to anyone with a web browser, it made sense again to use react.js/redux, WebGL and GLSL. There's no install requirement in the traditional sense, which is definitely a plus.
 
 ## Technical
 
 This app makes use of several features that were introduced in WebGL 2 including:
+
 - Removal of loop restrictions (very important).
 - Use of new texture formats to hold random seed, mesh, material and BVH data.
 - Texture arrays to store multiple BVH trees.
 - Direct texel lookup using texelFetch.
 
-
 ![shot3](./screenshots/shot3.png)
-
 
 The Javascript portion of the app reads Wavefront OBJ and MTL files, creates one or more BVH trees before pushing all this data on to the GPU. It's other purpose is to handle user input and user interaction with the camera.
 
@@ -40,9 +38,7 @@ The sample-fs.glsl fragment shader is the heart of the program. It handles:
 - Barycentric coordinates.
 - Recursion (via looping).
 
-
 ![shot4](./screenshots/shot4.png)
-
 
 The fragment shader is used to progressively build the final image via multiple rendering passes. It's done this way so the browser doesn't kill the program thinking it's gone rogue, which would happen if the shader took too long to finish. A nice bonus is it also allows a decent level of real-time interaction to be programmed in.
 
