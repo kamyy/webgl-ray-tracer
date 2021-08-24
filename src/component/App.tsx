@@ -1,5 +1,5 @@
-import React from "react";
 import { css } from "@emotion/css";
+import React from "react";
 import { connect } from "react-redux";
 import Canvas, { canvasWd } from "./Canvas";
 import OtherTabs from "./OtherTabs";
@@ -59,5 +59,4 @@ function mapStateToProps(state) {
     renderingPass: state.renderingPass,
   };
 }
-
 export default connect(mapStateToProps, null)(App);
