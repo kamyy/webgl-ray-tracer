@@ -1,10 +1,8 @@
-import React from "react";
-
-import { cx, css } from "@emotion/css";
-
-import RenderingParams from "./RenderingParams.js";
-import RenderingStatus from "./RenderingStatus.js";
-import ApplicationInfo from "./ApplicationInfo.jsx";
+import { css, cx } from "@emotion/css";
+import React, { useState } from "react";
+import ApplicationInfo from "./ApplicationInfo";
+import RenderingParams from "./RenderingParams";
+import RenderingStatus from "./RenderingStatus";
 
 const RENDERING_PARAMS_TAB = 0;
 const RENDERING_STATUS_TAB = 1;
@@ -49,72 +47,60 @@ const cssUnselectedTabButton = css`
   font-size: 12px;
 `;
 
-type Props = {};
+export default function OtherTabs(): JSX.Element {
+  const [currentTab, setCurrentTab] = useState<number>(RENDERING_PARAMS_TAB);
 
-export default class OtherTabs extends React.Component<Props, State> {
-  state = {
-    currentTab: RENDERING_PARAMS_TAB,
-  };
+  const renderingParamsTabButtonStyle =
+    currentTab === RENDERING_PARAMS_TAB ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);
+  const renderingStatusTabButtonStyle =
+    currentTab === RENDERING_STATUS_TAB ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);
+  const applicationInfoTabButtonStyle =
+    currentTab === APPLICATION_INFO_TAB ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);
 
-  render() {
-    const renderingParamsTabButtonStyle =
-      this.state.currentTab === RENDERING_PARAMS_TAB ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);
-    const renderingStatusTabButtonStyle =
-      this.state.currentTab === RENDERING_STATUS_TAB ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);
-    const applicationInfoTabButtonStyle =
-      this.state.currentTab === APPLICATION_INFO_TAB ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);
+  let tabPage;
+  switch (currentTab) {
+    case RENDERING_PARAMS_TAB:
+      tabPage = <RenderingParams />;
+      break;
+    case RENDERING_STATUS_TAB:
+      tabPage = <RenderingStatus />;
+      break;
+    case APPLICATION_INFO_TAB:
+      tabPage = <ApplicationInfo />;
+      break;
+    default:
+      break;
+  }
 
-    let tabPage;
-    switch (this.state.currentTab) {
-      case RENDERING_PARAMS_TAB:
-        tabPage = <RenderingParams />;
-        break;
-      case RENDERING_STATUS_TAB:
-        tabPage = <RenderingStatus />;
-        break;
-      case APPLICATION_INFO_TAB:
-        tabPage = <ApplicationInfo />;
-        break;
-      default:
-        break;
-    }
+  return (
+    <div className={css(cssTabPages)}>
+      <div className={cx(cssTabBar)}>
+        <button
+          type="button"
+          className={renderingParamsTabButtonStyle}
+          onClick={() => setCurrentTab(RENDERING_PARAMS_TAB)}
+        >
+          Rendering Parameters
+        </button>
 
-    return (
-      <div className={css(cssTabPages)}>
-        <div className={cx(cssTabBar)}>
-          <button
-            type="button"
-            className={renderingParamsTabButtonStyle}
-            onClick={() => this.onClick(RENDERING_PARAMS_TAB)}
-          >
-            Rendering Parameters
-          </button>
+        <button
+          type="button"
+          className={renderingStatusTabButtonStyle}
+          onClick={() => setCurrentTab(RENDERING_STATUS_TAB)}
+        >
+          Rendering Status
+        </button>
 
-          <button
-            type="button"
-            className={renderingStatusTabButtonStyle}
-            onClick={() => this.onClick(RENDERING_STATUS_TAB)}
-          >
-            Rendering Status
-          </button>
-
-          <button
-            type="button"
-            className={applicationInfoTabButtonStyle}
-            onClick={() => this.onClick(APPLICATION_INFO_TAB)}
-          >
-            App Info
-          </button>
-        </div>
-
-        {tabPage}
+        <button
+          type="button"
+          className={applicationInfoTabButtonStyle}
+          onClick={() => setCurrentTab(APPLICATION_INFO_TAB)}
+        >
+          App Info
+        </button>
       </div>
-    );
-  }
 
-  onClick(selectedTab: 0 | 1 | 2): void {
-    this.setState({
-      currentTab: selectedTab,
-    });
-  }
+      {tabPage}
+    </div>
+  );
 }

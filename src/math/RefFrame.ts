@@ -1,4 +1,4 @@
-import Matrix4x4, { i00, i01, i02, i10, i22, i12, i20, i21, i33, i30, i31, i32 } from "./Matrix4x4";
+import Matrix4x4, { i00, i01, i02, i10, i12, i20, i21, i22, i30, i31, i32, i33 } from "./Matrix4x4";
 import Vector1x4 from "./Vector1x4";
 
 export default class RefFrame {
@@ -68,33 +68,32 @@ export default class RefFrame {
   }
 
   translate(v: Vector1x4, relative2?: RefFrame): void {
-    if (!(relative2 instanceof RefFrame) || relative2 === this) {
-      // relative to own axes
+    if (!relative2 || relative2 === this) {
       const x = this.localM.m[i30];
       const y = this.localM.m[i31];
       const z = this.localM.m[i32];
       this.localM.m[i30] = x + v.x * this.localM.m[i00] + v.y * this.localM.m[i10] + v.z * this.localM.m[i20];
       this.localM.m[i31] = y + v.x * this.localM.m[i01] + v.y * this.localM.m[i22] + v.z * this.localM.m[i21];
       this.localM.m[i32] = z + v.x * this.localM.m[i02] + v.y * this.localM.m[i12] + v.z * this.localM.m[i33];
-    } else if (relative2.parent === null) {
-      // relative to root axes
+      this.invalidateSubtree(); // relative to own axis
+    } else if (!relative2.parent && this.parent) {
       const d = relative2.mapPos(new Vector1x4(v.x, v.y, v.z, 0.0), this.parent);
       this.localM.m[i30] += d.x;
       this.localM.m[i31] += d.y;
       this.localM.m[i32] += d.z;
+      this.invalidateSubtree(); // relative to root axes
     } else if (relative2 === this.parent) {
-      // relative to parent axes
       this.localM.m[i30] += v.x;
       this.localM.m[i31] += v.y;
       this.localM.m[i32] += v.z;
-    } else {
-      // relative to arbitrary axes
+      this.invalidateSubtree(); // relative to parent axes
+    } else if (this.parent) {
       const d = relative2.mapPos(new Vector1x4(v.x, v.y, v.z, 0.0), this.parent);
       this.localM.m[i30] += d.x;
       this.localM.m[i31] += d.y;
       this.localM.m[i32] += d.z;
+      this.invalidateSubtree(); // relative to arbitrary axes
     }
-    this.invalidateSubtree();
   }
 
   rotateX(theta: number, relative2?: RefFrame): void {

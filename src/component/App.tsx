@@ -1,6 +1,7 @@
 import { css } from "@emotion/css";
 import React from "react";
-import { connect } from "react-redux";
+import { useSelector } from "react-redux";
+import { RootState } from "../redux/reducers";
 import Canvas, { canvasWd } from "./Canvas";
 import OtherTabs from "./OtherTabs";
 
@@ -24,12 +25,9 @@ const cssProgressPercentage = css`
   font-weight: bold;
 `;
 
-interface AppProps {
-  renderingPass: number;
-  numSamples: number;
-}
-
-function App({ renderingPass, numSamples }: AppProps) {
+export default function App(): JSX.Element {
+  const renderingPass = useSelector((state: RootState) => state.renderingPass);
+  const numSamples = useSelector((state: RootState) => state.numSamples);
   const ratio = renderingPass / numSamples;
   const width = ratio * canvasWd;
 
@@ -52,11 +50,3 @@ function App({ renderingPass, numSamples }: AppProps) {
     </div>
   );
 }
-
-function mapStateToProps(state) {
-  return {
-    numSamples: state.numSamples,
-    renderingPass: state.renderingPass,
-  };
-}
-export default connect(mapStateToProps, null)(App);

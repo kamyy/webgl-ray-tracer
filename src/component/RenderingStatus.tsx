@@ -1,8 +1,7 @@
+import { css } from "@emotion/css";
 import React from "react";
-
-import { connect } from "react-redux";
-
-import { css } from "emotion";
+import { useSelector } from "react-redux";
+import { RootState } from "../redux/reducers";
 
 const cssTabPage = css`
   display: flex;
@@ -35,43 +34,37 @@ const cssTimeFieldset = css`
   text-align: center;
 `;
 
-function RenderingStatus(props) {
+export default function RenderingStatus(): JSX.Element {
+  const renderingPass = useSelector((state: RootState) => state.renderingPass);
+  const elapsedTime = useSelector((state: RootState) => state.elapsedTime);
+  const numSamples = useSelector((state: RootState) => state.numSamples);
+  const etaTime = useSelector((state: RootState) => state.etaTime);
+  const avgTime = useSelector((state: RootState) => state.avgTime);
+
   return (
     <div className={cssTabPage}>
       <fieldset className={cssPassFieldset}>
         <legend className={cssLegend}>Rendering Pass</legend>
         <div>
           {" "}
-          {props.renderingPass} / {props.numSamples}{" "}
+          {renderingPass} / {numSamples}{" "}
         </div>
       </fieldset>
 
       <fieldset className={cssTimeFieldset}>
         <legend className={cssLegend}>Elapsed Time</legend>
-        <div>{props.elapsedTime}</div>
+        <div>{elapsedTime}</div>
       </fieldset>
 
       <fieldset className={cssTimeFieldset}>
         <legend className={cssLegend}>Remaining Time</legend>
-        <div>{props.etaTime}</div>
+        <div>{etaTime}</div>
       </fieldset>
 
       <fieldset className={cssTimeFieldset}>
         <legend className={cssLegend}>Avg. Duration Per Pass</legend>
-        <div>{props.avgTime}</div>
+        <div>{avgTime}</div>
       </fieldset>
     </div>
   );
 }
-
-function mapStateToProps(state) {
-  return {
-    numSamples: state.numSamples,
-    renderingPass: state.renderingPass,
-    elapsedTime: state.elapsedTime,
-    etaTime: state.etaTime,
-    avgTime: state.avgTime,
-  };
-}
-
-export default connect(mapStateToProps, null)(RenderingStatus);

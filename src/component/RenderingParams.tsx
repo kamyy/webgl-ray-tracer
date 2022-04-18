@@ -1,18 +1,15 @@
+import { css } from "@emotion/css";
 import React from "react";
-import { bindActionCreators } from "redux";
-
-import { connect } from "react-redux";
-
-import { css } from "emotion";
-
+import { useDispatch, useSelector } from "react-redux";
 import {
-  setNumSamples,
-  setNumBounces,
-  setCameraFov,
-  setShadingMethod,
   FLAT_SHADING,
   PHONG_SHADING,
-} from "../redux/actions.js";
+  setCameraFov,
+  setNumBounces,
+  setNumSamples,
+  setShadingMethod,
+} from "../redux/actions";
+import { RootState } from "../redux/reducers";
 
 const minSamples = 1;
 const maxSamples = 10000;
@@ -90,13 +87,19 @@ const cssShadingMethodButtons = css`
   margin-right: 4px;
 `;
 
-function RenderingParams(props) {
+export default function RenderingParams(): JSX.Element {
+  const dispatch = useDispatch();
+  const cameraFov = useSelector((state: RootState) => state.cameraFov);
+  const numSamples = useSelector((state: RootState) => state.numSamples);
+  const numBounces = useSelector((state: RootState) => state.numBounces);
+  const shadingMethod = useSelector((state: RootState) => state.shadingMethod);
+
   return (
     <div className={cssTabPage}>
       <div className={cssLtSection}>
         <div className={cssValueRow}>
           <label className={cssHeading}>Camera Field of View</label>
-          <div className={cssBold}>{props.cameraFov}</div>
+          <div className={cssBold}>{cameraFov}</div>
         </div>
 
         <div className={cssRangeRow}>
@@ -106,15 +109,15 @@ function RenderingParams(props) {
             className={cssInputRange}
             min={minCameraFov}
             max={maxCameraFov}
-            value={props.cameraFov}
-            onChange={(event) => props.setCameraFov(parseInt(event.target.value))}
+            value={cameraFov}
+            onChange={(event) => dispatch(setCameraFov(parseInt(event.target.value)))}
           />
           <label className={cssMaxRange}>{maxCameraFov}</label>
         </div>
 
         <div className={cssValueRow}>
           <label className={cssHeading}># of Samples Per Pixel</label>
-          <div className={cssBold}>{props.numSamples}</div>
+          <div className={cssBold}>{numSamples}</div>
         </div>
 
         <div className={cssRangeRow}>
@@ -124,15 +127,15 @@ function RenderingParams(props) {
             className={cssInputRange}
             min={minSamples}
             max={maxSamples}
-            value={props.numSamples}
-            onChange={(event) => props.setNumSamples(parseInt(event.target.value))}
+            value={numSamples}
+            onChange={(event) => dispatch(setNumSamples(parseInt(event.target.value)))}
           />
           <label className={cssMaxRange}>{maxSamples}</label>
         </div>
 
         <div className={cssValueRow}>
           <label className={cssHeading}># of Ray Bounces</label>
-          <div className={cssBold}>{props.numBounces}</div>
+          <div className={cssBold}>{numBounces}</div>
         </div>
 
         <div className={cssRangeRow}>
@@ -142,8 +145,8 @@ function RenderingParams(props) {
             className={cssInputRange}
             min={minBounces}
             max={maxBounces}
-            value={props.numBounces}
-            onChange={(event) => props.setNumBounces(parseInt(event.target.value))}
+            value={numBounces}
+            onChange={(event) => dispatch(setNumBounces(parseInt(event.target.value)))}
           />
           <label className={cssMaxRange}>{maxBounces}</label>
         </div>
@@ -157,8 +160,8 @@ function RenderingParams(props) {
             <input
               type="radio"
               value={FLAT_SHADING}
-              checked={props.shadingMethod === FLAT_SHADING}
-              onChange={(event) => props.setShadingMethod(parseInt(event.target.value))}
+              checked={shadingMethod === FLAT_SHADING}
+              onChange={(event) => dispatch(setShadingMethod(parseInt(event.target.value)))}
             />
             Flat
           </label>
@@ -167,8 +170,8 @@ function RenderingParams(props) {
             <input
               type="radio"
               value={PHONG_SHADING}
-              checked={props.shadingMethod === PHONG_SHADING}
-              onChange={(event) => props.setShadingMethod(parseInt(event.target.value))}
+              checked={shadingMethod === PHONG_SHADING}
+              onChange={(event) => dispatch(setShadingMethod(parseInt(event.target.value)))}
             />
             Phong
           </label>
@@ -177,26 +180,3 @@ function RenderingParams(props) {
     </div>
   );
 }
-
-function mapStateToProps(state) {
-  return {
-    numSamples: state.numSamples,
-    numBounces: state.numBounces,
-    cameraFov: state.cameraFov,
-    shadingMethod: state.shadingMethod,
-  };
-}
-
-function mapDispatchToProps(dispatch) {
-  return bindActionCreators(
-    {
-      setNumSamples,
-      setNumBounces,
-      setCameraFov,
-      setShadingMethod,
-    },
-    dispatch
-  );
-}
-
-export default connect(mapStateToProps, mapDispatchToProps)(RenderingParams);

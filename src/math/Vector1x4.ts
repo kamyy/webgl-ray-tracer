@@ -33,7 +33,7 @@ export default class Vector1x4 {
   get y(): number {
     return this.v[1];
   }
-  set y(a: number) {
+  set y(y: number) {
     this.v[1] = y;
   }
 

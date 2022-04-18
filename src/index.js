@@ -1,10 +1,9 @@
-import ReactDOM from "react-dom";
 import React from "react";
+import ReactDOM from "react-dom";
 import { Provider } from "react-redux";
+import App from "./component/App.tsx";
+import { reduxStore } from "./redux/reducers.ts";
 import * as serviceWorker from "./serviceWorker";
-import { reduxStore } from "./redux/reducers.js";
-
-import App from "./component/App.js";
 
 ReactDOM.render(
   <Provider store={reduxStore}>

@@ -1,6 +1,5 @@
 export default class RandomTexture {
-  source: WebGLTexture;
-  target: WebGLTexture;
+  source: WebGLTexture | null;
 
   constructor(GL: WebGL2RenderingContext, wd: number, ht: number) {
     const data = new Uint32Array(wd * ht * 4); // require 4 random values for each fragment to seed
@@ -15,14 +14,15 @@ export default class RandomTexture {
     }
 
     GL.activeTexture(GL.TEXTURE2);
-
     this.source = GL.createTexture();
-    GL.bindTexture(GL.TEXTURE_2D, this.source);
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST);
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
-    GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32UI, wd, ht, 0, GL.RGBA_INTEGER, GL.UNSIGNED_INT, data);
+    if (this.source) {
+      GL.bindTexture(GL.TEXTURE_2D, this.source);
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST);
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+      GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32UI, wd, ht, 0, GL.RGBA_INTEGER, GL.UNSIGNED_INT, data);
+    }
   }
 
   bindToSampleShader(GL: WebGL2RenderingContext, program: WebGLProgram): void {

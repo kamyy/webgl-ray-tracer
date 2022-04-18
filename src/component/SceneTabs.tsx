@@ -1,11 +1,8 @@
+import { css, cx } from "@emotion/css";
 import React from "react";
-
-import { cx, css } from "emotion";
-import { reduxStore } from "../redux/reducers.js";
-
-import Scene, { SCENE_UNINITIALIZED, SCENE_INITIALIZING, SCENE_INITIALIZED } from "../texture/Scene.js";
-
-import { setScene, setLoadStatus, SPINNER_SHOW, SPINNER_HIDE, LOAD_FAILURE } from "../redux/actions.js";
+import { LOAD_FAILURE, setLoadStatus, setScene, SPINNER_HIDE, SPINNER_SHOW } from "../redux/actions";
+import { reduxStore } from "../redux/reducers";
+import Scene, { SCENE_INITIALIZED, SCENE_INITIALIZING, SCENE_UNINITIALIZED } from "../texture/Scene";
 
 const cssTabBar = css`
   display: flex;
@@ -40,12 +37,12 @@ const cssUnselectedTabButton = css`
   font-size: 12px;
 `;
 
-const scenes = [null, null, null];
+const scenes: Scene[] = [];
 
 export function createScenes(GL: WebGL2RenderingContext): void {
-  scenes[0] = new Scene(GL, "/suzanne.obj", "/suzanne.mtl");
-  scenes[1] = new Scene(GL, "/suzanne.obj", "/suzanne.mtl");
-  scenes[2] = new Scene(GL, "/suzanne.obj", "/suzanne.mtl");
+  scenes.push(new Scene(GL, "/suzanne.obj", "/suzanne.mtl"));
+  scenes.push(new Scene(GL, "/suzanne.obj", "/suzanne.mtl"));
+  scenes.push(new Scene(GL, "/suzanne.obj", "/suzanne.mtl"));
 
   scenes[0].init().then(() => reduxStore.dispatch(setLoadStatus(SPINNER_HIDE)));
   reduxStore.dispatch(setLoadStatus(SPINNER_SHOW));
@@ -80,7 +77,7 @@ function onClick(index: number) {
   }
 }
 
-export default function SceneTabs() {
+export default function SceneTabs(): JSX.Element {
   const { scene } = reduxStore.getState();
   const styleTabButton0 = scene === scenes[0] ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);
   const styleTabButton1 = scene === scenes[1] ? cx(cssSelectedTabButton) : cx(cssUnselectedTabButton);

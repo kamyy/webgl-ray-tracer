@@ -1,10 +1,8 @@
-import wavefrontObjParser from "obj-file-parser";
 import wavefrontMtlParser from "mtl-file-parser";
-
-import Material, { EMISSIVE_MATERIAL, DIELECTRIC_MATERIAL } from "../material/Material";
-
-import Vector1x4 from "../math/Vector1x4";
+import wavefrontObjParser from "obj-file-parser";
+import Material, { DIELECTRIC_MATERIAL, EMISSIVE_MATERIAL } from "../material/Material";
 import RefFrame from "../math/RefFrame";
+import Vector1x4 from "../math/Vector1x4";
 
 const X_AXIS = 0;
 const Y_AXIS = 1;
@@ -15,7 +13,27 @@ export const SCENE_UNINITIALIZED = 0;
 export const SCENE_INITIALIZING = 1;
 export const SCENE_INITIALIZED = 2;
 
-type Face = {
+interface Model {
+  name: string;
+  vertices: { x: number; y: number; z: number }[];
+  vertexNormals: { x: number; y: number; z: number }[];
+  faces: {
+    material: string;
+    vertices: { vertexIndex: number; textureCoordsIndex: number; vertexNormalIndex: number }[];
+  }[];
+}
+
+interface Mtl {
+  name: string;
+  Kd: {
+    method: string;
+    red: number;
+    green: number;
+    blue: number;
+  };
+}
+
+interface Face {
   p0: Vector1x4; // vertex position 0
   p1: Vector1x4; // vertex position 1
   p2: Vector1x4; // vertex position 2
@@ -27,7 +45,12 @@ type Face = {
   fn: Vector1x4; // face normal
   fi: number; // index into root face array
   mi: number; // index into material array
-};
+}
+
+interface ParsedObj {
+  faces: Face[];
+  AABBs: BV[];
+}
 
 class BV {
   // AABB bounding volume
@@ -153,15 +176,15 @@ export default class Scene {
   mtlUrl: string;
   objCount: number;
   mtlCount: number;
-  parsedObjs: any;
-  parsedMtls: any;
+  parsedObjs: ParsedObj[];
+  parsedMtls: Material[];
   rootNode: RefFrame;
   parentNode: RefFrame;
   cameraNode: RefFrame;
   GL: WebGL2RenderingContext;
-  facesTexture: WebGLTexture;
-  AABBsTexture: WebGLTexture;
-  mtlsTexture: WebGLTexture;
+  facesTexture: WebGLTexture | null;
+  AABBsTexture: WebGLTexture | null;
+  mtlsTexture: WebGLTexture | null;
 
   constructor(GL: WebGL2RenderingContext, objUrl: string, mtlUrl: string) {
     this.sceneStatus = SCENE_UNINITIALIZED;
@@ -169,6 +192,8 @@ export default class Scene {
     this.mtlUrl = mtlUrl;
     this.objCount = 0;
     this.mtlCount = 0;
+    this.parsedObjs = [];
+    this.parsedMtls = [];
     this.GL = GL;
 
     this.facesTexture = GL.createTexture();
@@ -192,48 +217,36 @@ export default class Scene {
   async init(): Promise<Scene> {
     this.sceneStatus = SCENE_INITIALIZING;
 
-    let wavefrontObj;
-    let wavefrontMtl;
-    try {
-      const _wavefrontObjParser = new wavefrontObjParser(await this.fetchTextFile(this.objUrl));
-      const _wavefrontMtlParser = new wavefrontMtlParser(await this.fetchTextFile(this.mtlUrl));
-      wavefrontObj = _wavefrontObjParser.parse();
-      wavefrontMtl = _wavefrontMtlParser.parse();
-    } catch (e) {
-      throw e;
-    }
+    const _wavefrontObjParser = new wavefrontObjParser(await this.fetchTextFile(this.objUrl));
+    const _wavefrontMtlParser = new wavefrontMtlParser(await this.fetchTextFile(this.mtlUrl));
+    const wavefrontObj = _wavefrontObjParser.parse();
+    const wavefrontMtl = _wavefrontMtlParser.parse();
 
-    let posArray = [];
-    let nrmArray = [];
+    let posArray: { x: number; y: number; z: number }[] = [];
+    let nrmArray: { x: number; y: number; z: number }[] = [];
 
-    this.parsedObjs = wavefrontObj.models.map(({ vertices, vertexNormals, faces }) => {
-      const outFaces = [];
+    this.parsedObjs = wavefrontObj.models.map(({ vertices, vertexNormals, faces }: Model) => {
+      const outFaces: Face[] = [];
       posArray = posArray.concat(vertices);
       nrmArray = nrmArray.concat(vertexNormals);
 
-      faces.forEach((f, i) => {
-        let p0 = f.vertices[0].vertexIndex - 1;
-        p0 = posArray[p0];
-        p0 = new Vector1x4(p0.x, p0.y, p0.z);
-        let p1 = f.vertices[1].vertexIndex - 1;
-        p1 = posArray[p1];
-        p1 = new Vector1x4(p1.x, p1.y, p1.z);
-        let p2 = f.vertices[2].vertexIndex - 1;
-        p2 = posArray[p2];
-        p2 = new Vector1x4(p2.x, p2.y, p2.z);
+      faces.forEach((f) => {
+        const i0 = f.vertices[0].vertexIndex - 1;
+        const i1 = f.vertices[1].vertexIndex - 1;
+        const i2 = f.vertices[2].vertexIndex - 1;
+        const p0 = new Vector1x4(posArray[i0].x, posArray[i0].y, posArray[i0].z);
+        const p1 = new Vector1x4(posArray[i1].x, posArray[i1].y, posArray[i1].z);
+        const p2 = new Vector1x4(posArray[i2].x, posArray[i2].y, posArray[i2].z);
 
-        let n0 = f.vertices[0].vertexNormalIndex - 1;
-        n0 = nrmArray[n0];
-        n0 = new Vector1x4(n0.x, n0.y, n0.z);
-        let n1 = f.vertices[1].vertexNormalIndex - 1;
-        n1 = nrmArray[n1];
-        n1 = new Vector1x4(n1.x, n1.y, n1.z);
-        let n2 = f.vertices[2].vertexNormalIndex - 1;
-        n2 = nrmArray[n2];
-        n2 = new Vector1x4(n2.x, n2.y, n2.z);
+        const j0 = f.vertices[0].vertexNormalIndex - 1;
+        const j1 = f.vertices[1].vertexNormalIndex - 1;
+        const j2 = f.vertices[2].vertexNormalIndex - 1;
+        const n0 = new Vector1x4(nrmArray[j0].x, nrmArray[j0].y, nrmArray[j0].z);
+        const n1 = new Vector1x4(nrmArray[j1].x, nrmArray[j1].y, nrmArray[j1].z);
+        const n2 = new Vector1x4(nrmArray[j2].x, nrmArray[j2].y, nrmArray[j2].z);
 
         const fn = p1.sub(p0).cross(p2.sub(p0)).normalize(); // face normal
-        const mi = wavefrontMtl.findIndex((m) => m.name === f.material); // material index
+        const mi = wavefrontMtl.findIndex((m: Mtl) => m.name === f.material); // material index
         const fi = outFaces.length; // face index
 
         outFaces.push({
@@ -283,7 +296,7 @@ export default class Scene {
       };
     });
 
-    this.parsedMtls = wavefrontMtl.map((mtl) => {
+    this.parsedMtls = wavefrontMtl.map((mtl: Mtl) => {
       const mat = new Material(new Vector1x4(mtl.Kd.red, mtl.Kd.green, mtl.Kd.blue));
       // 'Metal 0', 0.95, 'Glass 0', 0.00, 1.33
       switch (mtl.name) {
@@ -450,7 +463,7 @@ export default class Scene {
     GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32F, numTexelsPerMtl, this.parsedMtls.length, 0, GL.RGBA, GL.FLOAT, data);
   }
 
-  bindToSampleShader(GL: any, program: Webthis.GLProgram) {
+  bindToSampleShader(GL: WebGL2RenderingContext, program: WebGLProgram): void {
     GL.activeTexture(GL.TEXTURE3);
     GL.bindTexture(GL.TEXTURE_2D_ARRAY, this.facesTexture);
     GL.uniform1i(GL.getUniformLocation(program, "u_face_sampler"), 3);

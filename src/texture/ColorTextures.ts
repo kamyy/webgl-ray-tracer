@@ -1,25 +1,27 @@
 export default class ColorTextures {
-  source: WebGLTexture;
-  target: WebGLTexture;
+  source: WebGLTexture | null;
+  target: WebGLTexture | null;
 
   constructor(GL: WebGL2RenderingContext, wd: number, ht: number) {
     GL.activeTexture(GL.TEXTURE0);
-
     this.source = GL.createTexture();
-    GL.bindTexture(GL.TEXTURE_2D, this.source);
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST);
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
-    GL.texStorage2D(GL.TEXTURE_2D, 1, GL.RGBA32F, wd, ht);
-
     this.target = GL.createTexture();
-    GL.bindTexture(GL.TEXTURE_2D, this.target);
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST);
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
-    GL.texStorage2D(GL.TEXTURE_2D, 1, GL.RGBA32F, wd, ht);
+
+    if (this.source && this.target) {
+      GL.bindTexture(GL.TEXTURE_2D, this.source);
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST);
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+      GL.texStorage2D(GL.TEXTURE_2D, 1, GL.RGBA32F, wd, ht);
+
+      GL.bindTexture(GL.TEXTURE_2D, this.target);
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST);
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+      GL.texStorage2D(GL.TEXTURE_2D, 1, GL.RGBA32F, wd, ht);
+    }
   }
 
   bindToSampleShader(GL: WebGL2RenderingContext, program: WebGLProgram): void {
