@@ -41,11 +41,11 @@ export default function Forms() {
         </button>
       </nav>
 
-      <div>
+      <aside>
         {currentFormType === FormType.renderingParams && <RenderingParams />}
         {currentFormType === FormType.renderingStatus && <RenderingStatus />}
         {currentFormType === FormType.applicationInfo && <ApplicationInfo />}
-      </div>
+      </aside>
     </footer>
   );
 }
