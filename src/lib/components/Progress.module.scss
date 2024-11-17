@@ -1,0 +1,18 @@
+.progress {
+  display: flex;
+  align-items: center;
+  margin-top: 0.25em;
+  margin-bottom: 1em;
+
+  .bar {
+    height: 3px;
+    background-color: darkgreen;
+  }
+
+  .percent {
+    margin-left: 0.25%;
+    text-align: right;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+}

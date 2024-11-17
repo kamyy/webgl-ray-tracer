@@ -1,0 +1,67 @@
+.renderingParams {
+  display: flex;
+  padding: 2em;
+
+  .inputRanges {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+
+    .rangeHeader {
+      display: flex;
+    }
+    .rangeTitle {
+      flex-grow: 1;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    .rangeValue {
+      flex-basis: 5%;
+      font-weight: bold;
+      font-size: 0.9rem;
+      text-align: left;
+      margin-left: 1em;
+    }
+
+    .rangeSlider {
+      display: flex;
+      padding-top: 0.5em;
+      padding-bottom: 0.75em;
+    }
+    .rangeMin {
+      flex-basis: 5%;
+      text-align: right;
+    }
+    input {
+      flex-grow: 1;
+      margin: 0 1em;
+    }
+    .rangeMax {
+      flex-basis: 5%;
+      text-align: left;
+    }
+  }
+
+  .shadingMethod {
+    border-style: none none none solid;
+    border-color: lightgray;
+    border-width: 1px;
+    padding-left: 1em;
+
+    legend {
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+
+    .radioButtons {
+      display: flex;
+    }
+    input,
+    label {
+      margin-top: 0.5em;
+    }
+    label + input {
+      margin-left: 1em;
+    }
+  }
+}

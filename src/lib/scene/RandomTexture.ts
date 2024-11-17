@@ -1,5 +1,5 @@
 export default class RandomTexture {
-  source: WebGLTexture | null;
+  private source: WebGLTexture | null = null;
 
   constructor(GL: WebGL2RenderingContext, wd: number, ht: number) {
     const data = new Uint32Array(wd * ht * 4); // require 4 random values for each fragment to seed
@@ -29,6 +29,6 @@ export default class RandomTexture {
     // using texture unit 2
     GL.activeTexture(GL.TEXTURE2);
     GL.bindTexture(GL.TEXTURE_2D, this.source);
-    GL.uniform1i(GL.getUniformLocation(program, "u_random_sampler"), 2);
+    GL.uniform1i(GL.getUniformLocation(program, 'u_random_sampler'), 2);
   }
 }
