@@ -17,7 +17,7 @@ export default function RenderingParams(): JSX.Element {
   const shadingMethod = useAppSelector((state) => state.shadingMethod);
 
   return (
-    <section className={styles.renderingParams}>
+    <form className={styles.renderingParams}>
       <div className={styles.inputRanges}>
         <div className={styles.rangeHeader}>
           <div className={styles.rangeTitle}>Camera Field of View</div>
@@ -91,6 +91,6 @@ export default function RenderingParams(): JSX.Element {
           <label htmlFor="phong">Phong</label>
         </div>
       </fieldset>
-    </section>
+    </form>
   );
 }

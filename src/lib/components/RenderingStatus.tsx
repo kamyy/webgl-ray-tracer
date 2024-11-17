@@ -9,7 +9,7 @@ export default function RenderingStatus() {
   const avgTime = useAppSelector((state) => state.avgTime);
 
   return (
-    <section className={styles.renderingStatus}>
+    <form className={styles.renderingStatus}>
       <fieldset className={styles.renderingPass}>
         <legend>Rendering Pass</legend>
         <div>
@@ -31,6 +31,6 @@ export default function RenderingStatus() {
         <legend>Avg. Duration Per Pass</legend>
         <div>{avgTime}</div>
       </fieldset>
-    </section>
+    </form>
   );
 }

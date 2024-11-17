@@ -1,4 +1,4 @@
-.forms {
+.tabs {
   nav {
     display: flex;
     align-items: flex-end;
@@ -23,7 +23,7 @@
     }
   }
 
-  aside {
+  .tabContent {
     border: 1px solid lightgray;
     border-radius: 0 1em 1em 1em;
   }

@@ -14,7 +14,7 @@ export default function Forms() {
   const [currentFormType, setCurrentFormType] = useState<FormType>(FormType.renderingParams);
 
   return (
-    <footer className={styles.forms}>
+    <footer className={styles.tabs}>
       <nav>
         <button
           type="button"
@@ -41,11 +41,11 @@ export default function Forms() {
         </button>
       </nav>
 
-      <aside>
+      <div className={styles.tabContent}>
         {currentFormType === FormType.renderingParams && <RenderingParams />}
         {currentFormType === FormType.renderingStatus && <RenderingStatus />}
         {currentFormType === FormType.applicationInfo && <ApplicationInfo />}
-      </aside>
+      </div>
     </footer>
   );
 }

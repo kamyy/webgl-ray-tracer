@@ -2,7 +2,7 @@ import styles from './ApplicationInfo.module.scss';
 
 export default function ApplicationInfo() {
   return (
-    <section className={styles.applicationInfo}>
+    <form className={styles.applicationInfo}>
       <div>
         <p>MIT License</p>
         <p>
@@ -24,6 +24,6 @@ export default function ApplicationInfo() {
           <span className={styles.bold}>* Dolly In/Out</span> Left + right click + drag. Or shift + left click + drag.
         </p>
       </div>
-    </section>
+    </form>
   );
 }
