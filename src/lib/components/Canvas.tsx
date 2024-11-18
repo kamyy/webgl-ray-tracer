@@ -107,10 +107,8 @@ export default function Canvas() {
 
           if ((cv.lButtonDownOnCanvas && cv.rButtonDownOnCanvas) || (cv.lButtonDownOnCanvas && event.shiftKey)) {
             // dolly
-            if (x !== cv.x && cv.scene.cameraNode) {
-              cv.scene.cameraNode.translate(new Vector1x4(0, (x - cv.x) * cv.TXYZ_SCALAR, 0));
-              cv.x = x;
-              cv.y = y;
+            if (y !== cv.y && cv.scene.cameraNode) {
+              cv.scene.cameraNode.translate(new Vector1x4(0, (cv.y - y) * cv.TXYZ_SCALAR, 0));
               renderReset();
             }
           } else if ((cv.lButtonDownOnCanvas && event.ctrlKey) || cv.rButtonDownOnCanvas) {
@@ -120,8 +118,6 @@ export default function Canvas() {
               const dz = (y - cv.y) * cv.TXYZ_SCALAR;
               const dv = cv.scene.cameraNode.mapPos(new Vector1x4(dx, 0, dz, 0), cv.scene.parentNode);
               cv.scene.parentNode.translate(dv); // move parent in camera space
-              cv.x = x;
-              cv.y = y;
               renderReset();
             }
           } else if (cv.lButtonDownOnCanvas) {
@@ -129,11 +125,11 @@ export default function Canvas() {
             if (x !== cv.x || y !== cv.y) {
               cv.scene.parentNode.rotateZ(degreesToRadians(cv.x - x) * cv.RXYZ_SCALAR); // yaw camera target around it's own z-axis
               cv.scene.cameraNode.rotateX(degreesToRadians(cv.y - y) * cv.RXYZ_SCALAR, cv.scene.parentNode); // pitch around camera's parent x-axis
-              cv.x = x;
-              cv.y = y;
               renderReset();
             }
           }
+          cv.x = x;
+          cv.y = y;
         }
       }
 

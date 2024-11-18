@@ -615,13 +615,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/obj-file-parser@npm:^0":
-  version: 0.5.2
-  resolution: "@types/obj-file-parser@npm:0.5.2"
-  checksum: 10c0/72a8790b03087647901ecbcc3474d3830cbf40e41b10496a451304b71d9f5f7f62a5063f939cb69d36f0bba45d5b25ffd4e97b274c8574f05f4dfe53474ff83f
-  languageName: node
-  linkType: hard
-
 "@types/prop-types@npm:*":
   version: 15.7.13
   resolution: "@types/prop-types@npm:15.7.13"
@@ -4137,7 +4130,6 @@ __metadata:
   dependencies:
     "@reduxjs/toolkit": "npm:^2.3.0"
     "@types/node": "npm:^22"
-    "@types/obj-file-parser": "npm:^0"
     "@types/react": "npm:^18"
     "@types/react-dom": "npm:^18"
     classnames: "npm:^2.5.1"
