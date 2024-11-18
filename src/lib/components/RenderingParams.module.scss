@@ -9,6 +9,7 @@
     cursor: pointer;
 
     &::-webkit-slider-runnable-track {
+      -webkit-appearance: none;
       height: 2px;
       background: lightgray;
     }
