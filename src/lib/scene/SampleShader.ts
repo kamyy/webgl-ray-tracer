@@ -1,5 +1,5 @@
-import { CanvasVars } from '../components/Canvas';
 import Vector1x4 from '../math/Vector1x4';
+import { CanvasVars } from '../types/CanvasVars';
 import Shader from './Shader';
 
 export default class SampleShader extends Shader {
@@ -19,16 +19,18 @@ export default class SampleShader extends Shader {
   }
 
   draw({
-    GL,
-    scene,
     canvasWd,
     canvasHt,
+
     cameraFov,
     numBounces,
     shadingMethod,
     renderingPass,
+
+    GL,
     colorTextures,
     randomTexture,
+    scene,
   }: CanvasVars) {
     if (this.program && GL && colorTextures && randomTexture && scene?.cameraNode) {
       const origin = new Vector1x4(0.0, 0.0, 0.0); // in view space

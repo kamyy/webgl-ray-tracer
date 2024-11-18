@@ -27,7 +27,7 @@ export const initialAppState: AppState = {
   shadingMethod: ShadingMethod.flat,
   renderingPass: 0,
   numSamples: 10,
-  numBounces: 5,
+  numBounces: 6,
   cameraFov: 45,
   elapsedTime: '',
   etaTime: '',

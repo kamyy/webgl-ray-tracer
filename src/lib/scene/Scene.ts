@@ -169,14 +169,7 @@ class BV {
   }
 }
 
-export enum SceneStatus {
-  uninitialized,
-  initializing,
-  initialized,
-}
-
 export default class Scene {
-  status: SceneStatus;
   objUrl: string;
   mtlUrl: string;
   objCount: number;
@@ -192,7 +185,6 @@ export default class Scene {
   mtlsTexture: WebGLTexture | null = null;
 
   constructor(GL: WebGL2RenderingContext | null, objUrl: string, mtlUrl: string) {
-    this.status = SceneStatus.uninitialized;
     this.objUrl = objUrl;
     this.mtlUrl = mtlUrl;
     this.objCount = 0;
@@ -223,8 +215,6 @@ export default class Scene {
 
   async init() {
     if (this.GL) {
-      this.status = SceneStatus.initializing;
-
       const _wavefrontObjParser = new wavefrontObjParser(await this.fetchTextFile(this.objUrl));
       const _wavefrontMtlParser = new wavefrontMtlParser(await this.fetchTextFile(this.mtlUrl));
       const wavefrontObj = _wavefrontObjParser.parse();
@@ -295,8 +285,8 @@ export default class Scene {
         outAABBs.push(bv);
         bv.subDivide(outFaces, outAABBs);
 
-        console.log(`# faces ${outFaces.length}`);
-        console.log(`# AABBs ${outAABBs.length}`);
+        //console.log(`# faces ${outFaces.length}`);
+        //console.log(`# AABBs ${outAABBs.length}`);
         return {
           // a parsed obj containing faces and its corresponding BVH tree
           faces: outFaces,
@@ -338,17 +328,15 @@ export default class Scene {
         }
         return mat;
       });
-      console.log(`# mtls ${this.parsedMtls.length}`);
+      //console.log(`# mtls ${this.parsedMtls.length}`);
 
       this.initTextures(this.GL);
       this.objCount = this.parsedObjs.length;
       this.mtlCount = this.parsedMtls.length;
-
-      this.status = SceneStatus.initialized;
     }
   }
 
-  initTextures(GL: WebGL2RenderingContext): void {
+  initTextures(GL: WebGL2RenderingContext) {
     const maxNumFaces = this.parsedObjs.reduce((max, obj) => Math.max(max, obj.faces.length), 0); // max number of faces
     const numTexelsPerFace = 8; // RGBA texel
     const numFloatsPerFace = 24;
@@ -471,7 +459,7 @@ export default class Scene {
     GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32F, numTexelsPerMtl, this.parsedMtls.length, 0, GL.RGBA, GL.FLOAT, data);
   }
 
-  bindToSampleShader(GL: WebGL2RenderingContext, program: WebGLProgram): void {
+  bindToSampleShader(GL: WebGL2RenderingContext, program: WebGLProgram) {
     GL.activeTexture(GL.TEXTURE3);
     GL.bindTexture(GL.TEXTURE_2D_ARRAY, this.facesTexture);
     GL.uniform1i(GL.getUniformLocation(program, 'u_face_sampler'), 3);

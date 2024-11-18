@@ -1,4 +1,4 @@
-import { CanvasVars } from '../components/Canvas';
+import { CanvasVars } from '../types/CanvasVars';
 import Shader from './Shader';
 
 export default class CanvasShader extends Shader {
@@ -6,7 +6,7 @@ export default class CanvasShader extends Shader {
     super();
   }
 
-  draw({ GL, renderingPass, colorTextures }: CanvasVars): void {
+  draw({ GL, renderingPass, colorTextures }: CanvasVars) {
     if (this.program && GL && colorTextures) {
       GL.bindFramebuffer(GL.FRAMEBUFFER, null);
       // eslint-disable-next-line react-hooks/rules-of-hooks

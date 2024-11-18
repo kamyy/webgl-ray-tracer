@@ -1,38 +1,13 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import Vector1x4 from '../math/Vector1x4';
-import { appActions, initialAppState, LoadingSpinner } from '../redux/appSlice';
+import { appActions, LoadingSpinner } from '../redux/appSlice';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import CanvasShader from '../scene/CanvasShader';
 import ColorTextures from '../scene/ColorTextures';
 import RandomTexture from '../scene/RandomTexture';
 import SampleShader from '../scene/SampleShader';
-import Scene, { SceneStatus } from '../scene/Scene';
-
-export interface CanvasVars {
-  lx: number;
-  ly: number;
-  canvasWd: number;
-  canvasHt: number;
-
-  cameraFov: number;
-  numSamples: number;
-  numBounces: number;
-  shadingMethod: number;
-
-  renderingPass: number;
-  TXYZ_SCALAR: number;
-  RXYZ_SCALAR: number;
-  lButtonDown: boolean;
-  rButtonDown: boolean;
-  restartRenderTimestamp: number;
-
-  GL: WebGL2RenderingContext | null;
-  colorTextures: ColorTextures | null;
-  randomTexture: RandomTexture | null;
-  sampleShader: SampleShader | null;
-  canvasShader: CanvasShader | null;
-  scene: Scene | null;
-}
+import Scene from '../scene/Scene';
+import { CanvasVars, defaultCanvasVars } from '../types/CanvasVars';
 
 function degreesToRadians(degrees: number) {
   return (degrees * Math.PI) / 180.0;
@@ -66,117 +41,98 @@ function GPU_MeetsRequirements(GL: WebGL2RenderingContext) {
   return true;
 }
 
-interface CanvasProps {
-  canvasWd: number;
-  canvasHt: number;
-}
-
-export default function Canvas({ canvasWd, canvasHt }: CanvasProps) {
-  const canvasVars = useRef<CanvasVars>({
-    lx: 0,
-    ly: 0,
-    canvasWd,
-    canvasHt,
-
-    cameraFov: initialAppState.cameraFov,
-    numSamples: initialAppState.numSamples,
-    numBounces: initialAppState.numBounces,
-    shadingMethod: initialAppState.shadingMethod,
-    renderingPass: 0,
-    TXYZ_SCALAR: 0.01,
-    RXYZ_SCALAR: 0.25,
-    lButtonDown: false,
-    rButtonDown: false,
-    restartRenderTimestamp: Date.now(),
-
-    GL: null,
-    colorTextures: null,
-    randomTexture: null,
-    sampleShader: null,
-    canvasShader: null,
-    scene: null,
-  });
-  const cv = canvasVars.current;
-
+export default function Canvas() {
+  const dispatch = useAppDispatch();
   const cameraFov = useAppSelector((state) => state.cameraFov);
   const numSamples = useAppSelector((state) => state.numSamples);
   const numBounces = useAppSelector((state) => state.numBounces);
   const shadingMethod = useAppSelector((state) => state.shadingMethod);
-  const dispatch = useAppDispatch();
+  const cvRef = useRef<CanvasVars>({ ...defaultCanvasVars });
+  const cv = cvRef.current;
 
-  const render = useCallback(() => {
-    if (cv.scene?.status === SceneStatus.initialized && cv.renderingPass < cv.numSamples) {
-      if (cv.renderingPass === 0 || (!cv.lButtonDown && !cv.rButtonDown)) {
-        ++cv.renderingPass; // render 1st pass only if still moving camera around
+  useEffect(() => {
+    cv.renderingPass = 0;
+    cv.restartRenderTimestamp = Date.now();
 
-        if (cv.GL && cv.sampleShader && cv.canvasShader) {
-          cv.sampleShader.draw(cv);
-          cv.canvasShader.draw(cv);
-        }
-        dispatch(appActions.setRenderingPass(cv.renderingPass));
-      }
-      if (cv.renderingPass > 0 /* prevents divide by zero */) {
-        const durationMs = Date.now() - cv.restartRenderTimestamp;
-        const avg = durationMs / cv.renderingPass;
-        const eta = (cv.numSamples - cv.renderingPass) * avg;
+    cv.cameraFov = cameraFov;
+    cv.numSamples = numSamples;
+    cv.numBounces = numBounces;
+    cv.shadingMethod = shadingMethod;
 
-        dispatch(appActions.setElapsedTime(new Date(durationMs).toISOString().slice(11, 19)));
-        dispatch(appActions.setEtaTime(new Date(eta).toISOString().slice(11, 19)));
-        dispatch(appActions.setAvgTime(`${avg.toFixed(0)}ms`));
-      }
-    }
-    requestAnimationFrame(render);
-  }, [cv, dispatch]);
-
-  const resetRender = useCallback(() => {
-    if (cv.GL) {
-      cv.cameraFov = cameraFov;
-      cv.numSamples = numSamples;
-      cv.numBounces = numBounces;
-      cv.shadingMethod = shadingMethod;
-      cv.renderingPass = 0;
-      cv.restartRenderTimestamp = Date.now();
-      dispatch(appActions.setRenderingPass(0));
-      dispatch(appActions.setElapsedTime('00:00:00'));
-      dispatch(appActions.setEtaTime('??:??:??'));
-      dispatch(appActions.setAvgTime('????'));
-    }
+    dispatch(appActions.setRenderingPass(0));
+    dispatch(appActions.setElapsedTime('00:00:00'));
+    dispatch(appActions.setEtaTime('??:??:??'));
+    dispatch(appActions.setAvgTime('????'));
   }, [cv, cameraFov, numSamples, numBounces, shadingMethod, dispatch]);
 
-  const canvasRef = useCallback(
+  const canvasCb = useCallback(
     (htmlCanvasElement: HTMLCanvasElement) => {
+      function render() {
+        if (cv.renderingPass < cv.numSamples) {
+          if (cv.renderingPass === 0 || (!cv.lButtonDown && !cv.rButtonDown)) {
+            ++cv.renderingPass; // always render pass 0 even if left or right mouse buttton is down
+
+            if (cv.GL && cv.sampleShader && cv.canvasShader) {
+              cv.sampleShader.draw(cv);
+              cv.canvasShader.draw(cv);
+            }
+            dispatch(appActions.setRenderingPass(cv.renderingPass));
+          }
+          if (cv.renderingPass > 0 /* prevents divide by zero */) {
+            const elapsed = Date.now() - cv.restartRenderTimestamp;
+            const average = elapsed / cv.renderingPass;
+            const eta = (cv.numSamples - cv.renderingPass) * average;
+
+            dispatch(appActions.setElapsedTime(new Date(elapsed).toISOString().slice(11, 19)));
+            dispatch(appActions.setEtaTime(new Date(eta).toISOString().slice(11, 19)));
+            dispatch(appActions.setAvgTime(`${average.toFixed(0)}ms`));
+          }
+        }
+        requestAnimationFrame(render);
+      }
+
+      function renderReset() {
+        cv.renderingPass = 0;
+        cv.restartRenderTimestamp = Date.now();
+
+        dispatch(appActions.setRenderingPass(0));
+        dispatch(appActions.setElapsedTime('00:00:00'));
+        dispatch(appActions.setEtaTime('??:??:??'));
+        dispatch(appActions.setAvgTime('????'));
+      }
+
       function onMouseMove(event: MouseEvent) {
         if (cv.scene?.cameraNode && cv.scene?.parentNode) {
           const x = event.clientX;
           const y = event.clientY;
 
-          if ((cv.lButtonDown && cv.rButtonDown) || (cv.lButtonDown && event.shiftKey)) {
+          if ((cv.lButtonDownOnCanvas && cv.rButtonDownOnCanvas) || (cv.lButtonDownOnCanvas && event.shiftKey)) {
             // dolly
-            if (x !== cv.lx && cv.scene.cameraNode) {
-              cv.scene.cameraNode.translate(new Vector1x4(0, (x - cv.lx) * cv.TXYZ_SCALAR, 0));
-              cv.lx = x;
-              cv.ly = y;
-              resetRender();
+            if (x !== cv.x && cv.scene.cameraNode) {
+              cv.scene.cameraNode.translate(new Vector1x4(0, (x - cv.x) * cv.TXYZ_SCALAR, 0));
+              cv.x = x;
+              cv.y = y;
+              renderReset();
             }
-          } else if ((cv.lButtonDown && event.ctrlKey) || cv.rButtonDown) {
+          } else if ((cv.lButtonDownOnCanvas && event.ctrlKey) || cv.rButtonDownOnCanvas) {
             // move
-            if (x !== cv.lx || y !== cv.ly) {
-              const dx = (cv.lx - x) * cv.TXYZ_SCALAR;
-              const dz = (y - cv.ly) * cv.TXYZ_SCALAR;
+            if (x !== cv.x || y !== cv.y) {
+              const dx = (cv.x - x) * cv.TXYZ_SCALAR;
+              const dz = (y - cv.y) * cv.TXYZ_SCALAR;
               const dv = cv.scene.cameraNode.mapPos(new Vector1x4(dx, 0, dz, 0), cv.scene.parentNode);
               cv.scene.parentNode.translate(dv); // move parent in camera space
-              cv.lx = x;
-              cv.ly = y;
-              resetRender();
+              cv.x = x;
+              cv.y = y;
+              renderReset();
             }
-          } else if (cv.lButtonDown) {
+          } else if (cv.lButtonDownOnCanvas) {
             // rotate
-            if (x !== cv.lx || y !== cv.ly) {
-              cv.scene.parentNode.rotateZ(degreesToRadians(cv.lx - x) * cv.RXYZ_SCALAR); // yaw camera target around it's own z-axis
-              cv.scene.cameraNode.rotateX(degreesToRadians(cv.ly - y) * cv.RXYZ_SCALAR, cv.scene.parentNode); // pitch around camera's parent x-axis
-              cv.lx = x;
-              cv.ly = y;
-              resetRender();
+            if (x !== cv.x || y !== cv.y) {
+              cv.scene.parentNode.rotateZ(degreesToRadians(cv.x - x) * cv.RXYZ_SCALAR); // yaw camera target around it's own z-axis
+              cv.scene.cameraNode.rotateX(degreesToRadians(cv.y - y) * cv.RXYZ_SCALAR, cv.scene.parentNode); // pitch around camera's parent x-axis
+              cv.x = x;
+              cv.y = y;
+              renderReset();
             }
           }
         }
@@ -184,22 +140,20 @@ export default function Canvas({ canvasWd, canvasHt }: CanvasProps) {
 
       function onMouseDown(event: MouseEvent) {
         const rect = htmlCanvasElement.getBoundingClientRect();
-        const x = event.clientX;
-        const y = event.clientY;
+        cv.x = event.clientX;
+        cv.y = event.clientY;
 
-        if (x > rect.left && x < rect.right && y > rect.top && y < rect.bottom) {
-          switch (event.button) {
-            case 0:
-              cv.lButtonDown = true;
-              break;
-            case 2:
-              cv.rButtonDown = true;
-              break;
-            default:
-              break;
-          }
-          cv.lx = x;
-          cv.ly = y;
+        switch (event.button) {
+          case 0:
+            cv.lButtonDown = true;
+            cv.lButtonDownOnCanvas = cv.x > rect.left && cv.x < rect.right && cv.y > rect.top && cv.y < rect.bottom;
+            break;
+          case 2:
+            cv.rButtonDown = true;
+            cv.rButtonDownOnCanvas = cv.x > rect.left && cv.x < rect.right && cv.y > rect.top && cv.y < rect.bottom;
+            break;
+          default:
+            break;
         }
       }
 
@@ -207,18 +161,18 @@ export default function Canvas({ canvasWd, canvasHt }: CanvasProps) {
         switch (event.button) {
           case 0:
             cv.lButtonDown = false;
+            cv.lButtonDownOnCanvas = false;
             break;
           case 2:
             cv.rButtonDown = false;
+            cv.rButtonDownOnCanvas = false;
             break;
           default:
             break;
         }
       }
 
-      if (cv.GL) {
-        resetRender();
-      } else {
+      if (!cv.GL) {
         cv.GL = htmlCanvasElement.getContext('webgl2', {
           depth: false,
           alpha: false,
@@ -230,8 +184,8 @@ export default function Canvas({ canvasWd, canvasHt }: CanvasProps) {
           window.onmousedown = onMouseDown;
           window.onmouseup = onMouseUp;
 
-          cv.colorTextures = new ColorTextures(cv.GL, canvasWd, canvasHt);
-          cv.randomTexture = new RandomTexture(cv.GL, canvasWd, canvasHt);
+          cv.colorTextures = new ColorTextures(cv.GL, cv.canvasWd, cv.canvasHt);
+          cv.randomTexture = new RandomTexture(cv.GL, cv.canvasWd, cv.canvasHt);
           cv.sampleShader = new SampleShader(cv.GL);
           cv.canvasShader = new CanvasShader();
 
@@ -254,11 +208,11 @@ export default function Canvas({ canvasWd, canvasHt }: CanvasProps) {
         }
       }
     },
-    [cv, canvasHt, canvasWd, render, resetRender, dispatch],
+    [cv, dispatch],
   );
 
   return (
-    <canvas ref={canvasRef} width={canvasWd} height={canvasHt}>
+    <canvas ref={canvasCb} width={cv.canvasWd} height={cv.canvasHt}>
       Please use a GPU and browser that supports WebGL 2
     </canvas>
   );
