@@ -1,12 +1,12 @@
 # WebGL Ray Tracer
 
-## Requirements
+## Minimum Hardware Recommendation
 
-You can view this app live at [https://webgl-ray-tracer.orky.net](https://webgl-ray-tracer.orky.net). Warning! It does require a reasonably powerful GPU and browser that supports WebGL 2 (Firefox and Chrome only). Your smart phone or tablet isn't going to cut it and your high end MacBook Pro even with an AMD GPU is going to feel really sluggish. Should work well on a PC hosting a Nvidia 1060 GPU and up.
+You can view this app live at [https://webgl-ray-tracer.orky.net](https://webgl-ray-tracer.orky.net). Warning! It does require a reasonably powerful GPU and browser that supports WebGL 2. It should perform well on a display adapter that matches or exceeds that of an Nvidia 1060 discrete graphics card.
 
-## Summary
+## Game Developer Conference
 
-I attended a talk given by Eric Haines at GDC 2019 titled 'A Fast Forward Through [Ray Tracing Gems](http://www.realtimerendering.com/raytracinggems)'. Real-time ray tracing was a hot topic at GDC 2019 and Peter Shirley's series of tutorials with regards to [writing a ray tracer in just one weekend](http://in1weekend.blogspot.com/2016/01/ray-tracing-in-one-weekend.html) was mentioned in passing. Very much inspired by what I'd read in those tutorials, I started this side project to see if I could write a ray tracer for the World Wide Web. Ideally, I wanted to utilize the awesome compute power of the GPU via a fragment shader, which fits the task of tracing rays in parallel almost perfectly.
+I attended a talk given by Eric Haines at GDC 2019 titled 'A Fast Forward Through [Ray Tracing Gems](http://www.realtimerendering.com/raytracinggems)'. Real-time ray tracing was a hot topic at GDC 2019 and Peter Shirley's series of tutorials with regards to [writing a ray tracer in just one weekend](http://in1weekend.blogspot.com/2016/01/ray-tracing-in-one-weekend.html) was mentioned in passing. Very much inspired by what I'd read in those tutorials, I started working on this project in my spare time to see if I could write a ray tracer for the World Wide Web. Ideally, I wanted to utilize the awesome compute power of the GPU via a fragment shader, which fits the task of tracing rays in parallel almost perfectly.
 
 ![shot1](./screenshots/shot1.png)
 
@@ -14,9 +14,20 @@ I attended a talk given by Eric Haines at GDC 2019 titled 'A Fast Forward Throug
 
 At the end of the day I ended up with what's called a path tracer. It requires a large quantity of rays to be fired through each pixel in a stochastic manner for convergence thus removing noise from the rendered image. It's a brute force technique and you pay for it in terms of time and compute power but it does produce incredibly accurate visuals like soft shadows, ambient occlusion and blurred reflections. These effects are difficult to achieve using a real-time 3D rasterizer but here you essentially get them for free with little to no rendering tricks involved.
 
-To allow my handiwork to be easily accesible to anyone with a web browser, it made sense again to use react.js/redux, WebGL and GLSL. There's no install requirement in the traditional sense, which is definitely a plus.
+## Development Framework
 
-## Technical
+This project started in April of 2019 and after a long hiatus, in November of 2024, I refactored the code to make some minor improvements. I also upgraded/added some packages including:
+
+- Node 22.11
+- Next.js 15
+- React.js 18
+- Redux.js 5
+- Redux Toolkit 2.3
+- Typescript 5
+
+In addition any css-in-js code has been discarded. My preference these days is for css modules via scss files (Sass), which has become a popular choice for good reason. I've also switched over to using yarn 4.5.1 instead of npm which is more performant while delivering fewer hiccups.
+
+## Technical Details
 
 This app makes use of several features that were introduced in WebGL 2 including:
 

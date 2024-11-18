@@ -1,6 +1,6 @@
 export default class ColorTextures {
-  source: WebGLTexture | null;
-  target: WebGLTexture | null;
+  private source: WebGLTexture | null = null;
+  private target: WebGLTexture | null = null;
 
   constructor(GL: WebGL2RenderingContext, wd: number, ht: number) {
     GL.activeTexture(GL.TEXTURE0);
@@ -37,13 +37,13 @@ export default class ColorTextures {
     // using texture unit 1
     GL.activeTexture(GL.TEXTURE1);
     GL.bindTexture(GL.TEXTURE_2D, this.source);
-    GL.uniform1i(GL.getUniformLocation(program, "u_color_sampler"), 1);
+    GL.uniform1i(GL.getUniformLocation(program, 'u_color_sampler'), 1);
   }
 
   bindToCanvasShader(GL: WebGL2RenderingContext, program: WebGLProgram): void {
     // using texture unit 0
     GL.activeTexture(GL.TEXTURE0);
     GL.bindTexture(GL.TEXTURE_2D, this.target);
-    GL.uniform1i(GL.getUniformLocation(program, "u_color_sampler"), 0);
+    GL.uniform1i(GL.getUniformLocation(program, 'u_color_sampler'), 0);
   }
 }

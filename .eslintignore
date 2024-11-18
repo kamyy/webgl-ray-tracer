@@ -2,4 +2,5 @@ LICENSE
 README.md
 public/**
 build/**
+node_modules/**
 

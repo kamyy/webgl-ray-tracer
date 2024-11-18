@@ -1,0 +1,106 @@
+.renderingParams {
+  display: flex;
+  padding: 2em;
+
+  /* input range */
+  input[type='range'] {
+    -webkit-appearance: none;
+    background: transparent; /* otherwise white in Chrome */
+    cursor: pointer;
+
+    &::-webkit-slider-runnable-track {
+      -webkit-appearance: none;
+      height: 2px;
+      background: lightgray;
+    }
+    &::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 1em;
+      height: 1em;
+      border: none;
+      border-radius: 50%;
+      background: darkgreen;
+      box-shadow: 2px 2px 2px #000000, 0px 0px 2px #0d0d0d;
+      margin-top: -5px; /* specify margin in Chrome, in Firefox and IE it is automatic */
+    }
+
+    &::-moz-range-track {
+      height: 2px;
+      background: lightgray;
+    }
+    &::-moz-range-thumb {
+      width: 1em;
+      height: 1em;
+      border: none;
+      border-radius: 50%;
+      background: darkgreen;
+      box-shadow: 2px 2px 2px #000000, 0px 0px 2px #0d0d0d;
+    }
+
+    &:focus {
+      outline: none; /* remove blue border */
+    }
+  }
+
+  .inputRanges {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+
+    .rangeHeader {
+      display: flex;
+    }
+    .rangeTitle {
+      flex-grow: 1;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    .rangeValue {
+      flex-basis: 5%;
+      font-weight: bold;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+
+    .rangeSlider {
+      display: flex;
+      padding-top: 0.5em;
+      padding-bottom: 0.75em;
+    }
+    .rangeMin {
+      flex-basis: 6%;
+      text-align: right;
+    }
+    input {
+      flex-grow: 1;
+      margin: 0 1em;
+    }
+    .rangeMax {
+      flex-basis: 5%;
+      text-align: left;
+    }
+  }
+
+  .shadingMethod {
+    border-style: none none none solid;
+    border-color: lightgray;
+    border-width: 1px;
+    padding-left: 1em;
+
+    legend {
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+
+    .radioButtons {
+      display: flex;
+    }
+    input,
+    label {
+      margin-top: 0.5em;
+    }
+    label + input {
+      margin-left: 1em;
+    }
+  }
+}
