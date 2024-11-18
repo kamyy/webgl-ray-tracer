@@ -72,17 +72,16 @@ export default function Canvas() {
           if (cv.renderingPass === 0 || (!cv.lButtonDown && !cv.rButtonDown)) {
             ++cv.renderingPass; // always render pass 0 even if left or right mouse buttton is down
 
-            if (cv.GL && cv.sampleShader && cv.canvasShader) {
+            if (cv.sampleShader && cv.canvasShader) {
               cv.sampleShader.draw(cv);
               cv.canvasShader.draw(cv);
             }
-            dispatch(appActions.setRenderingPass(cv.renderingPass));
-          }
-          if (cv.renderingPass > 0 /* prevents divide by zero */) {
+
             const elapsed = Date.now() - cv.restartRenderTimestamp;
             const average = elapsed / cv.renderingPass;
             const eta = (cv.numSamples - cv.renderingPass) * average;
 
+            dispatch(appActions.setRenderingPass(cv.renderingPass));
             dispatch(appActions.setElapsedTime(new Date(elapsed).toISOString().slice(11, 19)));
             dispatch(appActions.setEtaTime(new Date(eta).toISOString().slice(11, 19)));
             dispatch(appActions.setAvgTime(`${average.toFixed(0)}ms`));
