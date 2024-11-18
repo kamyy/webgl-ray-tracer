@@ -47,6 +47,7 @@ export default function Canvas() {
   const numSamples = useAppSelector((state) => state.numSamples);
   const numBounces = useAppSelector((state) => state.numBounces);
   const shadingMethod = useAppSelector((state) => state.shadingMethod);
+  const loadingSpinner = useAppSelector((state) => state.loadingSpinner);
   const cvRef = useRef<CanvasVars>({ ...defaultCanvasVars });
   const cv = cvRef.current;
 
@@ -207,8 +208,11 @@ export default function Canvas() {
   );
 
   return (
-    <canvas ref={canvasCb} width={cv.canvasWd} height={cv.canvasHt}>
-      Please use a GPU and browser that supports WebGL 2
-    </canvas>
+    <>
+      {loadingSpinner === LoadingSpinner.show && <div className="spinner" />}
+      <canvas ref={canvasCb} width={cv.canvasWd} height={cv.canvasHt}>
+        Please use a GPU and browser that supports WebGL 2
+      </canvas>
+    </>
   );
 }

@@ -2,6 +2,45 @@
   display: flex;
   padding: 2em;
 
+  /* input range */
+  input[type='range'] {
+    -webkit-appearance: none;
+    background: transparent; /* otherwise white in Chrome */
+    cursor: pointer;
+
+    &::-webkit-slider-runnable-track {
+      height: 2px;
+      background: lightgray;
+    }
+    &::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 1em;
+      height: 1em;
+      border: none;
+      border-radius: 50%;
+      background: darkgreen;
+      box-shadow: 2px 2px 2px #000000, 0px 0px 2px #0d0d0d;
+      margin-top: -5px; /* specify margin in Chrome, in Firefox and IE it is automatic */
+    }
+
+    &::-moz-range-track {
+      height: 2px;
+      background: lightgray;
+    }
+    &::-moz-range-thumb {
+      width: 1em;
+      height: 1em;
+      border: none;
+      border-radius: 50%;
+      background: darkgreen;
+      box-shadow: 2px 2px 2px #000000, 0px 0px 2px #0d0d0d;
+    }
+
+    &:focus {
+      outline: none; /* remove blue border */
+    }
+  }
+
   .inputRanges {
     flex-grow: 1;
     display: flex;
@@ -20,7 +59,6 @@
       font-weight: bold;
       font-size: 0.9rem;
       text-align: left;
-      margin-left: 1em;
     }
 
     .rangeSlider {
@@ -29,7 +67,7 @@
       padding-bottom: 0.75em;
     }
     .rangeMin {
-      flex-basis: 5%;
+      flex-basis: 6%;
       text-align: right;
     }
     input {
