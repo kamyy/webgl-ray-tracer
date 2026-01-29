@@ -1,4 +1,4 @@
-import Matrix4x4, { i00, i01, i02, i03, i10, i11, i12, i13, i20, i21, i22, i23, i30, i31, i32, i33 } from "./Matrix4x4";
+import Matrix4x4, { i00, i01, i02, i03, i10, i11, i12, i13, i20, i21, i22, i23, i30, i31, i32, i33 } from './matrix4x4';
 
 export default class Vector1x4 {
   v: number[];
@@ -92,7 +92,7 @@ export default class Vector1x4 {
   }
 
   mul(rhs: number | Matrix4x4): Vector1x4 {
-    if (typeof rhs === "number") {
+    if (typeof rhs === 'number') {
       return new Vector1x4(this.x * rhs, this.y * rhs, this.z * rhs);
     }
     const x = this.x * rhs.m[i00] + this.y * rhs.m[i10] + this.z * rhs.m[i20] + this.w * rhs.m[i30];
@@ -119,7 +119,7 @@ export default class Vector1x4 {
     return new Vector1x4(
       this.y * rhs.z - this.z * rhs.y,
       this.z * rhs.x - this.x * rhs.z,
-      this.x * rhs.y - this.y * rhs.x
+      this.x * rhs.y - this.y * rhs.x,
     );
   }
 

@@ -1,9 +1,9 @@
 import classnames from 'classnames';
 import { useState } from 'react';
-import ApplicationInfo from './ApplicationInfo';
-import styles from './Forms.module.scss';
-import RenderingParams from './RenderingParams';
-import RenderingStatus from './RenderingStatus';
+import ApplicationInfo from './applicationInfo';
+import styles from './forms.module.scss';
+import RenderingParams from './renderingParams';
+import RenderingStatus from './renderingStatus';
 
 export default function Forms() {
   enum FormType {

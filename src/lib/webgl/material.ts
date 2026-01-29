@@ -1,4 +1,4 @@
-import Vector1x4 from "../math/Vector1x4";
+import Vector1x4 from '../math/vector1x4';
 
 export const EMISSIVE_MATERIAL = 0;
 export const REFLECTIVE_MATERIAL = 1;
@@ -17,7 +17,7 @@ export default class Material {
     mtlCls: 0 | 1 | 2 = REFLECTIVE_MATERIAL,
     reflectionRatio = 0.0,
     reflectionGloss = 1.0,
-    refractionIndex = 1.0
+    refractionIndex = 1.0,
   ) {
     this.albedo = albedo;
     this.mtlCls = mtlCls;

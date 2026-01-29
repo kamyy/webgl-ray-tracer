@@ -1,5 +1,5 @@
-import Vector1x4 from "./Vector1x4";
-import Ray from "./Ray";
+import Ray from './ray';
+import Vector1x4 from './vector1x4';
 
 export class RayIntersectSphereResult {
   t0: number;

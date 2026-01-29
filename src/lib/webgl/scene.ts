@@ -1,8 +1,8 @@
 import wavefrontMtlParser from 'mtl-file-parser';
 import wavefrontObjParser from 'obj-file-parser';
-import RefFrame from '../math/RefFrame';
-import Vector1x4 from '../math/Vector1x4';
-import Material, { DIELECTRIC_MATERIAL, EMISSIVE_MATERIAL } from './Material';
+import RefFrame from '../math/refFrame';
+import Vector1x4 from '../math/vector1x4';
+import Material, { DIELECTRIC_MATERIAL, EMISSIVE_MATERIAL } from './material';
 
 enum Axis {
   x = 0,

@@ -1,12 +1,13 @@
-import { useAppSelector } from '../redux/hooks';
-import styles from './RenderingStatus.module.scss';
+import { useAppSelector } from '../lib/store/hooks';
+import type { RootState } from '../lib/store/store';
+import styles from './renderingStatus.module.scss';
 
 export default function RenderingStatus() {
-  const renderingPass = useAppSelector((state) => state.renderingPass);
-  const elapsedTime = useAppSelector((state) => state.elapsedTime);
-  const numSamples = useAppSelector((state) => state.numSamples);
-  const etaTime = useAppSelector((state) => state.etaTime);
-  const avgTime = useAppSelector((state) => state.avgTime);
+  const renderingPass = useAppSelector((state: RootState) => state.renderingPass);
+  const elapsedTime = useAppSelector((state: RootState) => state.elapsedTime);
+  const numSamples = useAppSelector((state: RootState) => state.numSamples);
+  const etaTime = useAppSelector((state: RootState) => state.etaTime);
+  const avgTime = useAppSelector((state: RootState) => state.avgTime);
 
   return (
     <form className={styles.renderingStatus}>

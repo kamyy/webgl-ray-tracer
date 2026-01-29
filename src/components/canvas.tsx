@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react';
-import Vector1x4 from '../math/Vector1x4';
-import { appActions, LoadingSpinner } from '../redux/appSlice';
-import { useAppDispatch, useAppSelector } from '../redux/hooks';
-import CanvasShader from '../scene/CanvasShader';
-import ColorTextures from '../scene/ColorTextures';
-import RandomTexture from '../scene/RandomTexture';
-import SampleShader from '../scene/SampleShader';
-import Scene from '../scene/Scene';
-import { CanvasVars, defaultCanvasVars } from '../types/CanvasVars';
+import Vector1x4 from '../lib/math/vector1x4';
+import { appActions, LoadingSpinner } from '../lib/store/appSlice';
+import { useAppDispatch, useAppSelector } from '../lib/store/hooks';
+import CanvasShader from '../lib/webgl/canvasShader';
+import ColorTextures from '../lib/webgl/colorTextures';
+import RandomTexture from '../lib/webgl/randomTexture';
+import SampleShader from '../lib/webgl/sampleShader';
+import Scene from '../lib/webgl/scene';
+import { CanvasVars, defaultCanvasVars } from '../types/canvasVars';
 
 function degreesToRadians(degrees: number) {
   return (degrees * Math.PI) / 180.0;
@@ -49,9 +49,9 @@ export default function Canvas() {
   const shadingMethod = useAppSelector((state) => state.shadingMethod);
   const loadingSpinner = useAppSelector((state) => state.loadingSpinner);
   const cvRef = useRef<CanvasVars>({ ...defaultCanvasVars });
-  const cv = cvRef.current;
 
   useEffect(() => {
+    const cv = cvRef.current;
     cv.renderingPass = 0;
     cv.restartRenderTimestamp = Date.now();
 
@@ -64,10 +64,11 @@ export default function Canvas() {
     dispatch(appActions.setElapsedTime('00:00:00'));
     dispatch(appActions.setEtaTime('??:??:??'));
     dispatch(appActions.setAvgTime('????'));
-  }, [cv, cameraFov, numSamples, numBounces, shadingMethod, dispatch]);
+  }, [cameraFov, numSamples, numBounces, shadingMethod, dispatch]);
 
   const canvasCb = useCallback(
     (htmlCanvasElement: HTMLCanvasElement) => {
+      const cv = cvRef.current;
       function render() {
         if (cv.renderingPass < cv.numSamples) {
           if (cv.renderingPass === 0 || (!cv.lButtonDown && !cv.rButtonDown)) {
@@ -204,13 +205,13 @@ export default function Canvas() {
         }
       }
     },
-    [cv, dispatch],
+    [dispatch],
   );
 
   return (
     <>
       {loadingSpinner === LoadingSpinner.show && <div className="spinner" />}
-      <canvas ref={canvasCb} width={cv.canvasWd} height={cv.canvasHt}>
+      <canvas ref={canvasCb} width={defaultCanvasVars.canvasWd} height={defaultCanvasVars.canvasHt}>
         Please use a GPU and browser that supports WebGL 2
       </canvas>
     </>
