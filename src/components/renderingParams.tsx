@@ -1,22 +1,22 @@
-import { ReactElement } from 'react';
-import { appActions, ShadingMethod } from '../lib/store/appSlice';
-import { useAppDispatch, useAppSelector } from '../lib/store/hooks';
-import type { RootState } from '../lib/store/store';
-import styles from './renderingParams.module.scss';
+import { ReactElement } from 'react'
+import { appActions, ShadingMethod } from '../lib/store/appSlice'
+import { useAppDispatch, useAppSelector } from '../lib/store/hooks'
+import type { RootState } from '../lib/store/store'
+import styles from './renderingParams.module.scss'
 
-const minSamples = 1;
-const maxSamples = 10000;
-const minBounces = 1;
-const maxBounces = 16;
-const minCameraFov = 10;
-const maxCameraFov = 120;
+const minSamples = 1
+const maxSamples = 10000
+const minBounces = 1
+const maxBounces = 16
+const minCameraFov = 10
+const maxCameraFov = 120
 
 export default function RenderingParams(): ReactElement {
-  const dispatch = useAppDispatch();
-  const cameraFov = useAppSelector((state: RootState) => state.cameraFov);
-  const numSamples = useAppSelector((state: RootState) => state.numSamples);
-  const numBounces = useAppSelector((state: RootState) => state.numBounces);
-  const shadingMethod = useAppSelector((state: RootState) => state.shadingMethod);
+  const dispatch = useAppDispatch()
+  const cameraFov = useAppSelector((state: RootState) => state.cameraFov)
+  const numSamples = useAppSelector((state: RootState) => state.numSamples)
+  const numBounces = useAppSelector((state: RootState) => state.numBounces)
+  const shadingMethod = useAppSelector((state: RootState) => state.shadingMethod)
 
   return (
     <form className={styles.renderingParams}>
@@ -32,7 +32,7 @@ export default function RenderingParams(): ReactElement {
             min={minCameraFov}
             max={maxCameraFov}
             value={cameraFov}
-            onChange={(event) => dispatch(appActions.setCameraFov(parseInt(event.target.value)))}
+            onChange={event => dispatch(appActions.setCameraFov(parseInt(event.target.value)))}
           />
           <label className={styles.rangeMax}>{maxCameraFov}</label>
         </div>
@@ -48,7 +48,7 @@ export default function RenderingParams(): ReactElement {
             min={minSamples}
             max={maxSamples}
             value={numSamples}
-            onChange={(event) => dispatch(appActions.setNumSamples(parseInt(event.target.value)))}
+            onChange={event => dispatch(appActions.setNumSamples(parseInt(event.target.value)))}
           />
           <label className={styles.rangeMax}>{maxSamples}</label>
         </div>
@@ -64,7 +64,7 @@ export default function RenderingParams(): ReactElement {
             min={minBounces}
             max={maxBounces}
             value={numBounces}
-            onChange={(event) => dispatch(appActions.setNumBounces(parseInt(event.target.value)))}
+            onChange={event => dispatch(appActions.setNumBounces(parseInt(event.target.value)))}
           />
           <label className={styles.rangeMax}>{maxBounces}</label>
         </div>
@@ -79,7 +79,7 @@ export default function RenderingParams(): ReactElement {
             type="radio"
             value={ShadingMethod.flat}
             checked={shadingMethod === ShadingMethod.flat}
-            onChange={(event) => dispatch(appActions.setShadingMethod(parseInt(event.target.value)))}
+            onChange={event => dispatch(appActions.setShadingMethod(parseInt(event.target.value)))}
           />
           <label htmlFor="flat">Flat</label>
 
@@ -88,11 +88,11 @@ export default function RenderingParams(): ReactElement {
             type="radio"
             value={ShadingMethod.phong}
             checked={shadingMethod === ShadingMethod.phong}
-            onChange={(event) => dispatch(appActions.setShadingMethod(parseInt(event.target.value)))}
+            onChange={event => dispatch(appActions.setShadingMethod(parseInt(event.target.value)))}
           />
           <label htmlFor="phong">Phong</label>
         </div>
       </fieldset>
     </form>
-  );
+  )
 }

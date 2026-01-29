@@ -3,7 +3,7 @@
   padding: 2em;
 
   /* input range */
-  input[type='range'] {
+  input[type="range"] {
     -webkit-appearance: none;
     background: transparent; /* otherwise white in Chrome */
     cursor: pointer;
@@ -20,7 +20,9 @@
       border: none;
       border-radius: 50%;
       background: darkgreen;
-      box-shadow: 2px 2px 2px #000000, 0px 0px 2px #0d0d0d;
+      box-shadow:
+        2px 2px 2px #000000,
+        0px 0px 2px #0d0d0d;
       margin-top: -5px; /* specify margin in Chrome, in Firefox and IE it is automatic */
     }
 
@@ -34,7 +36,9 @@
       border: none;
       border-radius: 50%;
       background: darkgreen;
-      box-shadow: 2px 2px 2px #000000, 0px 0px 2px #0d0d0d;
+      box-shadow:
+        2px 2px 2px #000000,
+        0px 0px 2px #0d0d0d;
     }
 
     &:focus {

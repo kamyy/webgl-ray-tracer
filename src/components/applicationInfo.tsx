@@ -1,4 +1,4 @@
-import styles from './applicationInfo.module.scss';
+import styles from './applicationInfo.module.scss'
 
 export default function ApplicationInfo() {
   return (
@@ -25,5 +25,5 @@ export default function ApplicationInfo() {
         </p>
       </div>
     </form>
-  );
+  )
 }

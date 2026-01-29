@@ -1,1 +1,1 @@
-declare module "mtl-file-parser";
+declare module 'mtl-file-parser'

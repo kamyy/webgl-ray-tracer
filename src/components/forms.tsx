@@ -1,9 +1,9 @@
-import classnames from 'classnames';
-import { useState } from 'react';
-import ApplicationInfo from './applicationInfo';
-import styles from './forms.module.scss';
-import RenderingParams from './renderingParams';
-import RenderingStatus from './renderingStatus';
+import classnames from 'classnames'
+import { useState } from 'react'
+import ApplicationInfo from './applicationInfo'
+import styles from './forms.module.scss'
+import RenderingParams from './renderingParams'
+import RenderingStatus from './renderingStatus'
 
 export default function Forms() {
   enum FormType {
@@ -11,7 +11,7 @@ export default function Forms() {
     renderingStatus,
     applicationInfo,
   }
-  const [currentFormType, setCurrentFormType] = useState<FormType>(FormType.renderingParams);
+  const [currentFormType, setCurrentFormType] = useState<FormType>(FormType.renderingParams)
 
   return (
     <footer className={styles.tabs}>
@@ -47,5 +47,5 @@ export default function Forms() {
         {currentFormType === FormType.applicationInfo && <ApplicationInfo />}
       </div>
     </footer>
-  );
+  )
 }

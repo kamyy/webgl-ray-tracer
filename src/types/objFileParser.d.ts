@@ -1,1 +1,1 @@
-declare module "obj-file-parser";
+declare module 'obj-file-parser'
