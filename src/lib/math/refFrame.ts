@@ -1,5 +1,5 @@
-import Matrix4x4, { i00, i01, i02, i10, i12, i20, i21, i22, i30, i31, i32, i33 } from "./Matrix4x4";
-import Vector1x4 from "./Vector1x4";
+import Matrix4x4, { i00, i01, i02, i10, i12, i20, i21, i22, i30, i31, i32, i33 } from './matrix4x4';
+import Vector1x4 from './vector1x4';
 
 export default class RefFrame {
   parent: RefFrame | null;
@@ -107,7 +107,7 @@ export default class RefFrame {
       this.localMatrix = this.localMatrix.mul(rotx);
     } else {
       // relative to arbitrary axes
-      throw new Error("Cannot rotate relative to arbitrary axis!");
+      throw new Error('Cannot rotate relative to arbitrary axis!');
     }
     this.invalidateSubtree();
   }
@@ -123,7 +123,7 @@ export default class RefFrame {
       this.localMatrix = this.localMatrix.mul(roty);
     } else {
       // relative to arbitrary axes
-      throw new Error("Cannot rotate relative to arbitrary axis!");
+      throw new Error('Cannot rotate relative to arbitrary axis!');
     }
     this.invalidateSubtree();
   }
@@ -139,7 +139,7 @@ export default class RefFrame {
       this.localMatrix = this.localMatrix.mul(rotz);
     } else {
       // relative to arbitrary axes
-      throw new Error("Cannot rotate relative to arbitrary axis!");
+      throw new Error('Cannot rotate relative to arbitrary axis!');
     }
     this.invalidateSubtree();
   }

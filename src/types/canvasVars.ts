@@ -1,9 +1,9 @@
-import { initialAppState } from '../redux/appSlice';
-import CanvasShader from '../scene/CanvasShader';
-import ColorTextures from '../scene/ColorTextures';
-import RandomTexture from '../scene/RandomTexture';
-import SampleShader from '../scene/SampleShader';
-import Scene from '../scene/Scene';
+import { initialAppState } from '../lib/store/appSlice';
+import CanvasShader from '../lib/webgl/canvasShader';
+import ColorTextures from '../lib/webgl/colorTextures';
+import RandomTexture from '../lib/webgl/randomTexture';
+import SampleShader from '../lib/webgl/sampleShader';
+import Scene from '../lib/webgl/scene';
 
 export interface CanvasVars {
   canvasWd: number;

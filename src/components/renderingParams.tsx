@@ -1,6 +1,8 @@
-import { appActions, ShadingMethod } from '../redux/appSlice';
-import { useAppDispatch, useAppSelector } from '../redux/hooks';
-import styles from './RenderingParams.module.scss';
+import { ReactElement } from 'react';
+import { appActions, ShadingMethod } from '../lib/store/appSlice';
+import { useAppDispatch, useAppSelector } from '../lib/store/hooks';
+import type { RootState } from '../lib/store/store';
+import styles from './renderingParams.module.scss';
 
 const minSamples = 1;
 const maxSamples = 10000;
@@ -9,12 +11,12 @@ const maxBounces = 16;
 const minCameraFov = 10;
 const maxCameraFov = 120;
 
-export default function RenderingParams(): JSX.Element {
+export default function RenderingParams(): ReactElement {
   const dispatch = useAppDispatch();
-  const cameraFov = useAppSelector((state) => state.cameraFov);
-  const numSamples = useAppSelector((state) => state.numSamples);
-  const numBounces = useAppSelector((state) => state.numBounces);
-  const shadingMethod = useAppSelector((state) => state.shadingMethod);
+  const cameraFov = useAppSelector((state: RootState) => state.cameraFov);
+  const numSamples = useAppSelector((state: RootState) => state.numSamples);
+  const numBounces = useAppSelector((state: RootState) => state.numBounces);
+  const shadingMethod = useAppSelector((state: RootState) => state.shadingMethod);
 
   return (
     <form className={styles.renderingParams}>

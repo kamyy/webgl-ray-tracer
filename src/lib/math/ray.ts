@@ -1,4 +1,4 @@
-import Vector1x4 from "./Vector1x4";
+import Vector1x4 from './vector1x4';
 
 export default class Ray {
   origin: Vector1x4;

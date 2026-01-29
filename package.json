@@ -3,30 +3,36 @@
   "version": "0.3.0",
   "private": true,
   "dependencies": {
-    "@reduxjs/toolkit": "^2.3.0",
+    "@reduxjs/toolkit": "^2.11.2",
     "classnames": "^2.5.1",
     "mtl-file-parser": "^0.3.0",
-    "next": "15.0.2",
     "obj-file-parser": "^0.6.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-redux": "^9.1.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-redux": "^9.2.0",
     "redux": "^5.0.1"
   },
   "devDependencies": {
     "@types/node": "^22",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "eslint": "^8",
-    "eslint-config-next": "15.0.2",
-    "sass": "^1.80.6",
-    "typescript": "^5"
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.11.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "prettier": "^3.8.1",
+    "sass": "^1.89.1",
+    "typescript": "^5.7",
+    "typescript-eslint": "^8.53.1",
+    "vite": "^6.2.0"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "packageManager": "yarn@4.5.1"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  }
 }

@@ -1,6 +1,6 @@
-import Vector1x4 from '../math/Vector1x4';
-import { CanvasVars } from '../types/CanvasVars';
-import Shader from './Shader';
+import { CanvasVars } from '../../types/canvasVars';
+import Vector1x4 from '../math/vector1x4';
+import Shader from './shader';
 
 export default class SampleShader extends Shader {
   private frameBuffer: WebGLFramebuffer | null = null;

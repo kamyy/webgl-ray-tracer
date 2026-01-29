@@ -1,5 +1,5 @@
-import { CanvasVars } from '../types/CanvasVars';
-import Shader from './Shader';
+import { CanvasVars } from '../../types/canvasVars';
+import Shader from './shader';
 
 export default class CanvasShader extends Shader {
   constructor() {

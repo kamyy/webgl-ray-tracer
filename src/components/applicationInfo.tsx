@@ -1,4 +1,4 @@
-import styles from './ApplicationInfo.module.scss';
+import styles from './applicationInfo.module.scss';
 
 export default function ApplicationInfo() {
   return (
