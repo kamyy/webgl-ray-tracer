@@ -1,8 +1,8 @@
-import styles from './applicationInfo.module.scss'
+import styles from './appInfo.module.scss'
 
-export default function ApplicationInfo() {
+export default function AppInfo() {
   return (
-    <form className={styles.applicationInfo}>
+    <form className={styles.appInfo}>
       <div>
         <p>MIT License</p>
         <p>

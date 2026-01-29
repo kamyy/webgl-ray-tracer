@@ -1,6 +1,6 @@
 import classnames from 'classnames'
 import { useState } from 'react'
-import ApplicationInfo from './applicationInfo'
+import AppInfo from './appInfo'
 import styles from './forms.module.scss'
 import RenderingParams from './renderingParams'
 import RenderingStatus from './renderingStatus'
@@ -44,7 +44,7 @@ export default function Forms() {
       <div className={styles.tabContent}>
         {currentFormType === FormType.renderingParams && <RenderingParams />}
         {currentFormType === FormType.renderingStatus && <RenderingStatus />}
-        {currentFormType === FormType.applicationInfo && <ApplicationInfo />}
+        {currentFormType === FormType.applicationInfo && <AppInfo />}
       </div>
     </footer>
   )
