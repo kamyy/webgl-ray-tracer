@@ -2,6 +2,7 @@
   "name": "webgl-ray-tracer",
   "version": "0.3.0",
   "private": true,
+  "type": "module",
   "dependencies": {
     "@reduxjs/toolkit": "^2.11.2",
     "classnames": "^2.5.1",
