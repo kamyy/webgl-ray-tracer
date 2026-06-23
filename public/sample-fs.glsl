@@ -2,6 +2,7 @@
 precision highp int;
 precision highp float;
 
+// ----------------------------------------------------------------------------
 // structures
 //
 struct Ray {
@@ -71,15 +72,9 @@ const int MTL_ATTRIB_INDEX = 1;
 const int RAY_BOUNCE_MAX_STACK_SIZE = 16;
 
 // ----------------------------------------------------------------------------
-// varyings
+// globals
 //
-in float v_eye_to_x;
-in float v_eye_to_z;
-
-// ----------------------------------------------------------------------------
-// outputs
-//
-layout (location = 0) out vec4 o_color; // texture unit 0, COLOR_ATTACHMENT0
+uvec4 g_randGeneratorState; // random number generator current state
 
 // ----------------------------------------------------------------------------
 // uniforms
@@ -100,9 +95,15 @@ uniform vec3  u_eye_position; // eye position in world space
 uniform mat4  u_eye_to_world; // eye to world space matrix (BVH, rays and triangles are all stored in world space)
 
 // ----------------------------------------------------------------------------
-// globals
+// varyings
 //
-uvec4 g_randGeneratorState; // random number generator current state
+in float v_eye_to_x;
+in float v_eye_to_z;
+
+// ----------------------------------------------------------------------------
+// outputs
+//
+layout (location = 0) out vec4 o_color; // texture unit 0, COLOR_ATTACHMENT0
 
 // ----------------------------------------------------------------------------
 // randomness

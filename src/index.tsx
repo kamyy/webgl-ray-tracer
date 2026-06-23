@@ -1,11 +1,11 @@
-import Canvas from '@/components/canvas';
-import Forms from '@/components/forms';
-import { Progress } from '@/components/progress';
-import StoreProvider from '@/components/storeProvider';
-import { defaultCanvasVars } from '@/types/canvasVars';
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import './styles/globals.css';
+import Canvas from '@/components/canvas'
+import Forms from '@/components/forms'
+import { Progress } from '@/components/progress'
+import StoreProvider from '@/components/storeProvider'
+import { defaultCanvasVars } from '@/types/canvasVars'
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import './styles/globals.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -22,4 +22,4 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       </main>
     </StoreProvider>
   </React.StrictMode>,
-);
+)

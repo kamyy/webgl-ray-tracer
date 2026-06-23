@@ -1,72 +1,65 @@
 export default class Shader {
-  vs: WebGLShader | null;
-  fs: WebGLShader | null;
-  va: WebGLVertexArrayObject | null;
-  program: WebGLProgram | null;
-
-  constructor() {
-    this.vs = null;
-    this.fs = null;
-    this.va = null;
-    this.program = null;
-  }
+  vs: WebGLShader | null = null
+  fs: WebGLShader | null = null
+  vao: WebGLVertexArrayObject | null = null
+  pgm: WebGLProgram | null = null
 
   async fetchShader(url: string): Promise<string> {
-    const response = await fetch(url);
+    const response = await fetch(url)
     if (!response.ok) {
-      throw new Error(`Unable to GET ${url} status=${response.status}`);
+      throw new Error(`Unable to GET ${url} status=${response.status}`)
     }
-    return response.text();
+    return response.text()
   }
 
-  async init(GL: WebGL2RenderingContext, vsURL: string, fsURL: string): Promise<void> {
-    const responses = await Promise.all([this.fetchShader(vsURL), this.fetchShader(fsURL)]);
+  async init(gl: WebGL2RenderingContext, vsURL: string, fsURL: string): Promise<void> {
+    const responses = await Promise.all([this.fetchShader(vsURL), this.fetchShader(fsURL)])
 
-    this.vs = GL.createShader(GL.VERTEX_SHADER);
+    this.vs = gl.createShader(gl.VERTEX_SHADER)
     if (this.vs) {
-      GL.shaderSource(this.vs, responses[0]);
-      GL.compileShader(this.vs);
-      if (!GL.getShaderParameter(this.vs, GL.COMPILE_STATUS)) {
-        throw new Error(`Error compiling ${vsURL} !\n ${GL.getShaderInfoLog(this.vs)}\n`);
+      gl.shaderSource(this.vs, responses[0])
+      gl.compileShader(this.vs)
+      if (!gl.getShaderParameter(this.vs, gl.COMPILE_STATUS)) {
+        throw new Error(`Error compiling ${vsURL} !\n ${gl.getShaderInfoLog(this.vs)}\n`)
+      }
+    }
+
+    this.fs = gl.createShader(gl.FRAGMENT_SHADER)
+    if (this.fs) {
+      gl.shaderSource(this.fs, responses[1])
+      gl.compileShader(this.fs)
+      if (!gl.getShaderParameter(this.fs, gl.COMPILE_STATUS)) {
+        throw new Error(`Error compiling ${fsURL} !\n ${gl.getShaderInfoLog(this.fs)}\n`)
+      }
+    }
+
+    this.pgm = gl.createProgram()
+    if (this.pgm && this.vs && this.fs) {
+      gl.attachShader(this.pgm, this.vs)
+      gl.attachShader(this.pgm, this.fs)
+      gl.linkProgram(this.pgm)
+      if (!gl.getProgramParameter(this.pgm, gl.LINK_STATUS)) {
+        const log = gl.getProgramInfoLog(this.pgm)
+        throw new Error(`Error linking shader program!\n ${log}\n`)
       }
 
-      this.fs = GL.createShader(GL.FRAGMENT_SHADER);
-      if (this.fs) {
-        GL.shaderSource(this.fs, responses[1]);
-        GL.compileShader(this.fs);
-        if (!GL.getShaderParameter(this.fs, GL.COMPILE_STATUS)) {
-          throw new Error(`Error compiling ${fsURL} !\n ${GL.getShaderInfoLog(this.fs)}\n`);
+      // vertices for clip space rectangle covering entire canvas
+      this.vao = gl.createVertexArray() // begin vertex array object
+      if (this.vao) {
+        gl.bindVertexArray(this.vao)
+        const f32 = new Float32Array([-1, -1, +1, -1, +1, +1, -1, +1])
+        const buf = gl.createBuffer()
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+        gl.bufferData(gl.ARRAY_BUFFER, f32, gl.STATIC_DRAW)
+        const desc = {
+          length: 2,
+          stride: 8,
+          offset: 0,
         }
-
-        this.program = GL.createProgram();
-        if (this.program) {
-          GL.attachShader(this.program, this.vs);
-          GL.attachShader(this.program, this.fs);
-          GL.linkProgram(this.program);
-          if (!GL.getProgramParameter(this.program, GL.LINK_STATUS)) {
-            const log = GL.getProgramInfoLog(this.program);
-            throw new Error(`Error linking shader program!\n ${log}\n`);
-          }
-
-          // vertices for clip space rectangle covering entire canvas
-          this.va = GL.createVertexArray(); // begin vertex array object
-          if (this.va) {
-            GL.bindVertexArray(this.va);
-            const vtxBuf = GL.createBuffer();
-            GL.bindBuffer(GL.ARRAY_BUFFER, vtxBuf);
-            GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([-1, -1, +1, -1, +1, +1, -1, +1]), GL.STATIC_DRAW);
-            const desc = {
-              length: 2,
-              stride: 8,
-              offset: 0,
-            };
-            const loc = GL.getAttribLocation(this.program, "a_vert_data");
-            GL.vertexAttribPointer(loc, desc.length, GL.FLOAT, false, desc.stride, desc.offset);
-
-            GL.enableVertexAttribArray(loc);
-            GL.bindVertexArray(null); // end vertex array object
-          }
-        }
+        const loc = gl.getAttribLocation(this.pgm, 'a_vert_data')
+        gl.vertexAttribPointer(loc, desc.length, gl.FLOAT, false, desc.stride, desc.offset)
+        gl.enableVertexAttribArray(loc)
+        gl.bindVertexArray(null) // end vertex array object
       }
     }
   }
