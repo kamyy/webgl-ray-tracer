@@ -6,16 +6,16 @@ export default class CanvasShader extends Shader {
     super()
   }
 
-  draw({ GL, renderingPass, colorTextures }: CanvasVars) {
-    if (this.program && GL && colorTextures) {
-      GL.bindFramebuffer(GL.FRAMEBUFFER, null)
+  draw({ gl, renderingPass, colorTextures }: CanvasVars) {
+    if (this.pgm && gl && colorTextures) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
       // eslint-disable-next-line react-hooks/rules-of-hooks
-      GL.useProgram(this.program)
-      GL.bindVertexArray(this.va)
-      colorTextures.bindToCanvasShader(GL, this.program)
+      gl.useProgram(this.pgm)
+      gl.bindVertexArray(this.vao)
+      colorTextures.bindToCanvasShader(gl, this.pgm)
 
-      GL.uniform1f(GL.getUniformLocation(this.program, 'u_inv_render_pass'), 1.0 / renderingPass)
-      GL.drawArrays(GL.TRIANGLE_FAN, 0, 4)
+      gl.uniform1f(gl.getUniformLocation(this.pgm, 'u_inv_render_pass'), 1.0 / renderingPass)
+      gl.drawArrays(gl.TRIANGLE_FAN, 0, 4)
     }
   }
 }

@@ -26,7 +26,7 @@ export interface CanvasVars {
   TXYZ_SCALAR: number
   RXYZ_SCALAR: number
 
-  GL: WebGL2RenderingContext | null
+  gl: WebGL2RenderingContext | null
   colorTextures: ColorTextures | null
   randomTexture: RandomTexture | null
   sampleShader: SampleShader | null
@@ -55,7 +55,7 @@ export const defaultCanvasVars: Readonly<CanvasVars> = {
   TXYZ_SCALAR: 0.01,
   RXYZ_SCALAR: 0.25,
 
-  GL: null,
+  gl: null,
   colorTextures: null,
   randomTexture: null,
   sampleShader: null,

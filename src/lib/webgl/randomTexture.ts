@@ -1,7 +1,7 @@
 export default class RandomTexture {
   private source: WebGLTexture | null = null
 
-  constructor(GL: WebGL2RenderingContext, wd: number, ht: number) {
+  constructor(gl: WebGL2RenderingContext, wd: number, ht: number) {
     const data = new Uint32Array(wd * ht * 4) // require 4 random values for each fragment to seed
     for (let i = 0; i < data.length; ++i) {
       // tausworthe/LCG random number generator
@@ -13,22 +13,22 @@ export default class RandomTexture {
       data[i] = n
     }
 
-    GL.activeTexture(GL.TEXTURE2)
-    this.source = GL.createTexture()
+    gl.activeTexture(gl.TEXTURE2)
+    this.source = gl.createTexture()
     if (this.source) {
-      GL.bindTexture(GL.TEXTURE_2D, this.source)
-      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST)
-      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST)
-      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE)
-      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE)
-      GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32UI, wd, ht, 0, GL.RGBA_INTEGER, GL.UNSIGNED_INT, data)
+      gl.bindTexture(gl.TEXTURE_2D, this.source)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32UI, wd, ht, 0, gl.RGBA_INTEGER, gl.UNSIGNED_INT, data)
     }
   }
 
-  bindToSampleShader(GL: WebGL2RenderingContext, program: WebGLProgram): void {
+  bindToSampleShader(gl: WebGL2RenderingContext, program: WebGLProgram): void {
     // using texture unit 2
-    GL.activeTexture(GL.TEXTURE2)
-    GL.bindTexture(GL.TEXTURE_2D, this.source)
-    GL.uniform1i(GL.getUniformLocation(program, 'u_random_sampler'), 2)
+    gl.activeTexture(gl.TEXTURE2)
+    gl.bindTexture(gl.TEXTURE_2D, this.source)
+    gl.uniform1i(gl.getUniformLocation(program, 'u_random_sampler'), 2)
   }
 }

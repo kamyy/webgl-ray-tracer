@@ -179,24 +179,24 @@ export default class Scene {
   rootNode: RefFrame | null = null
   parentNode: RefFrame | null = null
   cameraNode: RefFrame | null = null
-  GL: WebGL2RenderingContext | null
+  gl: WebGL2RenderingContext | null
   facesTexture: WebGLTexture | null = null
   AABBsTexture: WebGLTexture | null = null
   mtlsTexture: WebGLTexture | null = null
 
-  constructor(GL: WebGL2RenderingContext | null, objUrl: string, mtlUrl: string) {
+  constructor(gl: WebGL2RenderingContext | null, objUrl: string, mtlUrl: string) {
     this.objUrl = objUrl
     this.mtlUrl = mtlUrl
     this.objCount = 0
     this.mtlCount = 0
     this.parsedObjs = []
     this.parsedMtls = []
-    this.GL = GL
+    this.gl = gl
 
-    if (GL) {
-      this.facesTexture = GL.createTexture()
-      this.AABBsTexture = GL.createTexture()
-      this.mtlsTexture = GL.createTexture()
+    if (gl) {
+      this.facesTexture = gl.createTexture()
+      this.AABBsTexture = gl.createTexture()
+      this.mtlsTexture = gl.createTexture()
 
       this.rootNode = new RefFrame()
       this.parentNode = new RefFrame(this.rootNode)
@@ -214,7 +214,7 @@ export default class Scene {
   }
 
   async init() {
-    if (this.GL) {
+    if (this.gl) {
       const _wavefrontObjParser = new wavefrontObjParser(await this.fetchTextFile(this.objUrl))
       const _wavefrontMtlParser = new wavefrontMtlParser(await this.fetchTextFile(this.mtlUrl))
       const wavefrontObj = _wavefrontObjParser.parse()
@@ -330,13 +330,13 @@ export default class Scene {
       })
       //console.log(`# mtls ${this.parsedMtls.length}`);
 
-      this.initTextures(this.GL)
+      this.initTextures(this.gl)
       this.objCount = this.parsedObjs.length
       this.mtlCount = this.parsedMtls.length
     }
   }
 
-  initTextures(GL: WebGL2RenderingContext) {
+  initTextures(gl: WebGL2RenderingContext) {
     const maxNumFaces = this.parsedObjs.reduce((max, obj) => Math.max(max, obj.faces.length), 0) // max number of faces
     const numTexelsPerFace = 8 // RGBA texel
     const numFloatsPerFace = 24
@@ -373,22 +373,22 @@ export default class Scene {
         i += 3
       })
     })
-    GL.activeTexture(GL.TEXTURE0)
-    GL.bindTexture(GL.TEXTURE_2D_ARRAY, this.facesTexture)
-    GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_MIN_FILTER, GL.NEAREST)
-    GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_MAG_FILTER, GL.NEAREST)
-    GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE)
-    GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE)
-    GL.texImage3D(
-      GL.TEXTURE_2D_ARRAY,
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.facesTexture)
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.texImage3D(
+      gl.TEXTURE_2D_ARRAY,
       0,
-      GL.RGB32F,
+      gl.RGB32F,
       numTexelsPerFace,
       maxNumFaces,
       this.parsedObjs.length,
       0,
-      GL.RGB,
-      GL.FLOAT,
+      gl.RGB,
+      gl.FLOAT,
       data,
     )
 
@@ -416,22 +416,22 @@ export default class Scene {
         data[i++] = bv.fi[1] + 0.5 // face index is cast to int in fragment shader
       })
     })
-    GL.activeTexture(GL.TEXTURE0)
-    GL.bindTexture(GL.TEXTURE_2D_ARRAY, this.AABBsTexture)
-    GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_MIN_FILTER, GL.NEAREST)
-    GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_MAG_FILTER, GL.NEAREST)
-    GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE)
-    GL.texParameteri(GL.TEXTURE_2D_ARRAY, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE)
-    GL.texImage3D(
-      GL.TEXTURE_2D_ARRAY,
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.AABBsTexture)
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.texImage3D(
+      gl.TEXTURE_2D_ARRAY,
       0,
-      GL.RGBA32F,
+      gl.RGBA32F,
       numTexelsPerBV,
       maxNumBVs,
       this.parsedObjs.length,
       0,
-      GL.RGBA,
-      GL.FLOAT,
+      gl.RGBA,
+      gl.FLOAT,
       data,
     )
 
@@ -450,26 +450,26 @@ export default class Scene {
       data[i++] = mtl.reflectionGloss
       data[i++] = mtl.refractionIndex
     })
-    GL.activeTexture(GL.TEXTURE0)
-    GL.bindTexture(GL.TEXTURE_2D, this.mtlsTexture)
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST)
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST)
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE)
-    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE)
-    GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32F, numTexelsPerMtl, this.parsedMtls.length, 0, GL.RGBA, GL.FLOAT, data)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.mtlsTexture)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, numTexelsPerMtl, this.parsedMtls.length, 0, gl.RGBA, gl.FLOAT, data)
   }
 
-  bindToSampleShader(GL: WebGL2RenderingContext, program: WebGLProgram) {
-    GL.activeTexture(GL.TEXTURE3)
-    GL.bindTexture(GL.TEXTURE_2D_ARRAY, this.facesTexture)
-    GL.uniform1i(GL.getUniformLocation(program, 'u_face_sampler'), 3)
+  bindToSampleShader(gl: WebGL2RenderingContext, program: WebGLProgram) {
+    gl.activeTexture(gl.TEXTURE3)
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.facesTexture)
+    gl.uniform1i(gl.getUniformLocation(program, 'u_face_sampler'), 3)
 
-    GL.activeTexture(GL.TEXTURE4)
-    GL.bindTexture(GL.TEXTURE_2D_ARRAY, this.AABBsTexture)
-    GL.uniform1i(GL.getUniformLocation(program, 'u_aabb_sampler'), 4)
+    gl.activeTexture(gl.TEXTURE4)
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.AABBsTexture)
+    gl.uniform1i(gl.getUniformLocation(program, 'u_aabb_sampler'), 4)
 
-    GL.activeTexture(GL.TEXTURE5)
-    GL.bindTexture(GL.TEXTURE_2D, this.mtlsTexture)
-    GL.uniform1i(GL.getUniformLocation(program, 'u_mtl_sampler'), 5)
+    gl.activeTexture(gl.TEXTURE5)
+    gl.bindTexture(gl.TEXTURE_2D, this.mtlsTexture)
+    gl.uniform1i(gl.getUniformLocation(program, 'u_mtl_sampler'), 5)
   }
 }

@@ -13,16 +13,16 @@ function degreesToRadians(degrees: number) {
   return (degrees * Math.PI) / 180.0
 }
 
-function GPU_MeetsRequirements(GL: WebGL2RenderingContext) {
-  if (!GL.getExtension('EXT_color_buffer_float')) {
+function GPU_MeetsRequirements(gl: WebGL2RenderingContext) {
+  if (!gl.getExtension('EXT_color_buffer_float')) {
     console.log('EXT_color_buffer_float not supported')
     return false
   }
 
-  const MAX_ARRAY_TEXTURE_LAYERS = GL.getParameter(GL.MAX_ARRAY_TEXTURE_LAYERS)
-  const MAX_TEXTURE_IMAGE_UNITS = GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS)
-  const MAX_RENDERBUFFER_SIZE = GL.getParameter(GL.MAX_RENDERBUFFER_SIZE)
-  const MAX_TEXTURE_SIZE = GL.getParameter(GL.MAX_TEXTURE_SIZE)
+  const MAX_ARRAY_TEXTURE_LAYERS = gl.getParameter(gl.MAX_ARRAY_TEXTURE_LAYERS)
+  const MAX_TEXTURE_IMAGE_UNITS = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS)
+  const MAX_RENDERBUFFER_SIZE = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)
+  const MAX_TEXTURE_SIZE = gl.getParameter(gl.MAX_TEXTURE_SIZE)
 
   console.log(`MAX_ARRAY_TEXTURE_LAYERS = ${MAX_ARRAY_TEXTURE_LAYERS}`)
   console.log(`MAX_TEXTURE_IMAGE_UNITS = ${MAX_TEXTURE_IMAGE_UNITS}`)
@@ -169,30 +169,30 @@ export default function Canvas() {
         }
       }
 
-      if (!cv.GL) {
-        cv.GL = htmlCanvasElement.getContext('webgl2', {
+      if (!cv.gl) {
+        cv.gl = htmlCanvasElement.getContext('webgl2', {
           depth: false,
           alpha: false,
         })
 
-        if (cv.GL && GPU_MeetsRequirements(cv.GL)) {
+        if (cv.gl && GPU_MeetsRequirements(cv.gl)) {
           window.oncontextmenu = (e: MouseEvent) => e.preventDefault()
           window.onmousemove = onMouseMove
           window.onmousedown = onMouseDown
           window.onmouseup = onMouseUp
 
-          cv.colorTextures = new ColorTextures(cv.GL, cv.canvasWd, cv.canvasHt)
-          cv.randomTexture = new RandomTexture(cv.GL, cv.canvasWd, cv.canvasHt)
-          cv.sampleShader = new SampleShader(cv.GL)
+          cv.colorTextures = new ColorTextures(cv.gl, cv.canvasWd, cv.canvasHt)
+          cv.randomTexture = new RandomTexture(cv.gl, cv.canvasWd, cv.canvasHt)
+          cv.sampleShader = new SampleShader(cv.gl)
           cv.canvasShader = new CanvasShader()
 
           Promise.all([
-            cv.sampleShader.init(cv.GL, '/sample-vs.glsl', '/sample-fs.glsl'),
-            cv.canvasShader.init(cv.GL, '/canvas-vs.glsl', '/canvas-fs.glsl'),
+            cv.sampleShader.init(cv.gl, '/sample-vs.glsl', '/sample-fs.glsl'),
+            cv.canvasShader.init(cv.gl, '/canvas-vs.glsl', '/canvas-fs.glsl'),
           ])
             .then(() => {
               dispatch(appActions.setLoadingSpinner(LoadingSpinner.show))
-              cv.scene = new Scene(cv.GL, '/suzanne.obj', '/suzanne.mtl')
+              cv.scene = new Scene(cv.gl, '/suzanne.obj', '/suzanne.mtl')
               return cv.scene.init()
             })
             .then(() => {
