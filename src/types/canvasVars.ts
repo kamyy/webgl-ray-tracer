@@ -20,8 +20,10 @@ export interface CanvasVars {
   x: number
   y: number
   lButtonDown: boolean
+  mButtonDown: boolean
   rButtonDown: boolean
   lButtonDownOnCanvas: boolean
+  mButtonDownOnCanvas: boolean
   rButtonDownOnCanvas: boolean
   TXYZ_SCALAR: number
   RXYZ_SCALAR: number
@@ -49,8 +51,10 @@ export const defaultCanvasVars: Readonly<CanvasVars> = {
   x: 0,
   y: 0,
   lButtonDown: false,
+  mButtonDown: false,
   rButtonDown: false,
   lButtonDownOnCanvas: false,
+  mButtonDownOnCanvas: false,
   rButtonDownOnCanvas: false,
   TXYZ_SCALAR: 0.01,
   RXYZ_SCALAR: 0.25,

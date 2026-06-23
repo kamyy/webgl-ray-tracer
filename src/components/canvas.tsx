@@ -71,8 +71,8 @@ export default function Canvas() {
       const cv = cvRef.current
       function render() {
         if (cv.renderingPass < cv.numSamples) {
-          if (cv.renderingPass === 0 || (!cv.lButtonDown && !cv.rButtonDown)) {
-            ++cv.renderingPass // always render pass 0 even if left or right mouse buttton is down
+          if (cv.renderingPass === 0 || (!cv.lButtonDown && !cv.mButtonDown && !cv.rButtonDown)) {
+            ++cv.renderingPass // always render pass 0 even if a mouse button is down
 
             if (cv.sampleShader && cv.canvasShader) {
               cv.sampleShader.draw(cv)
@@ -102,17 +102,20 @@ export default function Canvas() {
         dispatch(appActions.setAvgTime('????'))
       }
 
+      function dollyCamera(delta: number) {
+        if (delta !== 0 && cv.scene?.cameraNode) {
+          cv.scene.cameraNode.translate(new Vector1x4(0, delta * cv.TXYZ_SCALAR, 0))
+          renderReset()
+        }
+      }
+
       function onMouseMove(event: MouseEvent) {
         if (cv.scene?.cameraNode && cv.scene?.parentNode) {
           const x = event.clientX
           const y = event.clientY
 
-          if ((cv.lButtonDownOnCanvas && cv.rButtonDownOnCanvas) || (cv.lButtonDownOnCanvas && event.shiftKey)) {
-            // dolly
-            if (y !== cv.y && cv.scene.cameraNode) {
-              cv.scene.cameraNode.translate(new Vector1x4(0, (cv.y - y) * cv.TXYZ_SCALAR, 0))
-              renderReset()
-            }
+          if (cv.mButtonDownOnCanvas) {
+            dollyCamera(cv.y - y)
           } else if ((cv.lButtonDownOnCanvas && event.ctrlKey) || cv.rButtonDownOnCanvas) {
             // move
             if (x !== cv.x || y !== cv.y) {
@@ -135,19 +138,34 @@ export default function Canvas() {
         }
       }
 
+      function onMouseWheel(event: WheelEvent) {
+        if (cv.scene?.cameraNode) {
+          event.preventDefault()
+          dollyCamera(-event.deltaY * 0.25)
+        }
+      }
+
       function onMouseDown(event: MouseEvent) {
         const rect = htmlCanvasElement.getBoundingClientRect()
         cv.x = event.clientX
         cv.y = event.clientY
+        const onCanvas = cv.x > rect.left && cv.x < rect.right && cv.y > rect.top && cv.y < rect.bottom
 
         switch (event.button) {
           case 0:
             cv.lButtonDown = true
-            cv.lButtonDownOnCanvas = cv.x > rect.left && cv.x < rect.right && cv.y > rect.top && cv.y < rect.bottom
+            cv.lButtonDownOnCanvas = onCanvas
+            break
+          case 1:
+            if (onCanvas) {
+              event.preventDefault()
+            }
+            cv.mButtonDown = true
+            cv.mButtonDownOnCanvas = onCanvas
             break
           case 2:
             cv.rButtonDown = true
-            cv.rButtonDownOnCanvas = cv.x > rect.left && cv.x < rect.right && cv.y > rect.top && cv.y < rect.bottom
+            cv.rButtonDownOnCanvas = onCanvas
             break
           default:
             break
@@ -159,6 +177,10 @@ export default function Canvas() {
           case 0:
             cv.lButtonDown = false
             cv.lButtonDownOnCanvas = false
+            break
+          case 1:
+            cv.mButtonDown = false
+            cv.mButtonDownOnCanvas = false
             break
           case 2:
             cv.rButtonDown = false
@@ -180,6 +202,7 @@ export default function Canvas() {
           window.onmousemove = onMouseMove
           window.onmousedown = onMouseDown
           window.onmouseup = onMouseUp
+          htmlCanvasElement.onwheel = onMouseWheel
 
           cv.colorTextures = new ColorTextures(cv.gl, cv.canvasWd, cv.canvasHt)
           cv.randomTexture = new RandomTexture(cv.gl, cv.canvasWd, cv.canvasHt)
