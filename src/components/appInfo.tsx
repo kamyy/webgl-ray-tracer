@@ -21,7 +21,7 @@ export default function AppInfo() {
           <span className={styles.bold}>* Translate</span> Right click + drag. Or ctrl + left click + drag.
         </p>
         <p>
-          <span className={styles.bold}>* Dolly In/Out</span> Left + right click + drag. Or shift + left click + drag.
+          <span className={styles.bold}>* Zoom In/Out</span> Mouse wheel. Or middle click + drag up/down.
         </p>
       </div>
     </form>
