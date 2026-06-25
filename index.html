@@ -1,14 +1,6 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/x-icon" href="/public/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebGL Ray Tracer</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-RBT0B609VT"></script>
     <script>
       window.dataLayer = window.dataLayer || []
@@ -16,10 +8,15 @@
         dataLayer.push(arguments)
       }
       gtag('js', new Date())
-
       gtag('config', 'G-RBT0B609VT')
     </script>
-
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="/public/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebGL Ray Tracer</title>
+  </head>
+  <body>
+    <div id="root"></div>
     <script type="module" src="/src/index.tsx"></script>
   </body>
 </html>
