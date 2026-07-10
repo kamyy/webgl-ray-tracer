@@ -12,6 +12,10 @@ enum Axis {
 
 const bvMinDelta = 0.01
 
+// must match BV_MAX_STACK_SIZE in public/sample-fs.glsl - the ray/BVH traversal stack there is a
+// fixed-size array with no bounds checking, so a tree deeper than this will silently corrupt rendering
+const bvMaxStackSize = 16
+
 interface Model {
   name: string
   vertices: { x: number; y: number; z: number }[]
@@ -67,44 +71,120 @@ class BV {
     this.fi = [-2.0, -2.0]
   }
 
-  subDivide(faces: Face[], AABBs: BV[]) {
+  subDivide(faces: Face[], AABBs: BV[], depth: number = 0) {
     if (faces.length <= this.fi.length) {
       // all the faces fit in this node
       faces.forEach((face, i) => (this.fi[i] = face.fi))
     } else {
-      // split the AABB into two across the longest AABB axis
-      const dx = Math.abs(this.max.x - this.min.x)
-      const dy = Math.abs(this.max.y - this.min.y)
-      const dz = Math.abs(this.max.z - this.min.z)
-      const largestDelta = Math.max(dx, dy, dz)
-
-      if (largestDelta === dx) {
-        this.splitAcross(Axis.x, faces, AABBs) // split BV AABB across x axis
-      } else if (largestDelta === dy) {
-        this.splitAcross(Axis.y, faces, AABBs) // split BV AABB across y axis
-      } else {
-        this.splitAcross(Axis.z, faces, AABBs) // split BV AABB across z axis
+      if (depth >= bvMaxStackSize) {
+        console.warn(
+          `BVH depth ${depth} reached the fragment shader's traversal stack limit (${bvMaxStackSize}); raise BV_MAX_STACK_SIZE in sample-fs.glsl`,
+        )
       }
+      // pick the axis/position that minimizes expected ray traversal cost (SAH)
+      const { index, sorted } = BV.findBestSplit(faces)
+      this.splitAcross(index, sorted, AABBs, depth)
     }
   }
 
-  splitAcross(axis: 0 | 1 | 2, faces: Face[], AABBs: BV[]) {
-    const sorted = [...faces].sort((faceA, faceB) => {
-      const a0 = faceA.p0.xyzw[axis]
-      const a1 = faceA.p1.xyzw[axis]
-      const a2 = faceA.p2.xyzw[axis]
+  static faceMin(face: Face): Vector1x4 {
+    return new Vector1x4(
+      Math.min(face.p0.x, face.p1.x, face.p2.x),
+      Math.min(face.p0.y, face.p1.y, face.p2.y),
+      Math.min(face.p0.z, face.p1.z, face.p2.z),
+    )
+  }
 
-      const b0 = faceB.p0.xyzw[axis]
-      const b1 = faceB.p1.xyzw[axis]
-      const b2 = faceB.p2.xyzw[axis]
+  static faceMax(face: Face): Vector1x4 {
+    return new Vector1x4(
+      Math.max(face.p0.x, face.p1.x, face.p2.x),
+      Math.max(face.p0.y, face.p1.y, face.p2.y),
+      Math.max(face.p0.z, face.p1.z, face.p2.z),
+    )
+  }
 
-      return (a0 + a1 + a2) / 3.0 - (b0 + b1 + b2) / 3.0
+  static surfaceArea(min: Vector1x4, max: Vector1x4): number {
+    const dx = Math.max(0, max.x - min.x)
+    const dy = Math.max(0, max.y - min.y)
+    const dz = Math.max(0, max.z - min.z)
+    return 2.0 * (dx * dy + dy * dz + dz * dx)
+  }
+
+  // sweep all 3 axes and every candidate split position, return the one with
+  // the lowest surface-area-heuristic cost: SA(left) * |left| + SA(right) * |right|
+  static findBestSplit(faces: Face[]): { index: number; sorted: Face[] } {
+    let bestIndex = Math.ceil(faces.length / 2)
+    let bestCost = Number.MAX_VALUE
+    let bestSorted = faces
+
+    ;[Axis.x, Axis.y, Axis.z].forEach(axis => {
+      const sorted = [...faces].sort((faceA, faceB) => {
+        const a = (faceA.p0.xyzw[axis] + faceA.p1.xyzw[axis] + faceA.p2.xyzw[axis]) / 3.0
+        const b = (faceB.p0.xyzw[axis] + faceB.p1.xyzw[axis] + faceB.p2.xyzw[axis]) / 3.0
+        return a - b
+      })
+      const n = sorted.length
+
+      // prefix[i]/suffix[i] = bounds of sorted[0..i) / sorted[i..n)
+      const prefixMin: Vector1x4[] = new Array(n + 1)
+      const prefixMax: Vector1x4[] = new Array(n + 1)
+      const suffixMin: Vector1x4[] = new Array(n + 1)
+      const suffixMax: Vector1x4[] = new Array(n + 1)
+
+      prefixMin[0] = new Vector1x4(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
+      prefixMax[0] = new Vector1x4(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER)
+      for (let i = 0; i < n; i++) {
+        const fMin = BV.faceMin(sorted[i])
+        const fMax = BV.faceMax(sorted[i])
+        prefixMin[i + 1] = new Vector1x4(
+          Math.min(prefixMin[i].x, fMin.x),
+          Math.min(prefixMin[i].y, fMin.y),
+          Math.min(prefixMin[i].z, fMin.z),
+        )
+        prefixMax[i + 1] = new Vector1x4(
+          Math.max(prefixMax[i].x, fMax.x),
+          Math.max(prefixMax[i].y, fMax.y),
+          Math.max(prefixMax[i].z, fMax.z),
+        )
+      }
+
+      suffixMin[n] = new Vector1x4(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
+      suffixMax[n] = new Vector1x4(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER)
+      for (let i = n - 1; i >= 0; i--) {
+        const fMin = BV.faceMin(sorted[i])
+        const fMax = BV.faceMax(sorted[i])
+        suffixMin[i] = new Vector1x4(
+          Math.min(suffixMin[i + 1].x, fMin.x),
+          Math.min(suffixMin[i + 1].y, fMin.y),
+          Math.min(suffixMin[i + 1].z, fMin.z),
+        )
+        suffixMax[i] = new Vector1x4(
+          Math.max(suffixMax[i + 1].x, fMax.x),
+          Math.max(suffixMax[i + 1].y, fMax.y),
+          Math.max(suffixMax[i + 1].z, fMax.z),
+        )
+      }
+
+      // only candidates that leave both children non-empty are valid splits
+      for (let i = 1; i < n; i++) {
+        const leftSA = BV.surfaceArea(prefixMin[i], prefixMax[i])
+        const rightSA = BV.surfaceArea(suffixMin[i], suffixMax[i])
+        const cost = leftSA * i + rightSA * (n - i)
+
+        if (cost < bestCost) {
+          bestCost = cost
+          bestIndex = i
+          bestSorted = sorted
+        }
+      }
     })
 
-    const h = sorted.length / 2
-    const l = sorted.length
-    const ltFaces = sorted.slice(0, h) // left faces
-    const rtFaces = sorted.slice(h, l) // right faces
+    return { index: bestIndex, sorted: bestSorted }
+  }
+
+  splitAcross(index: number, sorted: Face[], AABBs: BV[], depth: number) {
+    const ltFaces = sorted.slice(0, index) // left faces
+    const rtFaces = sorted.slice(index, sorted.length) // right faces
     let ltBV = null
     let rtBV = null
 
@@ -161,10 +241,10 @@ class BV {
     }
 
     if (ltBV) {
-      ltBV.subDivide(ltFaces, AABBs)
+      ltBV.subDivide(ltFaces, AABBs, depth + 1)
     }
     if (rtBV) {
-      rtBV.subDivide(rtFaces, AABBs)
+      rtBV.subDivide(rtFaces, AABBs, depth + 1)
     }
   }
 }

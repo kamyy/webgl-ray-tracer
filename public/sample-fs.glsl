@@ -181,16 +181,16 @@ bool rayIntersectFace(Ray r, int face_index, int obj_index, out RayHitResult res
     return true;
 }
 
-bool rayIntersectBV(Ray r, vec3 bvMin, vec3 bvMax) { // ray intersect AABB slabs method sped up using intrinsics
+bool rayIntersectBV(Ray r, vec3 bvMin, vec3 bvMax, out float tEnter) { // ray intersect AABB slabs method sped up using intrinsics
     vec3 t0 = (bvMin - r.origin) / r.dir;
     vec3 t1 = (bvMax - r.origin) / r.dir;
     vec3 tmin = min(t0, t1);
     vec3 tmax = max(t0, t1);
 
-    float max_tmin = max(tmin.x, max(tmin.y, tmin.z));
+    tEnter = max(tmin.x, max(tmin.y, tmin.z)); // distance along ray where it enters the box
     float min_tmax = min(tmax.x, min(tmax.y, tmax.z));
 
-    return max_tmin < min_tmax;
+    return tEnter < min_tmax;
 }
 
 bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
@@ -202,6 +202,7 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     int f0_idx, f1_idx;
     int bv_idx;
     int top;
+    float tEnter;
 
     nearest.t = MAX_FLT;
 
@@ -213,8 +214,9 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
             bv_idx = stack[top--]; // pop BV index from top of stack
             if (rayIntersectBV(r,
                 texelFetch(u_aabb_sampler, ivec3(BV_MIN_BOUNDS_INDEX, bv_idx, obj_idx), 0).xyz,// BV AABB min bounds
-                texelFetch(u_aabb_sampler, ivec3(BV_MAX_BOUNDS_INDEX, bv_idx, obj_idx), 0).xyz // BV AABB max bounds
-            )) {
+                texelFetch(u_aabb_sampler, ivec3(BV_MAX_BOUNDS_INDEX, bv_idx, obj_idx), 0).xyz,// BV AABB max bounds
+                tEnter
+            ) && tEnter < nearest.t) { // skip subtrees that can't be closer than the nearest hit found so far
                 texel = texelFetch(u_aabb_sampler, ivec3(BV_PAYLOAD_INDEX, bv_idx, obj_idx), 0);
                 lt_idx = int(texel.r); // index of L child BV node
                 rt_idx = int(texel.g); // index of R child BV node
