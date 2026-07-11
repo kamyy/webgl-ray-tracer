@@ -37,7 +37,6 @@ export default class SampleShader extends Shader {
       const eyePos = origin.mul(scene.cameraNode.modelMatrix) // in world space
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer)
-      // eslint-disable-next-line react-hooks/rules-of-hooks
       gl.useProgram(this.pgm)
       gl.bindVertexArray(this.vao)
 

@@ -9,7 +9,6 @@ export default class CanvasShader extends Shader {
   draw({ gl, renderingPass, colorTextures }: CanvasVars) {
     if (this.pgm && gl && colorTextures) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null)
-      // eslint-disable-next-line react-hooks/rules-of-hooks
       gl.useProgram(this.pgm)
       gl.bindVertexArray(this.vao)
       colorTextures.bindToCanvasShader(gl, this.pgm)

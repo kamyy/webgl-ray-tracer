@@ -1,5 +1,8 @@
 /** @type {import("prettier").Config} */
 export default {
+  // Uses TypeScript's organize imports (same as VS Code source.organizeImports)
+  plugins: ['prettier-plugin-organize-imports'],
+
   // Line formatting
   printWidth: 120,
   tabWidth: 2,
