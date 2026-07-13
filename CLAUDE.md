@@ -22,7 +22,9 @@ There is no test suite/runner in this project.
 
 CI (`.github/workflows/ci.yml`) runs `format:check`, `lint`, `typecheck`, `build` on every push/PR to `main`, then on push to `main` it builds `dist/` and syncs it to S3 (`webgl-ray-tracer.orky.net`) via an AWS deploy role — the deploy step only triggers on `main`.
 
-Husky runs `pretty-quick --staged` on pre-commit (see `.husky/pre-commit`).
+This is a fully client-side-rendered app — the default Vite React setup, no SSR/SSG. `dist/` is just static assets (HTML/JS/CSS + the `public/` GLSL files), so it can be served entirely from an S3 bucket with no server runtime, which is exactly what the CI deploy step does.
+
+Husky's pre-commit hook (`.husky/pre-commit`) runs three checks in sequence: `format-staged` (`pretty-quick --staged`), then `lint`, then `typecheck` — a commit is blocked if any of them fails, not just formatting.
 
 ## Architecture
 
