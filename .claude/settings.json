@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // empty' | { read -r f; case \"$f\" in */src/lib/webgl/scene.ts|*/public/sample-fs.glsl) printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"The scene packer and the path tracer shader share a texture layout and a stack depth. Run the shader-layout-sync skill: bvMaxStackSize must equal BV_MAX_STACK_SIZE, and the numFloatsPer* constants must match the *_INDEX constants.\"}}';; esac; } 2>/dev/null || true",
+            "statusMessage": "Checking shader layout sync"
+          }
+        ]
+      }
+    ]
+  }
+}
