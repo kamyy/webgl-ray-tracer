@@ -9,7 +9,8 @@
   }
 
   body {
-    margin: 8px;
+    margin: 0;
+    background: #14171b; /* matches the render view, so the space beside a capped view looks part of it */
   }
 }
 

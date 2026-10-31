@@ -104,7 +104,7 @@ export function Viewport() {
   }
 
   return (
-    <div className="relative" style={{ width: 1280, height: 720 }}>
+    <div className="absolute inset-0">
       <Canvas
         dpr={1}
         frameloop="always"

@@ -1,38 +1,29 @@
+/**
+ * Elapsed time, estimated time left and average pass time for the render in progress.
+ *
+ * The values come from the app store, where `PathTracer` writes them a few times a second.
+ */
 import { useAppStore } from '../lib/store/appStore'
 
-const fieldsetClass = 'w-1/4 p-4 not-first:border-l not-first:border-[lightgray]'
-const legendClass = 'mx-auto text-[0.9rem] font-bold'
-
-export default function RenderingStatus() {
-  const renderingPass = useAppStore(state => state.renderingPass)
+export function RenderingStatus() {
   const elapsedTime = useAppStore(state => state.elapsedTime)
-  const numSamples = useAppStore(state => state.numSamples)
   const etaTime = useAppStore(state => state.etaTime)
   const avgTime = useAppStore(state => state.avgTime)
 
+  const rows = [
+    { label: 'Elapsed', value: elapsedTime },
+    { label: 'Remaining', value: etaTime },
+    { label: 'Avg. per pass', value: avgTime },
+  ]
+
   return (
-    <form className="flex p-8 text-center">
-      <fieldset className={fieldsetClass}>
-        <legend className={legendClass}>Rendering Pass</legend>
-        <div>
-          {renderingPass} / {numSamples}
+    <dl className="mt-2 text-[0.9rem] tabular-nums">
+      {rows.map(row => (
+        <div key={row.label} className="flex justify-between border-t border-gray-300 py-1.5">
+          <dt className="text-gray-600">{row.label}</dt>
+          <dd>{row.value}</dd>
         </div>
-      </fieldset>
-
-      <fieldset className={fieldsetClass}>
-        <legend className={legendClass}>Elapsed Time</legend>
-        <div>{elapsedTime}</div>
-      </fieldset>
-
-      <fieldset className={fieldsetClass}>
-        <legend className={legendClass}>Remaining Time</legend>
-        <div>{etaTime}</div>
-      </fieldset>
-
-      <fieldset className={fieldsetClass}>
-        <legend className={legendClass}>Avg. Duration Per Pass</legend>
-        <div>{avgTime}</div>
-      </fieldset>
-    </form>
+      ))}
+    </dl>
   )
 }

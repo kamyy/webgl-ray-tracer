@@ -1,4 +1,10 @@
-import { ReactElement } from 'react'
+/**
+ * The sliders and radio buttons that change how the scene is rendered.
+ *
+ * Each control writes its value to the app store. `PathTracer` watches those values and restarts accumulation when
+ * one changes, so a change shows up in the render at once.
+ */
+import { useId } from 'react'
 import { ShadingMethod, useAppStore } from '../lib/store/appStore'
 
 const minSamples = 1
@@ -8,15 +14,48 @@ const maxBounces = 16
 const minCameraFov = 10
 const maxCameraFov = 120
 
-const rangeHeaderClass = 'flex'
-const rangeTitleClass = 'grow text-[0.9rem] font-bold'
-const rangeValueClass = 'basis-[5%] text-left text-[0.9rem] font-bold'
-const rangeSliderClass = 'flex pt-2 pb-3'
-const rangeMinClass = 'basis-[6%] text-right'
-const rangeMaxClass = 'basis-[5%] text-left'
-const rangeInputClass = 'mx-4 grow'
+const shadingMethods = [
+  { value: ShadingMethod.flat, label: 'Flat' },
+  { value: ShadingMethod.phong, label: 'Phong' },
+]
 
-export default function RenderingParams(): ReactElement {
+interface RangeFieldProps {
+  title: string
+  value: number
+  min: number
+  max: number
+  onChange: (value: number) => void
+}
+
+function RangeField({ title, value, min, max, onChange }: RangeFieldProps) {
+  const id = useId()
+
+  return (
+    <div className="mt-3">
+      <div className="flex justify-between text-[0.9rem] font-bold">
+        <label htmlFor={id}>{title}</label>
+        <output htmlFor={id} className="tabular-nums">
+          {value}
+        </output>
+      </div>
+      <input
+        id={id}
+        className="my-0.5 h-8 w-full"
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={event => onChange(parseInt(event.target.value))}
+      />
+      <div className="flex justify-between text-xs text-gray-600 tabular-nums">
+        <span>{min}</span>
+        <span>{max}</span>
+      </div>
+    </div>
+  )
+}
+
+export function RenderingParams() {
   const cameraFov = useAppStore(state => state.cameraFov)
   const numSamples = useAppStore(state => state.numSamples)
   const numBounces = useAppStore(state => state.numBounces)
@@ -27,89 +66,43 @@ export default function RenderingParams(): ReactElement {
   const setShadingMethod = useAppStore(state => state.setShadingMethod)
 
   return (
-    <form className="flex p-8">
-      <div className="flex grow flex-col">
-        <div className={rangeHeaderClass}>
-          <div className={rangeTitleClass}>Camera Field of View</div>
-          <div className={rangeValueClass}>{cameraFov}</div>
-        </div>
-        <div className={rangeSliderClass}>
-          <label className={rangeMinClass}>{minCameraFov}</label>
-          <input
-            className={rangeInputClass}
-            type="range"
-            min={minCameraFov}
-            max={maxCameraFov}
-            value={cameraFov}
-            onChange={event => setCameraFov(parseInt(event.target.value))}
-          />
-          <label className={rangeMaxClass}>{maxCameraFov}</label>
-        </div>
+    <div>
+      <RangeField
+        title="Camera field of view"
+        value={cameraFov}
+        min={minCameraFov}
+        max={maxCameraFov}
+        onChange={setCameraFov}
+      />
+      <RangeField
+        title="Samples per pixel"
+        value={numSamples}
+        min={minSamples}
+        max={maxSamples}
+        onChange={setNumSamples}
+      />
+      <RangeField title="Ray bounces" value={numBounces} min={minBounces} max={maxBounces} onChange={setNumBounces} />
 
-        <div className={rangeHeaderClass}>
-          <div className={rangeTitleClass}># of Samples Per Pixel</div>
-          <div className={rangeValueClass}>{numSamples}</div>
-        </div>
-        <div className={rangeSliderClass}>
-          <label className={rangeMinClass}>{minSamples}</label>
-          <input
-            className={rangeInputClass}
-            type="range"
-            min={minSamples}
-            max={maxSamples}
-            value={numSamples}
-            onChange={event => setNumSamples(parseInt(event.target.value))}
-          />
-          <label className={rangeMaxClass}>{maxSamples}</label>
-        </div>
-
-        <div className={rangeHeaderClass}>
-          <div className={rangeTitleClass}># of Ray Bounces</div>
-          <div className={rangeValueClass}>{numBounces}</div>
-        </div>
-        <div className={rangeSliderClass}>
-          <label className={rangeMinClass}>{minBounces}</label>
-          <input
-            className={rangeInputClass}
-            type="range"
-            min={minBounces}
-            max={maxBounces}
-            value={numBounces}
-            onChange={event => setNumBounces(parseInt(event.target.value))}
-          />
-          <label className={rangeMaxClass}>{maxBounces}</label>
-        </div>
-      </div>
-
-      <fieldset className="border-l border-[lightgray] pl-4">
-        <legend className="text-[0.9rem] font-bold">Shading Method</legend>
-
-        <div className="flex">
-          <input
-            className="mt-2"
-            id="flat"
-            type="radio"
-            value={ShadingMethod.flat}
-            checked={shadingMethod === ShadingMethod.flat}
-            onChange={event => setShadingMethod(parseInt(event.target.value))}
-          />
-          <label className="mt-2" htmlFor="flat">
-            Flat
-          </label>
-
-          <input
-            className="mt-2 ml-4"
-            id="phong"
-            type="radio"
-            value={ShadingMethod.phong}
-            checked={shadingMethod === ShadingMethod.phong}
-            onChange={event => setShadingMethod(parseInt(event.target.value))}
-          />
-          <label className="mt-2" htmlFor="phong">
-            Phong
-          </label>
+      <fieldset className="mt-4">
+        <legend className="text-[0.9rem] font-bold">Shading method</legend>
+        <div className="mt-1.5 flex overflow-hidden rounded-lg border border-gray-300">
+          {shadingMethods.map(method => (
+            <label key={method.value} className="relative flex-1">
+              <input
+                className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                type="radio"
+                name="shadingMethod"
+                value={method.value}
+                checked={shadingMethod === method.value}
+                onChange={() => setShadingMethod(method.value)}
+              />
+              <span className="block min-h-11 content-center text-center text-xs font-semibold text-gray-600 peer-checked:bg-[darkgreen] peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-2 peer-focus-visible:outline-[darkgreen]">
+                {method.label}
+              </span>
+            </label>
+          ))}
         </div>
       </fieldset>
-    </form>
+    </div>
   )
 }
