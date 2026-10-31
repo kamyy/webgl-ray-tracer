@@ -58,7 +58,7 @@ A shader, BVH or scene change needs a look in the browser, because nothing else 
 
 ### 1.5 Changing the scene
 
-`public/suzanne.glb` is the only scene. To replace it, export a glTF binary (`.glb`) from Blender with Draco compression on, positions at 16 bits and normals at 12 bits. Set each material's base color, metallic, roughness and (for lights) emission strength, and (for glass) transmission and IOR. Then pass the new URL to `new Scene(...)` in `src/components/canvas.tsx`.
+`public/suzanne.glb` is the only scene. To replace it, export a glTF binary (`.glb`) from Blender with Draco compression on, positions at 16 bits and normals at 12 bits. Set each material's base color, metallic, roughness and (for lights) emission strength, and (for glass) transmission and IOR. Then pass the new URL to `useGLTF` in `src/components/viewport.tsx`.
 
 The Draco decoder in `public/draco/` is copied from `node_modules/three/examples/jsm/libs/draco/gltf/`. Copy the three files again after upgrading `three`, because the decoder must match the loader.
 
@@ -83,7 +83,7 @@ A merge that changes only Markdown or `LICENSE` starts no run. To redeploy witho
 
 ## 3. Troubleshooting
 
-- **A blank canvas, with `EXT_color_buffer_float not supported` or a limit in the console.** The GPU or browser fails `checkGpuLimits` in `src/components/canvas.tsx`. Try another browser or a newer GPU.
+- **A blank canvas, with `EXT_color_buffer_float not supported` or a limit in the console.** The GPU or browser fails `checkGpuLimits` in `src/components/viewport.tsx`. Try another browser or a newer GPU.
 - **The render is corrupted or has black holes, and the console says `BVH depth … reached the fragment shader's traversal stack limit`.** The tree is deeper than the shader's stack. Raise `bvhMaxStackSize` in `src/lib/webgl/sceneLayout.ts` and `BVH_MAX_STACK_SIZE` in `src/shaders/pathTrace.frag.glsl` together ([Rendering gotchas](AGENTS.md#3-rendering-gotchas)).
 - **Wrong geometry or colors with no error.** The packed layout constants in `src/lib/webgl/sceneLayout.ts` and `src/shaders/pathTrace.frag.glsl` have drifted apart ([Rendering gotchas](AGENTS.md#3-rendering-gotchas)).
 - **The `deploy` job fails at the credentials step.** Check that `secrets.AWS_DEPLOY_ROLE_ARN` is set and that the job still has `id-token: write` ([Workflow & deploy](AGENTS.md#51-workflow--deploy)).
