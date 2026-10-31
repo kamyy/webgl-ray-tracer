@@ -104,7 +104,7 @@ A single Vite + React app, with no server runtime.
 - **While the camera is being dragged, only pass 1 renders.** `CameraControls` sets `interactingRef` on `controlstart` and `controlend`, and accumulation resumes on release. This keeps dragging responsive ([Rendering](ARCHITECTURE.md#2-rendering-pipeline)).
 - **Material behavior comes from the glTF material fields.** `packMaterials` in `src/lib/webgl/packScene.ts` reads them: a non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective with `metalness` as the reflection ratio and `1 - roughness` as the gloss. A glTF exported without these fields renders every surface as diffuse. Textures are ignored.
 - **The Zustand store holds UI and render-status state only.** The camera, render targets, textures and pass counter live in React Three Fiber and `PathTracer`, because they change every frame and must not trigger React re-renders.
-- **The app needs WebGL 2 with `EXT_color_buffer_float` and generous texture limits.** `checkGpuLimits` in `src/components/viewport.tsx` lists them. A GPU that fails the check leaves a blank canvas and only a console message.
+- **The app needs WebGL 2 with `EXT_color_buffer_float`, `EXT_float_blend` and generous texture limits.** `checkGpuLimits` in `src/components/viewport.tsx` lists them. A GPU that fails the check leaves a blank canvas and only a console message.
 
 ---
 
