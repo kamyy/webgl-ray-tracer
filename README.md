@@ -2,7 +2,7 @@
 
 ## Hardware and Browser Compatibility
 
-You can view this app live at [https://webgl-ray-tracer.orky.net](https://webgl-ray-tracer.orky.net). Warning! It does require a reasonably powerful GPU (e.g. an Nvidia Geforce 1080) and a browser that supports WebGL 2. It's been tested on Chrome, Firefox and Safari. Development took place entirely on Linux but the app has been tested on Windows and MacOS as well.
+You can view this app live at [https://webgl-ray-tracer.orky.net](https://webgl-ray-tracer.orky.net). Warning! It does require a reasonably powerful GPU (e.g. an Nvidia Geforce 1080) and a browser that supports WebGL 2. It's been tested on Chrome, Firefox and Safari. It also runs on recent phones in portrait and landscape: a touch screen renders at half the width and height, one finger rotates, two fingers pan and pinch zooms. Development took place entirely on Linux but the app has been tested on Windows and MacOS as well.
 
 ## Game Developers Conference
 

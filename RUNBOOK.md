@@ -52,7 +52,7 @@ The pre-commit hook runs `format-staged`, `lint` and `typecheck`. CI runs `forma
 A shader, BVH or scene change needs a look in the browser, because nothing else catches it.
 
 1. Run `pnpm dev` and open `http://localhost:3000`.
-2. Open the browser console. `checkGpuLimits` logs the GPU limits, and `BvhNode.subDivide` in the BVH worker warns if the BVH is too deep.
+2. Open the browser console. `BvhNode.subDivide` in the BVH worker warns if the BVH is too deep.
 3. Wait for the pass counter to reach the sample setting. The image should converge from noise to a smooth scene.
 4. Drag to orbit, then release. Accumulation should restart from pass 1.
 5. Resize the window, or use the browser's device toolbar, and check the panel in portrait and landscape. A window above the `md` breakpoint should show a view no larger than 1280 by 720.
@@ -84,7 +84,7 @@ A merge that changes only Markdown or `LICENSE` starts no run. To redeploy witho
 
 ## 3. Troubleshooting
 
-- **A blank canvas, with `EXT_color_buffer_float not supported`, `EXT_float_blend not supported` or a limit in the console.** The GPU or browser fails `checkGpuLimits` in `src/components/viewport.tsx`. Try another browser or a newer GPU.
+- **The view shows a sentence about WebGL 2, a missing extension or a GPU limit.** The GPU or browser fails a check in `src/lib/webgl/checkGpuLimits.ts`. Try another browser or a newer GPU.
 - **The render is corrupted or has black holes, and the console says `BVH depth … reached the fragment shader's traversal stack limit`.** The tree is deeper than the shader's stack. Raise `bvhMaxStackSize` in `src/lib/webgl/sceneLayout.ts` and `BVH_MAX_STACK_SIZE` in `src/shaders/pathTrace.frag.glsl` together ([Rendering gotchas](AGENTS.md#3-rendering-gotchas)).
 - **Wrong geometry or colors with no error.** The packed layout constants in `src/lib/webgl/sceneLayout.ts` and `src/shaders/pathTrace.frag.glsl` have drifted apart ([Rendering gotchas](AGENTS.md#3-rendering-gotchas)).
 - **The `deploy` job fails at the credentials step.** Check that `secrets.AWS_DEPLOY_ROLE_ARN` is set and that the job still has `id-token: write` ([Workflow & deploy](AGENTS.md#51-workflow--deploy)).
