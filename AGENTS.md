@@ -158,7 +158,7 @@ A single Vite + React app, with no server runtime.
 
 ### 5.2 Formatting & linting
 
-- **Run `npm run format` and `npm run lint:fix` before committing.** CI's `format:check` and `lint` fail on anything they would change.
+- **Run `pnpm format` and `pnpm lint:fix` before committing.** CI's `format:check` and `lint` fail on anything they would change.
 - Prettier (`prettier.config.mjs`) uses no semicolons, single quotes, no parentheses around a single arrow parameter, and `printWidth: 120`. `prettier-plugin-organize-imports` sorts imports.
 - Husky's `.husky/pre-commit` runs `format-staged`, `lint` and `typecheck` in order. A failure in any of them blocks the commit.
 - Prettier also formats Markdown. Markdown prose has no maximum width: one line per paragraph or list item, since GitHub reflows paragraphs and fixed wraps only add diff noise.
@@ -175,7 +175,7 @@ A single Vite + React app, with no server runtime.
 
 ### 5.4 Testing
 
-There is no test suite or runner. `npm run lint`, `npm run typecheck` and `npm run build` cover what CI checks. A change to the shaders or the scene code also needs a manual render in the browser ([Checking a render](RUNBOOK.md#14-checking-a-render)).
+There is no test suite or runner. `pnpm lint`, `pnpm typecheck` and `pnpm build` cover what CI checks. A change to the shaders or the scene code also needs a manual render in the browser ([Checking a render](RUNBOOK.md#14-checking-a-render)).
 
 ---
 
