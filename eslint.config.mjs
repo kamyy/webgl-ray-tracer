@@ -7,7 +7,7 @@ import tseslint from 'typescript-eslint'
 export default tseslint.config(
   // Ignore patterns
   {
-    ignores: ['dist/**', 'node_modules/**', '*.config.{js,ts,mjs}'],
+    ignores: ['dist/**', 'node_modules/**', 'public/draco/**', '*.config.{js,ts,mjs}'],
   },
 
   // Base recommended configs
