@@ -1,12 +1,12 @@
 /**
  * The shader program that path-traces one sample per pixel.
  *
- * It runs as a render pass into one of the two accumulation targets. It reads the previous running sum from the
- * other target, adds the new sample, and reads the scene from the packed face, BVH and material textures. A raw
- * shader material is used because the GLSL declares its own `#version`, inputs and outputs, and three.js would
+ * It renders into the accumulation target with additive blending, so each draw adds one sample per pixel to the
+ * running sum, and the alpha channel counts the samples. It reads the scene from the packed face, BVH and material
+ * textures. A raw shader material is used because the GLSL declares its own inputs and outputs, and three.js would
  * otherwise add its own and clash with them.
  */
-import { GLSL3, Matrix4, RawShaderMaterial, Texture, Vector3 } from 'three'
+import { AddEquation, CustomBlending, GLSL3, Matrix4, OneFactor, RawShaderMaterial, Texture, Vector3 } from 'three'
 import fragmentShader from '../../shaders/pathTrace.frag.glsl?raw'
 import vertexShader from '../../shaders/pathTrace.vert.glsl?raw'
 
@@ -17,6 +17,13 @@ export function createPathTraceMaterial(): RawShaderMaterial {
     fragmentShader,
     depthTest: false,
     depthWrite: false,
+    // Add each sample to the render target's contents instead of replacing them.
+    blending: CustomBlending,
+    blendEquation: AddEquation,
+    blendSrc: OneFactor,
+    blendDst: OneFactor,
+    blendSrcAlpha: OneFactor,
+    blendDstAlpha: OneFactor,
     uniforms: {
       u_half_wd: { value: 0 },
       u_half_ht: { value: 0 },
@@ -27,7 +34,6 @@ export function createPathTraceMaterial(): RawShaderMaterial {
       u_eye_to_image: { value: 0 },
       u_eye_position: { value: new Vector3() },
       u_eye_to_world: { value: new Matrix4() },
-      u_color_sampler: { value: null as Texture | null },
       u_random_sampler: { value: null as Texture | null },
       u_face_sampler: { value: null as Texture | null },
       u_bvh_sampler: { value: null as Texture | null },
