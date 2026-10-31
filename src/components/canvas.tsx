@@ -7,6 +7,10 @@ import ColorTextures from '../lib/webgl/colorTextures'
 import RandomTexture from '../lib/webgl/randomTexture'
 import SampleShader from '../lib/webgl/sampleShader'
 import Scene from '../lib/webgl/scene'
+import displayFragmentShader from '../shaders/display.frag.glsl?raw'
+import displayVertexShader from '../shaders/display.vert.glsl?raw'
+import pathTraceFragmentShader from '../shaders/pathTrace.frag.glsl?raw'
+import pathTraceVertexShader from '../shaders/pathTrace.vert.glsl?raw'
 import { CanvasVars, defaultCanvasVars } from '../types/canvasVars'
 
 function degreesToRadians(degrees: number) {
@@ -19,7 +23,7 @@ function renderReset(cv: CanvasVars) {
   useAppStore.getState().resetStatus()
 }
 
-function GPU_MeetsRequirements(gl: WebGL2RenderingContext) {
+function checkGpuLimits(gl: WebGL2RenderingContext) {
   if (!gl.getExtension('EXT_color_buffer_float')) {
     console.log('EXT_color_buffer_float not supported')
     return false
@@ -186,25 +190,27 @@ export default function Canvas() {
         alpha: false,
       })
 
-      if (cv.gl && GPU_MeetsRequirements(cv.gl)) {
+      if (cv.gl && checkGpuLimits(cv.gl)) {
         window.oncontextmenu = (e: MouseEvent) => e.preventDefault()
         window.onmousemove = onMouseMove
         window.onmousedown = onMouseDown
         window.onmouseup = onMouseUp
         htmlCanvasElement.onwheel = onMouseWheel
 
-        cv.colorTextures = new ColorTextures(cv.gl, cv.canvasWd, cv.canvasHt)
-        cv.randomTexture = new RandomTexture(cv.gl, cv.canvasWd, cv.canvasHt)
-        cv.sampleShader = new SampleShader(cv.gl)
-        cv.canvasShader = new CanvasShader()
+        const gl = cv.gl
+        const sampleShader = new SampleShader(gl)
+        const canvasShader = new CanvasShader()
+        cv.colorTextures = new ColorTextures(gl, cv.canvasWd, cv.canvasHt)
+        cv.randomTexture = new RandomTexture(gl, cv.canvasWd, cv.canvasHt)
+        cv.sampleShader = sampleShader
+        cv.canvasShader = canvasShader
 
-        Promise.all([
-          cv.sampleShader.init(cv.gl, '/sample-vs.glsl', '/sample-fs.glsl'),
-          cv.canvasShader.init(cv.gl, '/canvas-vs.glsl', '/canvas-fs.glsl'),
-        ])
+        Promise.resolve()
           .then(() => {
+            sampleShader.init(gl, pathTraceVertexShader, pathTraceFragmentShader)
+            canvasShader.init(gl, displayVertexShader, displayFragmentShader)
             useAppStore.getState().setLoadingSpinner(LoadingSpinner.show)
-            cv.scene = new Scene(cv.gl, '/suzanne.obj', '/suzanne.mtl')
+            cv.scene = new Scene(gl, '/suzanne.obj', '/suzanne.mtl')
             return cv.scene.init()
           })
           .then(() => {

@@ -4,32 +4,22 @@ export default class Shader {
   vao: WebGLVertexArrayObject | null = null
   pgm: WebGLProgram | null = null
 
-  async fetchShader(url: string): Promise<string> {
-    const response = await fetch(url)
-    if (!response.ok) {
-      throw new Error(`Unable to GET ${url} status=${response.status}`)
-    }
-    return response.text()
-  }
-
-  async init(gl: WebGL2RenderingContext, vsURL: string, fsURL: string): Promise<void> {
-    const responses = await Promise.all([this.fetchShader(vsURL), this.fetchShader(fsURL)])
-
+  init(gl: WebGL2RenderingContext, vsSource: string, fsSource: string): void {
     this.vs = gl.createShader(gl.VERTEX_SHADER)
     if (this.vs) {
-      gl.shaderSource(this.vs, responses[0])
+      gl.shaderSource(this.vs, vsSource)
       gl.compileShader(this.vs)
       if (!gl.getShaderParameter(this.vs, gl.COMPILE_STATUS)) {
-        throw new Error(`Error compiling ${vsURL} !\n ${gl.getShaderInfoLog(this.vs)}\n`)
+        throw new Error(`Error compiling the vertex shader!\n ${gl.getShaderInfoLog(this.vs)}\n`)
       }
     }
 
     this.fs = gl.createShader(gl.FRAGMENT_SHADER)
     if (this.fs) {
-      gl.shaderSource(this.fs, responses[1])
+      gl.shaderSource(this.fs, fsSource)
       gl.compileShader(this.fs)
       if (!gl.getShaderParameter(this.fs, gl.COMPILE_STATUS)) {
-        throw new Error(`Error compiling ${fsURL} !\n ${gl.getShaderInfoLog(this.fs)}\n`)
+        throw new Error(`Error compiling the fragment shader!\n ${gl.getShaderInfoLog(this.fs)}\n`)
       }
     }
 

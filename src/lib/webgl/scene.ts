@@ -12,9 +12,9 @@ enum Axis {
 
 const bvMinDelta = 0.01
 
-// must match BV_MAX_STACK_SIZE in public/sample-fs.glsl - the ray/BVH traversal stack there is a
+// must match BVH_MAX_STACK_SIZE in src/shaders/pathTrace.frag.glsl - the ray/BVH traversal stack there is a
 // fixed-size array with no bounds checking, so a tree deeper than this will silently corrupt rendering
-const bvMaxStackSize = 16
+const bvhMaxStackSize = 16
 
 interface Model {
   name: string
@@ -45,45 +45,45 @@ interface Face {
   n1: Vector1x4 // vertex normal 1
   n2: Vector1x4 // vertex normal 2
 
-  fn: Vector1x4 // face normal
-  fi: number // index into root face array
-  mi: number // index into material array
+  faceNormal: Vector1x4
+  faceIndex: number // index into root face array
+  materialIndex: number // index into material array
 }
 
 interface ParsedObj {
   faces: Face[]
-  AABBs: BV[]
+  bvhNodes: BvhNode[]
 }
 
-class BV {
-  // AABB bounding volume
+class BvhNode {
+  // axis-aligned bounding box node of the bounding volume hierarchy (BVH)
   min: Vector1x4 // min corner
   max: Vector1x4 // max corner
-  lt: number // lt child BV index
-  rt: number // rt child BV index
-  fi: number[] // face indices
+  leftChild: number // left child node index
+  rightChild: number // right child node index
+  faceIndices: number[] // indices of the faces stored in this node
 
   constructor(min: Vector1x4, max: Vector1x4) {
     this.min = min
     this.max = max
-    this.lt = -2.0
-    this.rt = -2.0
-    this.fi = [-2.0, -2.0]
+    this.leftChild = -2.0
+    this.rightChild = -2.0
+    this.faceIndices = [-2.0, -2.0]
   }
 
-  subDivide(faces: Face[], AABBs: BV[], depth: number = 0) {
-    if (faces.length <= this.fi.length) {
+  subDivide(faces: Face[], bvhNodes: BvhNode[], depth: number = 0) {
+    if (faces.length <= this.faceIndices.length) {
       // all the faces fit in this node
-      faces.forEach((face, i) => (this.fi[i] = face.fi))
+      faces.forEach((face, i) => (this.faceIndices[i] = face.faceIndex))
     } else {
-      if (depth >= bvMaxStackSize) {
+      if (depth >= bvhMaxStackSize) {
         console.warn(
-          `BVH depth ${depth} reached the fragment shader's traversal stack limit (${bvMaxStackSize}); raise BV_MAX_STACK_SIZE in sample-fs.glsl`,
+          `BVH depth ${depth} reached the fragment shader's traversal stack limit (${bvhMaxStackSize}); raise BVH_MAX_STACK_SIZE in pathTrace.frag.glsl`,
         )
       }
       // pick the axis/position that minimizes expected ray traversal cost (SAH)
-      const { index, sorted } = BV.findBestSplit(faces)
-      this.splitAcross(index, sorted, AABBs, depth)
+      const { index, sorted } = BvhNode.findBestSplit(faces)
+      this.splitAcross(index, sorted, bvhNodes, depth)
     }
   }
 
@@ -134,8 +134,8 @@ class BV {
       prefixMin[0] = new Vector1x4(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
       prefixMax[0] = new Vector1x4(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER)
       for (let i = 0; i < n; i++) {
-        const fMin = BV.faceMin(sorted[i])
-        const fMax = BV.faceMax(sorted[i])
+        const fMin = BvhNode.faceMin(sorted[i])
+        const fMax = BvhNode.faceMax(sorted[i])
         prefixMin[i + 1] = new Vector1x4(
           Math.min(prefixMin[i].x, fMin.x),
           Math.min(prefixMin[i].y, fMin.y),
@@ -151,8 +151,8 @@ class BV {
       suffixMin[n] = new Vector1x4(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
       suffixMax[n] = new Vector1x4(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER)
       for (let i = n - 1; i >= 0; i--) {
-        const fMin = BV.faceMin(sorted[i])
-        const fMax = BV.faceMax(sorted[i])
+        const fMin = BvhNode.faceMin(sorted[i])
+        const fMax = BvhNode.faceMax(sorted[i])
         suffixMin[i] = new Vector1x4(
           Math.min(suffixMin[i + 1].x, fMin.x),
           Math.min(suffixMin[i + 1].y, fMin.y),
@@ -167,8 +167,8 @@ class BV {
 
       // only candidates that leave both children non-empty are valid splits
       for (let i = 1; i < n; i++) {
-        const leftSA = BV.surfaceArea(prefixMin[i], prefixMax[i])
-        const rightSA = BV.surfaceArea(suffixMin[i], suffixMax[i])
+        const leftSA = BvhNode.surfaceArea(prefixMin[i], prefixMax[i])
+        const rightSA = BvhNode.surfaceArea(suffixMin[i], suffixMax[i])
         const cost = leftSA * i + rightSA * (n - i)
 
         if (cost < bestCost) {
@@ -182,16 +182,16 @@ class BV {
     return { index: bestIndex, sorted: bestSorted }
   }
 
-  splitAcross(index: number, sorted: Face[], AABBs: BV[], depth: number) {
-    const ltFaces = sorted.slice(0, index) // left faces
-    const rtFaces = sorted.slice(index, sorted.length) // right faces
-    let ltBV = null
-    let rtBV = null
+  splitAcross(index: number, sorted: Face[], bvhNodes: BvhNode[], depth: number) {
+    const leftFaces = sorted.slice(0, index) // left faces
+    const rightFaces = sorted.slice(index, sorted.length) // right faces
+    let leftNode = null
+    let rightNode = null
 
-    if (ltFaces.length > 0) {
+    if (leftFaces.length > 0) {
       const min = new Vector1x4(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
       const max = new Vector1x4(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER)
-      ltFaces.forEach(f => {
+      leftFaces.forEach(f => {
         min.x = Math.min(min.x, f.p0.x, f.p1.x, f.p2.x)
         min.y = Math.min(min.y, f.p0.y, f.p1.y, f.p2.y)
         min.z = Math.min(min.z, f.p0.z, f.p1.z, f.p2.z)
@@ -209,15 +209,15 @@ class BV {
         max.z += bvMinDelta
       }
 
-      this.lt = AABBs.length
-      ltBV = new BV(min, max)
-      AABBs.push(ltBV)
+      this.leftChild = bvhNodes.length
+      leftNode = new BvhNode(min, max)
+      bvhNodes.push(leftNode)
     }
 
-    if (rtFaces.length > 0) {
+    if (rightFaces.length > 0) {
       const min = new Vector1x4(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
       const max = new Vector1x4(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER)
-      rtFaces.forEach(f => {
+      rightFaces.forEach(f => {
         min.x = Math.min(min.x, f.p0.x, f.p1.x, f.p2.x)
         min.y = Math.min(min.y, f.p0.y, f.p1.y, f.p2.y)
         min.z = Math.min(min.z, f.p0.z, f.p1.z, f.p2.z)
@@ -235,16 +235,16 @@ class BV {
         max.z += bvMinDelta
       }
 
-      this.rt = AABBs.length
-      rtBV = new BV(min, max)
-      AABBs.push(rtBV)
+      this.rightChild = bvhNodes.length
+      rightNode = new BvhNode(min, max)
+      bvhNodes.push(rightNode)
     }
 
-    if (ltBV) {
-      ltBV.subDivide(ltFaces, AABBs, depth + 1)
+    if (leftNode) {
+      leftNode.subDivide(leftFaces, bvhNodes, depth + 1)
     }
-    if (rtBV) {
-      rtBV.subDivide(rtFaces, AABBs, depth + 1)
+    if (rightNode) {
+      rightNode.subDivide(rightFaces, bvhNodes, depth + 1)
     }
   }
 }
@@ -253,7 +253,7 @@ export default class Scene {
   objUrl: string
   mtlUrl: string
   objCount: number
-  mtlCount: number
+  materialCount: number
   parsedObjs: ParsedObj[]
   parsedMtls: Material[]
   rootNode: RefFrame | null = null
@@ -261,22 +261,22 @@ export default class Scene {
   cameraNode: RefFrame | null = null
   gl: WebGL2RenderingContext | null
   facesTexture: WebGLTexture | null = null
-  AABBsTexture: WebGLTexture | null = null
-  mtlsTexture: WebGLTexture | null = null
+  bvhTexture: WebGLTexture | null = null
+  materialsTexture: WebGLTexture | null = null
 
   constructor(gl: WebGL2RenderingContext | null, objUrl: string, mtlUrl: string) {
     this.objUrl = objUrl
     this.mtlUrl = mtlUrl
     this.objCount = 0
-    this.mtlCount = 0
+    this.materialCount = 0
     this.parsedObjs = []
     this.parsedMtls = []
     this.gl = gl
 
     if (gl) {
       this.facesTexture = gl.createTexture()
-      this.AABBsTexture = gl.createTexture()
-      this.mtlsTexture = gl.createTexture()
+      this.bvhTexture = gl.createTexture()
+      this.materialsTexture = gl.createTexture()
 
       this.rootNode = new RefFrame()
       this.parentNode = new RefFrame(this.rootNode)
@@ -323,9 +323,9 @@ export default class Scene {
           const n1 = new Vector1x4(nrmArray[j1].x, nrmArray[j1].y, nrmArray[j1].z)
           const n2 = new Vector1x4(nrmArray[j2].x, nrmArray[j2].y, nrmArray[j2].z)
 
-          const fn = p1.sub(p0).cross(p2.sub(p0)).normalize() // face normal
-          const mi = wavefrontMtl.findIndex((m: Mtl) => m.name === f.material) // material index
-          const fi = outFaces.length // face index
+          const faceNormal = p1.sub(p0).cross(p2.sub(p0)).normalize() // face normal
+          const materialIndex = wavefrontMtl.findIndex((m: Mtl) => m.name === f.material) // material index
+          const faceIndex = outFaces.length
 
           outFaces.push({
             p0,
@@ -334,12 +334,12 @@ export default class Scene {
             n0,
             n1,
             n2,
-            fn,
-            mi,
-            fi,
+            faceNormal,
+            materialIndex,
+            faceIndex,
           })
         })
-        const outAABBs = []
+        const outBvhNodes = []
         const min = new Vector1x4(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
         const max = new Vector1x4(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER)
         outFaces.forEach(f => {
@@ -361,16 +361,16 @@ export default class Scene {
         if (max.z - min.z < bvMinDelta) {
           max.z += bvMinDelta
         }
-        const bv = new BV(min, max)
-        outAABBs.push(bv)
-        bv.subDivide(outFaces, outAABBs)
+        const bv = new BvhNode(min, max)
+        outBvhNodes.push(bv)
+        bv.subDivide(outFaces, outBvhNodes)
 
         //console.log(`# faces ${outFaces.length}`);
-        //console.log(`# AABBs ${outAABBs.length}`);
+        //console.log(`# bvhNodes ${outBvhNodes.length}`);
         return {
           // a parsed obj containing faces and its corresponding BVH tree
           faces: outFaces,
-          AABBs: outAABBs,
+          bvhNodes: outBvhNodes,
         }
       })
 
@@ -412,7 +412,7 @@ export default class Scene {
 
       this.initTextures(this.gl)
       this.objCount = this.parsedObjs.length
-      this.mtlCount = this.parsedMtls.length
+      this.materialCount = this.parsedMtls.length
     }
   }
 
@@ -425,9 +425,9 @@ export default class Scene {
     this.parsedObjs.forEach((obj, id) => {
       let i = numFloatsPerFace * maxNumFaces * id // index to start of texture slice for object's faces
       obj.faces.forEach(face => {
-        data[i++] = face.fn.x
-        data[i++] = face.fn.y
-        data[i++] = face.fn.z // face unit normal
+        data[i++] = face.faceNormal.x
+        data[i++] = face.faceNormal.y
+        data[i++] = face.faceNormal.z // face unit normal
 
         data[i++] = face.p0.x
         data[i++] = face.p0.y
@@ -449,7 +449,7 @@ export default class Scene {
         data[i++] = face.n2.y
         data[i++] = face.n2.z
 
-        data[i] = face.mi + 0.5 // material index is cast to int in fragment shader
+        data[i] = face.materialIndex + 0.5 // material index is cast to int in fragment shader
         i += 3
       })
     })
@@ -472,14 +472,14 @@ export default class Scene {
       data,
     )
 
-    const maxNumBVs = this.parsedObjs.reduce((val: number, obj) => Math.max(val, obj.AABBs.length), 0) // max number of BV nodes
-    const numTexelsPerBV = 3 // RGBA texel
-    const numFloatsPerBV = 12
+    const maxNumBvhNodes = this.parsedObjs.reduce((val: number, obj) => Math.max(val, obj.bvhNodes.length), 0) // max number of BvhNode nodes
+    const numTexelsPerBvhNode = 3 // RGBA texel
+    const numFloatsPerBvhNode = 12
 
-    data = new Float32Array(numFloatsPerBV * maxNumBVs * this.parsedObjs.length)
+    data = new Float32Array(numFloatsPerBvhNode * maxNumBvhNodes * this.parsedObjs.length)
     this.parsedObjs.forEach((obj, id) => {
-      let i = numFloatsPerBV * maxNumBVs * id // index to start of texture slice for the object's BVH tree
-      obj.AABBs.forEach(bv => {
+      let i = numFloatsPerBvhNode * maxNumBvhNodes * id // index to start of texture slice for the object's BVH tree
+      obj.bvhNodes.forEach(bv => {
         data[i++] = bv.min.x
         data[i++] = bv.min.y
         data[i++] = bv.min.z
@@ -490,14 +490,14 @@ export default class Scene {
         data[i++] = bv.max.z
         data[i++] = 1.0
 
-        data[i++] = bv.lt + 0.5 // lt node index is cast to int in fragment shader
-        data[i++] = bv.rt + 0.5 // rt node index is cast to int in fragment shader
-        data[i++] = bv.fi[0] + 0.5 // face index is cast to int in fragment shader
-        data[i++] = bv.fi[1] + 0.5 // face index is cast to int in fragment shader
+        data[i++] = bv.leftChild + 0.5 // left child node index is cast to int in fragment shader
+        data[i++] = bv.rightChild + 0.5 // right child node index is cast to int in fragment shader
+        data[i++] = bv.faceIndices[0] + 0.5 // face index is cast to int in fragment shader
+        data[i++] = bv.faceIndices[1] + 0.5 // face index is cast to int in fragment shader
       })
     })
     gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.AABBsTexture)
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.bvhTexture)
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
@@ -506,8 +506,8 @@ export default class Scene {
       gl.TEXTURE_2D_ARRAY,
       0,
       gl.RGBA32F,
-      numTexelsPerBV,
-      maxNumBVs,
+      numTexelsPerBvhNode,
+      maxNumBvhNodes,
       this.parsedObjs.length,
       0,
       gl.RGBA,
@@ -515,11 +515,11 @@ export default class Scene {
       data,
     )
 
-    const numTexelsPerMtl = 2
-    const numFloatsPerMtl = 8
-    data = new Float32Array(numFloatsPerMtl * this.parsedMtls.length)
+    const numTexelsPerMaterial = 2
+    const numFloatsPerMaterial = 8
+    data = new Float32Array(numFloatsPerMaterial * this.parsedMtls.length)
     this.parsedMtls.forEach((mtl, id) => {
-      let i = numFloatsPerMtl * id
+      let i = numFloatsPerMaterial * id
       data[i++] = mtl.albedo.x
       data[i++] = mtl.albedo.y
       data[i++] = mtl.albedo.z
@@ -531,12 +531,22 @@ export default class Scene {
       data[i++] = mtl.refractionIndex
     })
     gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, this.mtlsTexture)
+    gl.bindTexture(gl.TEXTURE_2D, this.materialsTexture)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, numTexelsPerMtl, this.parsedMtls.length, 0, gl.RGBA, gl.FLOAT, data)
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA32F,
+      numTexelsPerMaterial,
+      this.parsedMtls.length,
+      0,
+      gl.RGBA,
+      gl.FLOAT,
+      data,
+    )
   }
 
   bindToSampleShader(gl: WebGL2RenderingContext, program: WebGLProgram) {
@@ -545,11 +555,11 @@ export default class Scene {
     gl.uniform1i(gl.getUniformLocation(program, 'u_face_sampler'), 3)
 
     gl.activeTexture(gl.TEXTURE4)
-    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.AABBsTexture)
-    gl.uniform1i(gl.getUniformLocation(program, 'u_aabb_sampler'), 4)
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.bvhTexture)
+    gl.uniform1i(gl.getUniformLocation(program, 'u_bvh_sampler'), 4)
 
     gl.activeTexture(gl.TEXTURE5)
-    gl.bindTexture(gl.TEXTURE_2D, this.mtlsTexture)
-    gl.uniform1i(gl.getUniformLocation(program, 'u_mtl_sampler'), 5)
+    gl.bindTexture(gl.TEXTURE_2D, this.materialsTexture)
+    gl.uniform1i(gl.getUniformLocation(program, 'u_material_sampler'), 5)
   }
 }
