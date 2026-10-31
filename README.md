@@ -29,7 +29,7 @@ This app makes use of several features that were introduced in WebGL 2 including
 
 The Javascript portion of the app reads Wavefront OBJ and MTL files, creates one or more BVH trees before pushing all this data on to the GPU. It's other purpose is to handle user input and user interaction with the camera.
 
-The sample-fs.glsl fragment shader is the heart of the program. It handles:
+The pathTrace.frag.glsl fragment shader is the heart of the program. It handles:
 
 - Pseudo random number generation.
 - Bounding volume hierarchy traversal.
