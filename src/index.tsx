@@ -1,20 +1,14 @@
-import Canvas from '@/components/canvas'
 import Forms from '@/components/forms'
 import { Progress } from '@/components/progress'
-import { defaultCanvasVars } from '@/types/canvasVars'
+import { Viewport } from '@/components/viewport'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './styles/globals.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <main
-      style={{
-        margin: 'auto',
-        width: `${defaultCanvasVars.canvasWd}px`,
-      }}
-    >
-      <Canvas />
+    <main className="m-auto w-[1280px]">
+      <Viewport />
       <Progress />
       <Forms />
     </main>

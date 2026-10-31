@@ -8,18 +8,12 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 
-export enum LoadingSpinner {
-  show,
-  hide,
-  fail,
-}
 export enum ShadingMethod {
   flat,
   phong,
 }
 
 interface AppState {
-  readonly loadingSpinner: LoadingSpinner
   readonly shadingMethod: ShadingMethod
   readonly renderingPass: number
   readonly numSamples: number
@@ -31,7 +25,6 @@ interface AppState {
 }
 
 interface AppActions {
-  setLoadingSpinner(loadingSpinner: LoadingSpinner): void
   setShadingMethod(shadingMethod: ShadingMethod): void
   setNumSamples(numSamples: number): void
   setNumBounces(numBounces: number): void
@@ -42,7 +35,6 @@ interface AppActions {
 
 export const useAppStore = create<AppState & AppActions>()(
   subscribeWithSelector(set => ({
-    loadingSpinner: LoadingSpinner.hide,
     shadingMethod: ShadingMethod.flat,
     renderingPass: 0,
     numSamples: 10,
@@ -52,7 +44,6 @@ export const useAppStore = create<AppState & AppActions>()(
     etaTime: '',
     avgTime: '',
 
-    setLoadingSpinner: loadingSpinner => set({ loadingSpinner }),
     setShadingMethod: shadingMethod => set({ shadingMethod }),
     setNumSamples: numSamples => set({ numSamples }),
     setNumBounces: numBounces => set({ numBounces }),
