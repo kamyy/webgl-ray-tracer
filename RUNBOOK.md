@@ -7,6 +7,7 @@ How to run, check and deploy the app. [`AGENTS.md`](AGENTS.md) is what breaks if
   - [1.2 Dev server](#12-dev-server)
   - [1.3 Checks](#13-checks)
   - [1.4 Checking a render](#14-checking-a-render)
+  - [1.5 Changing the scene](#15-changing-the-scene)
 - [2. Deploying](#2-deploying)
 - [3. Troubleshooting](#3-troubleshooting)
 
@@ -54,6 +55,12 @@ A shader, BVH or scene change needs a look in the browser, because nothing else 
 2. Open the browser console. `checkGpuLimits` logs the GPU limits, and `subDivide` warns if the BVH is too deep.
 3. Wait for the pass counter to reach the sample setting. The image should converge from noise to a smooth scene.
 4. Drag to orbit, then release. Accumulation should restart from pass 1.
+
+### 1.5 Changing the scene
+
+`public/suzanne.glb` is the only scene. To replace it, export a glTF binary (`.glb`) from Blender with Draco compression on, positions at 16 bits and normals at 12 bits. Set each material's base color, metallic, roughness and (for lights) emission strength, and (for glass) transmission and IOR. Then pass the new URL to `new Scene(...)` in `src/components/canvas.tsx`.
+
+The Draco decoder in `public/draco/` is copied from `node_modules/three/examples/jsm/libs/draco/gltf/`. Copy the three files again after upgrading `three`, because the decoder must match the loader.
 
 ---
 

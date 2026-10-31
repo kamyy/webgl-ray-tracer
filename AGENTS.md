@@ -77,14 +77,14 @@ A GPU path tracer that runs entirely in the browser through WebGL 2. React and T
 
 A single Vite + React app, with no server runtime.
 
-- `public/` — the sample OBJ/MTL scene. Vite copies it into `dist/` as-is.
+- `public/` — the sample glTF scene (`suzanne.glb`) and the Draco decoder in `public/draco/`. Vite copies it into `dist/` as-is.
 - `src/shaders/` — the GLSL vertex and fragment shaders, imported into the app as strings.
 - `src/components/` — React components, styled with Tailwind CSS utility classes.
 - `src/styles/` — `globals.css`, which imports Tailwind and holds the range slider rules that Tailwind has no utilities for.
 - `src/lib/math/` — vectors, matrices, rays, spheres and the `RefFrame` transform hierarchy.
 - `src/lib/store/` — the Zustand store for UI and rendering-status state only.
 - `src/lib/webgl/` — shader wrappers, textures, and scene loading with BVH construction.
-- `src/types/` — shared types, including `CanvasVars` and the typings for the OBJ and MTL parsers.
+- `src/types/` — shared types, including `CanvasVars`.
 
 `@/*` maps to `src/*` in both `vite.config.ts` and `tsconfig.json`.
 
@@ -102,7 +102,7 @@ A single Vite + React app, with no server runtime.
 - **GLSL files are imported with Vite's `?raw` suffix.** `src/components/canvas.tsx` imports each file from `src/shaders/` as a string, so a renamed shader file fails the build. A GLSL syntax error still only shows up in the browser console when the shader compiles.
 - **Any camera, scene or parameter change calls `renderReset()` to restart accumulation at pass 0.** A new setting that affects the image needs the same reset, or the canvas blends old and new samples.
 - **While a mouse button is held, only pass 1 renders.** Accumulation resumes on release. This keeps dragging responsive ([Rendering](ARCHITECTURE.md#2-rendering-pipeline)).
-- **Material behavior is chosen by hardcoded MTL name matches in `Scene.init`** (`'light'`, `'glass'`, `'suzanne'`, `'teapot'`, `'ladder'`). A new scene with other material names renders every material as reflective.
+- **Material behavior comes from the glTF material fields.** `packMaterials` in `src/lib/webgl/scene.ts` reads them: a non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective with `metalness` as the reflection ratio and `1 - roughness` as the gloss. A glTF exported without these fields renders every surface as diffuse. Textures are ignored.
 - **The Zustand store holds UI and render-status state only.** Camera transforms, textures and WebGL handles live in the `CanvasVars` ref (`src/types/canvasVars.ts`), because they change every frame and must not trigger React re-renders.
 - **The app needs WebGL 2 with `EXT_color_buffer_float` and generous texture limits.** `checkGpuLimits` in `src/components/canvas.tsx` lists them. A GPU that fails the check leaves a blank canvas and only a console message.
 
@@ -187,7 +187,7 @@ There is no test suite or runner. `pnpm lint`, `pnpm typecheck` and `pnpm build`
 
 ## 6. State / what's next
 
-The path tracer renders the bundled Suzanne scene and a few other models chosen by name. Known gaps:
+The path tracer renders the bundled Suzanne scene, and any glTF scene whose materials use constant PBR factors. Known gaps:
 
-1. **No generic material format.** Materials depend on hardcoded names ([Rendering gotchas](#3-rendering-gotchas)).
+1. **No textures.** Only constant material factors are read ([Rendering gotchas](#3-rendering-gotchas)).
 2. **No automated tests.** Shader and BVH regressions only show up in a manual render.
