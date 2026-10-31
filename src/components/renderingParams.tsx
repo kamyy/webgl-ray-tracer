@@ -40,7 +40,7 @@ function RangeField({ title, value, min, max, onChange }: RangeFieldProps) {
       </div>
       <input
         id={id}
-        className="my-0.5 h-8 w-full"
+        className="my-0.5 h-8 w-full pointer-coarse:h-11"
         type="range"
         min={min}
         max={max}

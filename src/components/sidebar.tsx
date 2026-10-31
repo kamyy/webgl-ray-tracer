@@ -16,9 +16,9 @@ import { RenderingStatus } from './renderingStatus'
 const panelClass =
   'absolute z-10 flex flex-col overflow-hidden rounded-2xl border border-gray-300 bg-white shadow-xl backdrop-blur-md supports-[backdrop-filter]:bg-white/90'
 const expandedClass =
-  'inset-x-2 bottom-2 h-[56%] landscape:max-lg:inset-x-auto landscape:max-lg:top-2 landscape:max-lg:left-[max(1.25rem,env(safe-area-inset-left))] landscape:max-lg:h-auto landscape:max-lg:w-[252px] lg:inset-x-auto lg:top-3 lg:left-3 lg:h-auto lg:w-[300px]'
+  'inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] h-[56%] landscape:max-lg:inset-x-auto landscape:max-lg:top-2 landscape:max-lg:left-[max(1.25rem,env(safe-area-inset-left))] landscape:max-lg:h-auto landscape:max-lg:w-[252px] lg:inset-x-auto lg:top-3 lg:left-3 lg:h-auto lg:w-[300px]'
 const collapsedClass =
-  'bottom-2 left-2 landscape:max-lg:top-2 landscape:max-lg:bottom-auto landscape:max-lg:left-[max(1.25rem,env(safe-area-inset-left))] lg:top-3 lg:bottom-auto lg:left-3'
+  'bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-2 landscape:max-lg:top-2 landscape:max-lg:bottom-auto landscape:max-lg:left-[max(1.25rem,env(safe-area-inset-left))] lg:top-3 lg:bottom-auto lg:left-3'
 const sectionTitleClass = 'text-[0.9rem] font-bold'
 
 export function Sidebar() {

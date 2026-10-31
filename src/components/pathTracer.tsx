@@ -236,8 +236,9 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
   const gl = useThree(state => state.gl)
   const camera = useThree(state => state.camera) as PerspectiveCamera
   const size = useThree(state => state.size)
-  const width = Math.floor(size.width)
-  const height = Math.floor(size.height)
+  const dpr = useThree(state => state.viewport.dpr)
+  const width = Math.floor(size.width * dpr) // the drawing buffer is size * dpr, and so are the render targets
+  const height = Math.floor(size.height * dpr)
 
   const accumulation = useFBO(width, height, renderTargetSettings)
   const randomTexture = useMemo(() => createRandomTexture(width, height), [width, height])
@@ -263,6 +264,14 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
       ),
     [state],
   )
+
+  // A lost context takes the accumulated image with it, so start over once it is back.
+  useEffect(() => {
+    const canvas = gl.domElement
+    const restart = () => renderReset(state)
+    canvas.addEventListener('webglcontextrestored', restart)
+    return () => canvas.removeEventListener('webglcontextrestored', restart)
+  }, [gl, state])
 
   useEffect(() => {
     return () => {

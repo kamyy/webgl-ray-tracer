@@ -11,6 +11,14 @@
   body {
     margin: 0;
     background: #14171b; /* matches the render view, so the space beside a capped view looks part of it */
+    overscroll-behavior: none; /* a drag on the view must not pull the page to refresh */
+  }
+
+  /* Removes the double-tap-to-zoom delay on controls. */
+  button,
+  input,
+  summary {
+    touch-action: manipulation;
   }
 }
 
@@ -58,6 +66,24 @@
 
     &:focus {
       outline: none; /* remove blue border */
+    }
+  }
+}
+
+/* A finger needs a bigger thumb than a mouse pointer does. */
+@layer base {
+  @media (pointer: coarse) {
+    input[type="range"] {
+      &::-webkit-slider-thumb {
+        width: 1.75em;
+        height: 1.75em;
+        margin-top: -11px;
+      }
+
+      &::-moz-range-thumb {
+        width: 1.75em;
+        height: 1.75em;
+      }
     }
   }
 }

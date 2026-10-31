@@ -3,48 +3,18 @@
  *
  * `Canvas` owns the WebGL context and the render loop. The camera and `CameraControls` handle mouse and touch input,
  * and `PathTracer` draws each progressive pass. The glTF scene loads under `<Suspense>`, so a spinner shows until the
- * file is decoded and its BVH is built.
+ * file is decoded and its BVH is built. When the GPU cannot run the tracer, or loses its context, the view says so in
+ * words instead of staying blank.
  */
 import { CameraControls, PerspectiveCamera, useGLTF } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { RefObject, Suspense, useEffect, useRef, useState } from 'react'
 import { usePackedScene } from '../lib/hooks/usePackedScene'
 import { useAppStore } from '../lib/store/appStore'
+import { checkGpuLimits, checkSceneLimits, supportsWebGL2 } from '../lib/webgl/checkGpuLimits'
 import { PathTracer } from './pathTracer'
 
 useGLTF.setDecoderPath('/draco/')
-
-function checkGpuLimits(gl: WebGL2RenderingContext) {
-  if (!gl.getExtension('EXT_color_buffer_float')) {
-    console.log('EXT_color_buffer_float not supported')
-    return false
-  }
-  if (!gl.getExtension('EXT_float_blend')) {
-    console.log('EXT_float_blend not supported')
-    return false
-  }
-
-  const MAX_ARRAY_TEXTURE_LAYERS = gl.getParameter(gl.MAX_ARRAY_TEXTURE_LAYERS)
-  const MAX_TEXTURE_IMAGE_UNITS = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS)
-  const MAX_RENDERBUFFER_SIZE = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)
-  const MAX_TEXTURE_SIZE = gl.getParameter(gl.MAX_TEXTURE_SIZE)
-
-  console.log(`MAX_ARRAY_TEXTURE_LAYERS = ${MAX_ARRAY_TEXTURE_LAYERS}`)
-  console.log(`MAX_TEXTURE_IMAGE_UNITS = ${MAX_TEXTURE_IMAGE_UNITS}`)
-  console.log(`MAX_RENDERBUFFER_SIZE = ${MAX_RENDERBUFFER_SIZE}`)
-  console.log(`MAX_TEXTURE_SIZE = ${MAX_TEXTURE_SIZE}`)
-
-  if (
-    MAX_ARRAY_TEXTURE_LAYERS < 2048 ||
-    MAX_TEXTURE_IMAGE_UNITS < 16 ||
-    MAX_RENDERBUFFER_SIZE < 16384 ||
-    MAX_TEXTURE_SIZE < 16384
-  ) {
-    return false
-  }
-
-  return true
-}
 
 // Starts in front of the room, looking straight along -z at the objects. drei makes a new controls instance when
 // the default camera changes, so this runs on the instance that is actually used.
@@ -63,14 +33,44 @@ function LoadingNotice({ onLoadingChange }: { onLoadingChange: (loading: boolean
   return null
 }
 
-function TracedScene({ interactingRef }: { interactingRef: RefObject<boolean> }) {
+// A phone's touch screen has far fewer pixels to spare than a desktop, so it traces a quarter as many.
+function getPixelRatio() {
+  return window.matchMedia('(pointer: coarse)').matches ? 0.5 : 1
+}
+
+function TracedScene({
+  interactingRef,
+  onProblem,
+}: {
+  interactingRef: RefObject<boolean>
+  onProblem: (problem: string | null) => void
+}) {
+  const gl = useThree(state => state.gl)
+  const size = useThree(state => state.size)
+  const dpr = useThree(state => state.viewport.dpr)
   const gltf = useGLTF('/suzanne.glb')
   const packed = usePackedScene(gltf.scene)
 
-  return <PathTracer packed={packed} interactingRef={interactingRef} />
+  const problem = checkSceneLimits(
+    gl.getContext() as WebGL2RenderingContext,
+    packed,
+    Math.floor(size.width * dpr),
+    Math.floor(size.height * dpr),
+  )
+  useEffect(() => {
+    onProblem(problem)
+  }, [problem, onProblem])
+
+  return problem ? null : <PathTracer packed={packed} interactingRef={interactingRef} />
 }
 
-function Scene({ onLoadingChange }: { onLoadingChange: (loading: boolean) => void }) {
+function Scene({
+  onLoadingChange,
+  onProblem,
+}: {
+  onLoadingChange: (loading: boolean) => void
+  onProblem: (problem: string | null) => void
+}) {
   const cameraFov = useAppStore(state => state.cameraFov)
   const interactingRef = useRef(false)
 
@@ -86,15 +86,31 @@ function Scene({ onLoadingChange }: { onLoadingChange: (loading: boolean) => voi
         onControlEnd={() => (interactingRef.current = false)}
       />
       <Suspense fallback={<LoadingNotice onLoadingChange={onLoadingChange} />}>
-        <TracedScene interactingRef={interactingRef} />
+        <TracedScene interactingRef={interactingRef} onProblem={onProblem} />
       </Suspense>
     </>
   )
 }
 
+function Notice({ children }: { children: React.ReactNode }) {
+  return (
+    <p role="alert" className="absolute inset-0 m-0 grid place-items-center p-6 text-center text-white">
+      {children}
+    </p>
+  )
+}
+
 export function Viewport() {
-  const [gpuOk, setGpuOk] = useState(true)
+  const [webgl2] = useState(supportsWebGL2)
+  const [pixelRatio] = useState(getPixelRatio)
   const [loading, setLoading] = useState(false)
+  const [gpuProblem, setGpuProblem] = useState<string | null>(null)
+  const [sceneProblem, setSceneProblem] = useState<string | null>(null)
+  const [contextLost, setContextLost] = useState(false)
+
+  if (!webgl2) {
+    return <Notice>This browser does not support WebGL 2. Try a recent version of Chrome, Firefox or Safari.</Notice>
+  }
 
   let spinner: React.ReactNode = null
   if (loading) {
@@ -103,17 +119,30 @@ export function Viewport() {
     )
   }
 
+  let notice: React.ReactNode = null
+  if (gpuProblem ?? sceneProblem) {
+    notice = <Notice>{gpuProblem ?? sceneProblem}</Notice>
+  } else if (contextLost) {
+    notice = <Notice>The GPU reset the graphics context. The render resumes when it recovers.</Notice>
+  }
+
   return (
     <div className="absolute inset-0">
       <Canvas
-        dpr={1}
+        dpr={pixelRatio}
         frameloop="always"
+        resize={{ debounce: { scroll: 50, resize: 200 } }}
         gl={{ antialias: false, alpha: false, depth: false, stencil: false }}
-        onCreated={({ gl }) => setGpuOk(checkGpuLimits(gl.getContext() as WebGL2RenderingContext))}
+        onCreated={({ gl }) => {
+          setGpuProblem(checkGpuLimits(gl.getContext() as WebGL2RenderingContext))
+          gl.domElement.addEventListener('webglcontextlost', () => setContextLost(true))
+          gl.domElement.addEventListener('webglcontextrestored', () => setContextLost(false))
+        }}
       >
-        {gpuOk ? <Scene onLoadingChange={setLoading} /> : null}
+        {gpuProblem ? null : <Scene onLoadingChange={setLoading} onProblem={setSceneProblem} />}
       </Canvas>
       {spinner}
+      {notice}
     </div>
   )
 }
