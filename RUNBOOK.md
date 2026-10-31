@@ -16,33 +16,33 @@ How to run, check and deploy the app. [`AGENTS.md`](AGENTS.md) is what breaks if
 
 ### 1.1 First-time setup
 
-CI uses Node 24. Install dependencies from the lockfile:
+CI uses Node 24. Run `corepack enable` once so the `packageManager` field in `package.json` gives you the matching pnpm version, or install pnpm 10.33.0 yourself. Then install dependencies from the lockfile:
 
 ```bash
-npm ci
+pnpm install --frozen-lockfile
 ```
 
-`npm ci` also runs `prepare`, which installs the Husky pre-commit hook.
+`pnpm install` also runs `prepare`, which installs the Husky pre-commit hook.
 
 ### 1.2 Dev server
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Vite serves the app on `http://localhost:3000` and opens the browser. It needs a browser with WebGL 2 and a reasonably powerful GPU (roughly an Nvidia GeForce 1080 or better).
 
 ### 1.3 Checks
 
-| Command                | What it does                               |
-| ---------------------- | ------------------------------------------ |
-| `npm run format`       | Applies Prettier to every file.            |
-| `npm run format:check` | Fails if Prettier would change a file.     |
-| `npm run lint`         | Runs ESLint.                               |
-| `npm run lint:fix`     | Runs ESLint and fixes what it can.         |
-| `npm run typecheck`    | Runs `tsc --noEmit`.                       |
-| `npm run build`        | Typechecks, then builds `dist/` with Vite. |
-| `npm run preview`      | Serves the built `dist/` locally.          |
+| Command             | What it does                               |
+| ------------------- | ------------------------------------------ |
+| `pnpm format`       | Applies Prettier to every file.            |
+| `pnpm format:check` | Fails if Prettier would change a file.     |
+| `pnpm lint`         | Runs ESLint.                               |
+| `pnpm lint:fix`     | Runs ESLint and fixes what it can.         |
+| `pnpm typecheck`    | Runs `tsc --noEmit`.                       |
+| `pnpm build`        | Typechecks, then builds `dist/` with Vite. |
+| `pnpm preview`      | Serves the built `dist/` locally.          |
 
 The pre-commit hook runs `format-staged`, `lint` and `typecheck`. CI runs `format:check`, `lint`, `typecheck` and `build`. There is no test suite.
 
@@ -50,7 +50,7 @@ The pre-commit hook runs `format-staged`, `lint` and `typecheck`. CI runs `forma
 
 A shader, BVH or scene change needs a look in the browser, because nothing else catches it.
 
-1. Run `npm run dev` and open `http://localhost:3000`.
+1. Run `pnpm dev` and open `http://localhost:3000`.
 2. Open the browser console. `GPU_MeetsRequirements` logs the GPU limits, and `subDivide` warns if the BVH is too deep.
 3. Wait for the pass counter to reach the sample setting. The image should converge from noise to a smooth scene.
 4. Drag to orbit, then release. Accumulation should restart from pass 1.
