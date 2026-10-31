@@ -91,9 +91,9 @@ A Wavefront `.obj`/`.mtl` pair is parsed with `obj-file-parser` and `mtl-file-pa
 
 ## 6. State management
 
-Redux Toolkit (`src/lib/store`) holds only state the UI displays: the loading spinner, shading method, render pass and timing counters, and the sample, bounce and field-of-view settings.
+A Zustand store (`src/lib/store/appStore.ts`) holds only state the UI displays: the loading spinner, shading method, render pass and timing counters, and the sample, bounce and field-of-view settings. Zustand needs no provider component, and the render loop reads the store directly with `useAppStore.getState()`, so the settings are not copied into a second place.
 
-Everything else lives in the `CanvasVars` ref (`src/types/canvasVars.ts`) held by `Canvas`: camera transforms, textures and WebGL handles. These change every animation frame, and Redux would re-render React on each change for no benefit.
+Everything else lives in the `CanvasVars` ref (`src/types/canvasVars.ts`) held by `Canvas`: camera transforms, textures and WebGL handles. These change every animation frame, and storing them in the store would re-render React on each change for no benefit.
 
 ---
 
