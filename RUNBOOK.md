@@ -55,6 +55,7 @@ A shader, BVH or scene change needs a look in the browser, because nothing else 
 2. Open the browser console. `checkGpuLimits` logs the GPU limits, and `BvhNode.subDivide` in the BVH worker warns if the BVH is too deep.
 3. Wait for the pass counter to reach the sample setting. The image should converge from noise to a smooth scene.
 4. Drag to orbit, then release. Accumulation should restart from pass 1.
+5. Resize the window, or use the browser's device toolbar, and check the panel in portrait and landscape. A window above the `md` breakpoint should show a view no larger than 1280 by 720.
 
 ### 1.5 Changing the scene
 

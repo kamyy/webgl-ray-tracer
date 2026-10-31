@@ -79,7 +79,7 @@ A single Vite + React app, with no server runtime.
 
 - `public/` — the sample glTF scene (`suzanne.glb`) and the Draco decoder in `public/draco/`. Vite copies it into `dist/` as-is.
 - `src/shaders/` — the GLSL vertex and fragment shaders, imported into the app as strings.
-- `src/components/` — React components, styled with Tailwind CSS utility classes.
+- `src/components/` — React components, styled with Tailwind CSS utility classes. `src/components/sidebar.tsx` is the floating settings panel, and `src/components/viewport.tsx` is the render view.
 - `src/styles/` — `globals.css`, which imports Tailwind and holds the range slider rules that Tailwind has no utilities for.
 - `src/lib/store/` — the Zustand store for UI and rendering-status state only.
 - `src/lib/hooks/` — custom React hooks, one per file.
@@ -104,6 +104,7 @@ A single Vite + React app, with no server runtime.
 - **While the camera is being dragged, only pass 1 renders.** `CameraControls` sets `interactingRef` on `controlstart` and `controlend`, and accumulation resumes on release. This keeps dragging responsive ([Rendering](ARCHITECTURE.md#2-rendering-pipeline)).
 - **Material behavior comes from the glTF material fields.** `packMaterials` in `src/lib/webgl/packScene.ts` reads them: a non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective with `metalness` as the reflection ratio and `1 - roughness` as the gloss. A glTF exported without these fields renders every surface as diffuse. Textures are ignored.
 - **The Zustand store holds UI and render-status state only.** The camera, render targets, textures and pass counter live in React Three Fiber and `PathTracer`, because they change every frame and must not trigger React re-renders.
+- **The render view's size cap comes from `src/lib/webgl/renderLimits.ts`.** `src/index.tsx` turns it into CSS variables for the container that holds both `Viewport` and `Sidebar`. Keep `Sidebar` a sibling of `Viewport` inside that container, or the panel stops floating over the capped view and pointer events reach the camera controls ([Layout](ARCHITECTURE.md#9-layout)).
 - **The app needs WebGL 2 with `EXT_color_buffer_float`, `EXT_float_blend` and generous texture limits.** `checkGpuLimits` in `src/components/viewport.tsx` lists them. A GPU that fails the check leaves a blank canvas and only a console message.
 
 ---

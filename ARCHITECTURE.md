@@ -10,6 +10,7 @@ Why the system is shaped this way: decisions, alternatives rejected, costs accep
 - [6. State management](#6-state-management)
 - [7. Hosting & CI/CD](#7-hosting--cicd)
 - [8. Styling](#8-styling)
+- [9. Layout](#9-layout)
 
 ---
 
@@ -121,3 +122,14 @@ Components are styled with Tailwind CSS utility classes in the JSX, not with CSS
 
 - **The cost is long `className` strings.** A string shared by several elements in one file goes into a constant above the component.
 - **The range slider track and thumb stay as CSS** in `src/styles/globals.css`, because Tailwind has no utilities for the vendor pseudo-elements that style them.
+
+---
+
+## 9. Layout
+
+The render view fills the window up to a cap, and a translucent settings panel floats over its edge.
+
+- **The view is capped at 1280 by 720 CSS pixels from the `md` breakpoint up** (`src/lib/webgl/renderLimits.ts`). Every pixel is traced many times, so a maximized window on a 5K monitor, about 14.7 million pixels, would never converge. The capped view is centered with auto side margins and top-aligned, and the page background matches the render's dark surround. Phones are below the breakpoint, have few pixels, and use the whole window.
+- **The panel overlays the view instead of sitting beside it.** Opening or closing it then never resizes the canvas, so it does not rebuild the render targets or restart accumulation. The cost is that the panel hides part of the image, and a translucent surface has less contrast over bright areas, so it is 90% opaque.
+- **The panel is a sibling of the canvas, not a child.** Pointer events on the panel never reach `CameraControls`, and a camera drag that starts on the canvas keeps working when it passes under the panel.
+- **The panel's position depends on the screen.** It is a left column from the `lg` breakpoint up, a narrower left column on a phone in landscape, and a sheet along the bottom on a phone in portrait. Collapsing leaves a pill with the pass counter.
