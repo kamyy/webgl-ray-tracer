@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { shallow } from 'zustand/shallow'
 import Vector1x4 from '../lib/math/vector1x4'
-import { appActions, LoadingSpinner } from '../lib/store/appSlice'
-import { useAppDispatch, useAppSelector } from '../lib/store/hooks'
+import { LoadingSpinner, useAppStore } from '../lib/store/appStore'
 import CanvasShader from '../lib/webgl/canvasShader'
 import ColorTextures from '../lib/webgl/colorTextures'
 import RandomTexture from '../lib/webgl/randomTexture'
@@ -11,6 +11,12 @@ import { CanvasVars, defaultCanvasVars } from '../types/canvasVars'
 
 function degreesToRadians(degrees: number) {
   return (degrees * Math.PI) / 180.0
+}
+
+function renderReset(cv: CanvasVars) {
+  cv.renderingPass = 0
+  cv.restartRenderTimestamp = Date.now()
+  useAppStore.getState().resetStatus()
 }
 
 function GPU_MeetsRequirements(gl: WebGL2RenderingContext) {
@@ -42,194 +48,175 @@ function GPU_MeetsRequirements(gl: WebGL2RenderingContext) {
 }
 
 export default function Canvas() {
-  const dispatch = useAppDispatch()
-  const cameraFov = useAppSelector(state => state.cameraFov)
-  const numSamples = useAppSelector(state => state.numSamples)
-  const numBounces = useAppSelector(state => state.numBounces)
-  const shadingMethod = useAppSelector(state => state.shadingMethod)
-  const loadingSpinner = useAppSelector(state => state.loadingSpinner)
+  const loadingSpinner = useAppStore(state => state.loadingSpinner)
   const cvRef = useRef<CanvasVars>({ ...defaultCanvasVars })
 
   useEffect(() => {
     const cv = cvRef.current
-    cv.renderingPass = 0
-    cv.restartRenderTimestamp = Date.now()
+    renderReset(cv)
 
-    cv.cameraFov = cameraFov
-    cv.numSamples = numSamples
-    cv.numBounces = numBounces
-    cv.shadingMethod = shadingMethod
+    // Any setting that changes the image restarts accumulation at pass 0.
+    return useAppStore.subscribe(
+      state => [state.cameraFov, state.numSamples, state.numBounces, state.shadingMethod],
+      () => renderReset(cv),
+      { equalityFn: shallow },
+    )
+  }, [])
 
-    dispatch(appActions.setRenderingPass(0))
-    dispatch(appActions.setElapsedTime('00:00:00'))
-    dispatch(appActions.setEtaTime('??:??:??'))
-    dispatch(appActions.setAvgTime('????'))
-  }, [cameraFov, numSamples, numBounces, shadingMethod, dispatch])
+  const canvasCb = useCallback((htmlCanvasElement: HTMLCanvasElement) => {
+    const cv = cvRef.current
+    function render() {
+      const { numSamples } = useAppStore.getState()
+      if (cv.renderingPass < numSamples) {
+        if (cv.renderingPass === 0 || (!cv.lButtonDown && !cv.mButtonDown && !cv.rButtonDown)) {
+          ++cv.renderingPass // always render pass 0 even if a mouse button is down
 
-  const canvasCb = useCallback(
-    (htmlCanvasElement: HTMLCanvasElement) => {
-      const cv = cvRef.current
-      function render() {
-        if (cv.renderingPass < cv.numSamples) {
-          if (cv.renderingPass === 0 || (!cv.lButtonDown && !cv.mButtonDown && !cv.rButtonDown)) {
-            ++cv.renderingPass // always render pass 0 even if a mouse button is down
+          if (cv.sampleShader && cv.canvasShader) {
+            cv.sampleShader.draw(cv)
+            cv.canvasShader.draw(cv)
+          }
 
-            if (cv.sampleShader && cv.canvasShader) {
-              cv.sampleShader.draw(cv)
-              cv.canvasShader.draw(cv)
-            }
+          const elapsed = Date.now() - cv.restartRenderTimestamp
+          const average = elapsed / cv.renderingPass
+          const eta = (numSamples - cv.renderingPass) * average
 
-            const elapsed = Date.now() - cv.restartRenderTimestamp
-            const average = elapsed / cv.renderingPass
-            const eta = (cv.numSamples - cv.renderingPass) * average
+          useAppStore.getState().setStatus({
+            renderingPass: cv.renderingPass,
+            elapsedTime: new Date(elapsed).toISOString().slice(11, 19),
+            etaTime: new Date(eta).toISOString().slice(11, 19),
+            avgTime: `${average.toFixed(0)}ms`,
+          })
+        }
+      }
+      requestAnimationFrame(render)
+    }
 
-            dispatch(appActions.setRenderingPass(cv.renderingPass))
-            dispatch(appActions.setElapsedTime(new Date(elapsed).toISOString().slice(11, 19)))
-            dispatch(appActions.setEtaTime(new Date(eta).toISOString().slice(11, 19)))
-            dispatch(appActions.setAvgTime(`${average.toFixed(0)}ms`))
+    function dollyCamera(delta: number) {
+      if (delta !== 0 && cv.scene?.cameraNode) {
+        cv.scene.cameraNode.translate(new Vector1x4(0, delta * cv.TXYZ_SCALAR, 0))
+        renderReset(cv)
+      }
+    }
+
+    function onMouseMove(event: MouseEvent) {
+      if (cv.scene?.cameraNode && cv.scene?.parentNode) {
+        const x = event.clientX
+        const y = event.clientY
+
+        if (cv.mButtonDownOnCanvas) {
+          dollyCamera(cv.y - y)
+        } else if ((cv.lButtonDownOnCanvas && event.ctrlKey) || cv.rButtonDownOnCanvas) {
+          // move
+          if (x !== cv.x || y !== cv.y) {
+            const dx = (cv.x - x) * cv.TXYZ_SCALAR
+            const dz = (y - cv.y) * cv.TXYZ_SCALAR
+            const dv = cv.scene.cameraNode.mapPos(new Vector1x4(dx, 0, dz, 0), cv.scene.parentNode)
+            cv.scene.parentNode.translate(dv) // move parent in camera space
+            renderReset(cv)
+          }
+        } else if (cv.lButtonDownOnCanvas) {
+          // rotate
+          if (x !== cv.x || y !== cv.y) {
+            cv.scene.parentNode.rotateZ(degreesToRadians(cv.x - x) * cv.RXYZ_SCALAR) // yaw camera target around it's own z-axis
+            cv.scene.cameraNode.rotateX(degreesToRadians(cv.y - y) * cv.RXYZ_SCALAR, cv.scene.parentNode) // pitch around camera's parent x-axis
+            renderReset(cv)
           }
         }
-        requestAnimationFrame(render)
+        cv.x = x
+        cv.y = y
       }
+    }
 
-      function renderReset() {
-        cv.renderingPass = 0
-        cv.restartRenderTimestamp = Date.now()
-
-        dispatch(appActions.setRenderingPass(0))
-        dispatch(appActions.setElapsedTime('00:00:00'))
-        dispatch(appActions.setEtaTime('??:??:??'))
-        dispatch(appActions.setAvgTime('????'))
+    function onMouseWheel(event: WheelEvent) {
+      if (cv.scene?.cameraNode) {
+        event.preventDefault()
+        dollyCamera(-event.deltaY * 0.25)
       }
+    }
 
-      function dollyCamera(delta: number) {
-        if (delta !== 0 && cv.scene?.cameraNode) {
-          cv.scene.cameraNode.translate(new Vector1x4(0, delta * cv.TXYZ_SCALAR, 0))
-          renderReset()
-        }
-      }
+    function onMouseDown(event: MouseEvent) {
+      const rect = htmlCanvasElement.getBoundingClientRect()
+      cv.x = event.clientX
+      cv.y = event.clientY
+      const onCanvas = cv.x > rect.left && cv.x < rect.right && cv.y > rect.top && cv.y < rect.bottom
 
-      function onMouseMove(event: MouseEvent) {
-        if (cv.scene?.cameraNode && cv.scene?.parentNode) {
-          const x = event.clientX
-          const y = event.clientY
-
-          if (cv.mButtonDownOnCanvas) {
-            dollyCamera(cv.y - y)
-          } else if ((cv.lButtonDownOnCanvas && event.ctrlKey) || cv.rButtonDownOnCanvas) {
-            // move
-            if (x !== cv.x || y !== cv.y) {
-              const dx = (cv.x - x) * cv.TXYZ_SCALAR
-              const dz = (y - cv.y) * cv.TXYZ_SCALAR
-              const dv = cv.scene.cameraNode.mapPos(new Vector1x4(dx, 0, dz, 0), cv.scene.parentNode)
-              cv.scene.parentNode.translate(dv) // move parent in camera space
-              renderReset()
-            }
-          } else if (cv.lButtonDownOnCanvas) {
-            // rotate
-            if (x !== cv.x || y !== cv.y) {
-              cv.scene.parentNode.rotateZ(degreesToRadians(cv.x - x) * cv.RXYZ_SCALAR) // yaw camera target around it's own z-axis
-              cv.scene.cameraNode.rotateX(degreesToRadians(cv.y - y) * cv.RXYZ_SCALAR, cv.scene.parentNode) // pitch around camera's parent x-axis
-              renderReset()
-            }
+      switch (event.button) {
+        case 0:
+          cv.lButtonDown = true
+          cv.lButtonDownOnCanvas = onCanvas
+          break
+        case 1:
+          if (onCanvas) {
+            event.preventDefault()
           }
-          cv.x = x
-          cv.y = y
-        }
+          cv.mButtonDown = true
+          cv.mButtonDownOnCanvas = onCanvas
+          break
+        case 2:
+          cv.rButtonDown = true
+          cv.rButtonDownOnCanvas = onCanvas
+          break
+        default:
+          break
       }
+    }
 
-      function onMouseWheel(event: WheelEvent) {
-        if (cv.scene?.cameraNode) {
-          event.preventDefault()
-          dollyCamera(-event.deltaY * 0.25)
-        }
+    function onMouseUp(event: MouseEvent) {
+      switch (event.button) {
+        case 0:
+          cv.lButtonDown = false
+          cv.lButtonDownOnCanvas = false
+          break
+        case 1:
+          cv.mButtonDown = false
+          cv.mButtonDownOnCanvas = false
+          break
+        case 2:
+          cv.rButtonDown = false
+          cv.rButtonDownOnCanvas = false
+          break
+        default:
+          break
       }
+    }
 
-      function onMouseDown(event: MouseEvent) {
-        const rect = htmlCanvasElement.getBoundingClientRect()
-        cv.x = event.clientX
-        cv.y = event.clientY
-        const onCanvas = cv.x > rect.left && cv.x < rect.right && cv.y > rect.top && cv.y < rect.bottom
+    if (!cv.gl) {
+      cv.gl = htmlCanvasElement.getContext('webgl2', {
+        depth: false,
+        alpha: false,
+      })
 
-        switch (event.button) {
-          case 0:
-            cv.lButtonDown = true
-            cv.lButtonDownOnCanvas = onCanvas
-            break
-          case 1:
-            if (onCanvas) {
-              event.preventDefault()
-            }
-            cv.mButtonDown = true
-            cv.mButtonDownOnCanvas = onCanvas
-            break
-          case 2:
-            cv.rButtonDown = true
-            cv.rButtonDownOnCanvas = onCanvas
-            break
-          default:
-            break
-        }
+      if (cv.gl && GPU_MeetsRequirements(cv.gl)) {
+        window.oncontextmenu = (e: MouseEvent) => e.preventDefault()
+        window.onmousemove = onMouseMove
+        window.onmousedown = onMouseDown
+        window.onmouseup = onMouseUp
+        htmlCanvasElement.onwheel = onMouseWheel
+
+        cv.colorTextures = new ColorTextures(cv.gl, cv.canvasWd, cv.canvasHt)
+        cv.randomTexture = new RandomTexture(cv.gl, cv.canvasWd, cv.canvasHt)
+        cv.sampleShader = new SampleShader(cv.gl)
+        cv.canvasShader = new CanvasShader()
+
+        Promise.all([
+          cv.sampleShader.init(cv.gl, '/sample-vs.glsl', '/sample-fs.glsl'),
+          cv.canvasShader.init(cv.gl, '/canvas-vs.glsl', '/canvas-fs.glsl'),
+        ])
+          .then(() => {
+            useAppStore.getState().setLoadingSpinner(LoadingSpinner.show)
+            cv.scene = new Scene(cv.gl, '/suzanne.obj', '/suzanne.mtl')
+            return cv.scene.init()
+          })
+          .then(() => {
+            useAppStore.getState().setLoadingSpinner(LoadingSpinner.hide)
+            requestAnimationFrame(render)
+          })
+          .catch(() => {
+            useAppStore.getState().setLoadingSpinner(LoadingSpinner.fail)
+          })
       }
-
-      function onMouseUp(event: MouseEvent) {
-        switch (event.button) {
-          case 0:
-            cv.lButtonDown = false
-            cv.lButtonDownOnCanvas = false
-            break
-          case 1:
-            cv.mButtonDown = false
-            cv.mButtonDownOnCanvas = false
-            break
-          case 2:
-            cv.rButtonDown = false
-            cv.rButtonDownOnCanvas = false
-            break
-          default:
-            break
-        }
-      }
-
-      if (!cv.gl) {
-        cv.gl = htmlCanvasElement.getContext('webgl2', {
-          depth: false,
-          alpha: false,
-        })
-
-        if (cv.gl && GPU_MeetsRequirements(cv.gl)) {
-          window.oncontextmenu = (e: MouseEvent) => e.preventDefault()
-          window.onmousemove = onMouseMove
-          window.onmousedown = onMouseDown
-          window.onmouseup = onMouseUp
-          htmlCanvasElement.onwheel = onMouseWheel
-
-          cv.colorTextures = new ColorTextures(cv.gl, cv.canvasWd, cv.canvasHt)
-          cv.randomTexture = new RandomTexture(cv.gl, cv.canvasWd, cv.canvasHt)
-          cv.sampleShader = new SampleShader(cv.gl)
-          cv.canvasShader = new CanvasShader()
-
-          Promise.all([
-            cv.sampleShader.init(cv.gl, '/sample-vs.glsl', '/sample-fs.glsl'),
-            cv.canvasShader.init(cv.gl, '/canvas-vs.glsl', '/canvas-fs.glsl'),
-          ])
-            .then(() => {
-              dispatch(appActions.setLoadingSpinner(LoadingSpinner.show))
-              cv.scene = new Scene(cv.gl, '/suzanne.obj', '/suzanne.mtl')
-              return cv.scene.init()
-            })
-            .then(() => {
-              dispatch(appActions.setLoadingSpinner(LoadingSpinner.hide))
-              requestAnimationFrame(render)
-            })
-            .catch(() => {
-              dispatch(appActions.setLoadingSpinner(LoadingSpinner.fail))
-            })
-        }
-      }
-    },
-    [dispatch],
-  )
+    }
+  }, [])
 
   return (
     <>

@@ -1,15 +1,14 @@
-import { useAppSelector } from '../lib/store/hooks'
-import type { RootState } from '../lib/store/store'
+import { useAppStore } from '../lib/store/appStore'
 
 const fieldsetClass = 'w-1/4 p-4 not-first:border-l not-first:border-[lightgray]'
 const legendClass = 'mx-auto text-[0.9rem] font-bold'
 
 export default function RenderingStatus() {
-  const renderingPass = useAppSelector((state: RootState) => state.renderingPass)
-  const elapsedTime = useAppSelector((state: RootState) => state.elapsedTime)
-  const numSamples = useAppSelector((state: RootState) => state.numSamples)
-  const etaTime = useAppSelector((state: RootState) => state.etaTime)
-  const avgTime = useAppSelector((state: RootState) => state.avgTime)
+  const renderingPass = useAppStore(state => state.renderingPass)
+  const elapsedTime = useAppStore(state => state.elapsedTime)
+  const numSamples = useAppStore(state => state.numSamples)
+  const etaTime = useAppStore(state => state.etaTime)
+  const avgTime = useAppStore(state => state.avgTime)
 
   return (
     <form className="flex p-8 text-center">

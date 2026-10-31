@@ -1,5 +1,6 @@
 import { CanvasVars } from '../../types/canvasVars'
 import Vector1x4 from '../math/vector1x4'
+import { useAppStore } from '../store/appStore'
 import Shader from './shader'
 
 export default class SampleShader extends Shader {
@@ -22,9 +23,6 @@ export default class SampleShader extends Shader {
     canvasWd,
     canvasHt,
 
-    cameraFov,
-    numBounces,
-    shadingMethod,
     renderingPass,
 
     gl,
@@ -33,6 +31,7 @@ export default class SampleShader extends Shader {
     scene,
   }: CanvasVars) {
     if (this.pgm && gl && colorTextures && randomTexture && scene?.cameraNode) {
+      const { cameraFov, numBounces, shadingMethod } = useAppStore.getState()
       const origin = new Vector1x4(0.0, 0.0, 0.0) // in view space
       const eyePos = origin.mul(scene.cameraNode.modelMatrix) // in world space
 
