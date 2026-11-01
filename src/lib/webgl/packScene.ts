@@ -38,6 +38,22 @@ export interface PackedScene {
   materialsTexture: DataTexture
 }
 
+// A glTF mesh without normals is flat shaded, so each corner takes the normal of its triangle.
+function writeFlatNormals(positions: Float32Array, normals: Float32Array) {
+  const p0 = new Vector3()
+  const p1 = new Vector3()
+  const p2 = new Vector3()
+  for (let corner = 0; corner < positions.length; corner += 9) {
+    p0.fromArray(positions, corner)
+    p1.fromArray(positions, corner + 3)
+    p2.fromArray(positions, corner + 6)
+    p1.sub(p0).cross(p2.sub(p0)).normalize()
+    for (let vertex = 0; vertex < 3; ++vertex) {
+      p1.toArray(normals, corner + vertex * 3)
+    }
+  }
+}
+
 // Turns a mesh into world-space triangles for the BVH worker, three corners of x, y, z per face.
 function extractTriangles(mesh: Mesh, materialIndex: number): BvhRequestMesh {
   const matrix = mesh.matrixWorld
@@ -56,11 +72,17 @@ function extractTriangles(mesh: Mesh, materialIndex: number): BvhRequestMesh {
       .fromBufferAttribute(positionAttribute, vertex)
       .applyMatrix4(matrix)
       .toArray(positions, corner * 3)
-    vector
-      .fromBufferAttribute(normalAttribute, vertex)
-      .applyMatrix3(normalMatrix)
-      .normalize()
-      .toArray(normals, corner * 3)
+    if (normalAttribute) {
+      vector
+        .fromBufferAttribute(normalAttribute, vertex)
+        .applyMatrix3(normalMatrix)
+        .normalize()
+        .toArray(normals, corner * 3)
+    }
+  }
+
+  if (!normalAttribute) {
+    writeFlatNormals(positions, normals)
   }
 
   return { positions, normals, materialIndex }
