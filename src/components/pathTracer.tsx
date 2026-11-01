@@ -59,7 +59,7 @@ interface PassState {
   wantedNumStrips: number // the strip count that `adaptNumStrips` wants to switch to at the next pass boundary
   strip: number // next strip of the current pass
   needsClear: boolean // true after a restart, so the next draw empties the accumulation target first
-  drewLastFrame: boolean // false when the last frame drew nothing, which says nothing about how heavy a strip is
+  drewLastFrame: boolean // false after a frame with no strip drawn, because the preview is no measure of a strip
   slowFrames: number // consecutive frames over `slowFrameMs`
   fastFrames: number // consecutive frames under `fastFrameMs`
   lastStatusTimestamp: number // when the counters were last written to the store
@@ -232,7 +232,6 @@ function drawStrip(state: PassState, inputs: PassInputs, numStrips: number) {
   // Pass 1: trace the strip and add its samples to the running sum.
   gl.setRenderTarget(accumulation)
   gl.render(pathTrace.scene, screenQuadCamera)
-  accumulation.scissorTest = false
 
   // Pass 2: divide the sum by the sample count and show it on the canvas. This covers every pixel, so strips not yet
   // traced in this pass still show their previous average.
@@ -269,7 +268,7 @@ function frame(state: PassState, inputs: PassInputs, interacting: boolean, frame
   const isPreview = state.renderingPass === 0
   if (state.renderingPass < numSamples && (isPreview || !interacting)) {
     drawStrip(state, inputs, isPreview ? 1 : state.numStrips)
-    state.drewLastFrame = true
+    state.drewLastFrame = !isPreview
   }
 }
 
