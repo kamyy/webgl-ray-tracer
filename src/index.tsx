@@ -1,25 +1,31 @@
-import Canvas from '@/components/canvas'
-import Forms from '@/components/forms'
-import { Progress } from '@/components/progress'
-import StoreProvider from '@/components/storeProvider'
-import { defaultCanvasVars } from '@/types/canvasVars'
+/**
+ * The app's entry point: mounts the render view with the floating controls over it.
+ *
+ * `main` fills the window and is capped at the largest render size from `src/lib/webgl/renderLimits.ts`. The cap is
+ * passed as CSS variables, which Tailwind classes read. The progress display and the settings card are positioned over
+ * the view, so neither takes room from it.
+ */
+import { Hud } from '@/components/hud'
+import { SettingsPanel } from '@/components/settingsPanel'
+import { Viewport } from '@/components/viewport'
+import { maxCanvasHt, maxCanvasWd } from '@/lib/webgl/renderLimits'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './styles/globals.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <StoreProvider>
+    {/* Centers `main` when the window is larger than the cap. */}
+    <div className="flex h-dvh items-center justify-center">
       <main
-        style={{
-          margin: 'auto',
-          width: `${defaultCanvasVars.canvasWd}px`,
-        }}
+        className="relative size-full md:max-h-(--max-canvas-ht) md:max-w-(--max-canvas-wd)"
+        style={{ '--max-canvas-wd': `${maxCanvasWd}px`, '--max-canvas-ht': `${maxCanvasHt}px` } as React.CSSProperties}
       >
-        <Canvas />
-        <Progress />
-        <Forms />
+        {/* The render fills `main`. The two floating layers sit over it. */}
+        <Viewport />
+        <Hud />
+        <SettingsPanel />
       </main>
-    </StoreProvider>
+    </div>
   </React.StrictMode>,
 )

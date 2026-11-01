@@ -34,3 +34,6 @@ coverage/
 
 # Vite cache
 .cache/
+
+# Vendored Draco decoder copied from three
+public/draco/

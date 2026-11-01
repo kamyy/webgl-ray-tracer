@@ -7,6 +7,7 @@ How to run, check and deploy the app. [`AGENTS.md`](AGENTS.md) is what breaks if
   - [1.2 Dev server](#12-dev-server)
   - [1.3 Checks](#13-checks)
   - [1.4 Checking a render](#14-checking-a-render)
+  - [1.5 Changing the scene](#15-changing-the-scene)
 - [2. Deploying](#2-deploying)
 - [3. Troubleshooting](#3-troubleshooting)
 
@@ -51,15 +52,30 @@ The pre-commit hook runs `format-staged`, `lint` and `typecheck`. CI runs `forma
 A shader, BVH or scene change needs a look in the browser, because nothing else catches it.
 
 1. Run `pnpm dev` and open `http://localhost:3000`.
-2. Open the browser console. `GPU_MeetsRequirements` logs the GPU limits, and `subDivide` warns if the BVH is too deep.
+2. Open the browser console. `BvhNode.subDivide` in the BVH worker warns if the BVH is too deep.
 3. Wait for the pass counter to reach the sample setting. The image should converge from noise to a smooth scene.
-4. Drag to orbit, then release. Accumulation should restart from pass 1.
+4. Drag to orbit, then release. Accumulation should restart at pass 0.
+5. Resize the window, or use the browser's device toolbar, and check the readout and the settings card in portrait and landscape, collapse the card, and open the About popover. The render should restart when the size changes. A window above the `md` breakpoint should show a view no larger than 2560 by 1440.
+
+### 1.5 Changing the scene
+
+`public/suzanne.glb` is the only scene. To replace it, export a glTF binary (`.glb`) from Blender with Draco compression on, positions at 16 bits and normals at 12 bits. Set each material's base color, metallic, roughness and (for lights) emission strength, and (for glass) transmission and IOR. Then pass the new URL to `useGLTF` in `src/components/viewport.tsx`.
+
+The Draco decoder in `public/draco/` is copied from `node_modules/three/examples/jsm/libs/draco/gltf/`. Copy the three files again after upgrading `three`, because the decoder must match the loader.
 
 ---
 
 ## 2. Deploying
 
 Merging to `main` deploys. The `deploy` job in `.github/workflows/ci.yml` syncs `dist/` to the S3 bucket `webgl-ray-tracer.orky.net` once the `build` job passes ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)).
+
+```text
+ pull request ──► build job ──► merge to main ──► build job ──► deploy job ──► S3 bucket
+                  format:check                                   assumes AWS     webgl-ray-tracer
+                  lint                                           role, syncs     .orky.net
+                  typecheck                                      dist/
+                  build
+```
 
 1. Open a pull request. CI runs `format:check`, `lint`, `typecheck` and `build`.
 2. Merge it once CI is green.
@@ -76,7 +92,7 @@ A merge that changes only Markdown or `LICENSE` starts no run. To redeploy witho
 
 ## 3. Troubleshooting
 
-- **A blank canvas, with `EXT_color_buffer_float not supported` or a limit in the console.** The GPU or browser fails `GPU_MeetsRequirements` in `src/components/canvas.tsx`. Try another browser or a newer GPU.
-- **The render is corrupted or has black holes, and the console says `BVH depth … reached the fragment shader's traversal stack limit`.** The tree is deeper than the shader's stack. Raise `bvMaxStackSize` in `src/lib/webgl/scene.ts` and `BV_MAX_STACK_SIZE` in `public/sample-fs.glsl` together ([Rendering gotchas](AGENTS.md#3-rendering-gotchas)).
-- **Wrong geometry or colors with no error.** The packed layout constants in `src/lib/webgl/scene.ts` and `public/sample-fs.glsl` have drifted apart ([Rendering gotchas](AGENTS.md#3-rendering-gotchas)).
+- **The view shows a sentence about WebGL 2, a missing extension or a GPU limit.** The GPU or browser fails a check in `src/lib/webgl/checkGpuLimits.ts`. Try another browser or a newer GPU.
+- **The render is corrupted or has black holes, and the console says `BVH depth … reached the fragment shader's traversal stack limit`.** The tree is deeper than the shader's stack. Raise `bvhMaxStackSize` in `src/lib/webgl/sceneLayout.ts` and `BVH_MAX_STACK_SIZE` in `src/shaders/pathTrace.frag.glsl` together ([Rendering gotchas](AGENTS.md#3-rendering-gotchas)).
+- **Wrong geometry or colors with no error.** The packed layout constants in `src/lib/webgl/sceneLayout.ts` and `src/shaders/pathTrace.frag.glsl` have drifted apart ([Rendering gotchas](AGENTS.md#3-rendering-gotchas)).
 - **The `deploy` job fails at the credentials step.** Check that `secrets.AWS_DEPLOY_ROLE_ARN` is set and that the job still has `id-token: write` ([Workflow & deploy](AGENTS.md#51-workflow--deploy)).

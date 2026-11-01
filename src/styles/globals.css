@@ -1,45 +1,109 @@
-:root {
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.875em; /* 14px if default font size is 16px */
-  box-sizing: border-box;
-}
+@import "tailwindcss";
 
-*,
-::before,
-::after {
-  box-sizing: inherit; /* inherit border-box universally */
-}
+/* A phone held in landscape is wide but short, so it needs compact bars. */
+@custom-variant short (@media (max-height: 500px));
 
-.spinner {
-  position: absolute;
-  top: 28%;
-  left: 50%;
-  margin: auto;
-  border-radius: 50%;
-  border-top: 16px solid blue;
-  border-right: 16px solid green;
-  border-bottom: 16px solid red;
-  border-left: 16px solid yellow;
-  width: 12px;
-  height: 12px;
-  -webkit-animation: spin 2s linear infinite;
-  animation: spin 1s linear infinite;
-}
+/* The theme is a `dark` class on the html element, set by `useTheme`, so it can be switched without a reload. */
+@custom-variant dark (&:where(.dark, .dark *));
 
-@-webkit-keyframes spin {
-  0% {
-    -webkit-transform: rotate(0deg);
+/* --- Base ------------------------------------------------------------------------- */
+
+@layer base {
+  /* The theme colors are variables, so the sliders, the ring and the green controls follow the light or dark theme. */
+  :root {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 0.875em; /* 14px if default font size is 16px */
+    color: #111827;
+    --accent: darkgreen; /* the slider thumb, the progress ring and the selected shading choice */
+    --accent-track: #dcece3; /* the unfilled part of the progress ring */
+    --slider-track: lightgray;
   }
-  100% {
-    -webkit-transform: rotate(360deg);
+
+  /* Set by `useTheme` on the html element. */
+  :root.dark {
+    color-scheme: dark;
+    color: #f3f4f6;
+    --accent: #3dbb7f;
+    --accent-track: #2f4a3b;
+    --slider-track: #4b5563;
+  }
+
+  body {
+    margin: 0;
+    background: #14171b; /* matches the render view, so the space beside a capped view looks part of it */
+    overscroll-behavior: none; /* a drag on the view must not pull the page to refresh */
+  }
+
+  /* Removes the double-tap-to-zoom delay on controls. */
+  button,
+  input,
+  summary {
+    touch-action: manipulation;
   }
 }
 
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
+/* --- Range slider ----------------------------------------------------------------- */
+
+/* Tailwind has no utilities for the slider track and thumb, so they are styled here. */
+@layer base {
+  input[type="range"] {
+    -webkit-appearance: none;
+    background: transparent; /* otherwise white in Chrome */
+    cursor: pointer;
+
+    &::-webkit-slider-runnable-track {
+      -webkit-appearance: none;
+      height: 2px;
+      background: var(--slider-track);
+    }
+    &::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 1em;
+      height: 1em;
+      border: none;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow:
+        2px 2px 2px #000000,
+        0px 0px 2px #0d0d0d;
+      margin-top: -5px; /* specify margin in Chrome, in Firefox and IE it is automatic */
+    }
+
+    &::-moz-range-track {
+      height: 2px;
+      background: var(--slider-track);
+    }
+    &::-moz-range-thumb {
+      width: 1em;
+      height: 1em;
+      border: none;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow:
+        2px 2px 2px #000000,
+        0px 0px 2px #0d0d0d;
+    }
+
+    &:focus {
+      outline: none; /* remove blue border */
+    }
   }
-  100% {
-    transform: rotate(360deg);
+}
+
+/* Touch screens use a slightly smaller thumb in both orientations. The touch area is the slider's own height. */
+@layer base {
+  @media (pointer: coarse) {
+    input[type="range"] {
+      &::-webkit-slider-thumb {
+        width: 0.875em;
+        height: 0.875em;
+        margin-top: -6px;
+      }
+
+      &::-moz-range-thumb {
+        width: 0.875em;
+        height: 0.875em;
+      }
+    }
   }
 }

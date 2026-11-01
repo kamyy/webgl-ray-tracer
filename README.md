@@ -1,47 +1,60 @@
 # WebGL Ray Tracer
 
-## Hardware and Browser Compatibility
+A path tracer that runs entirely in your browser. The GPU does the tracing in a WebGL 2 fragment shader, and the image sharpens pass by pass as more samples arrive. You can orbit the camera while it renders, change the settings live, and switch between light and dark mode.
 
-You can view this app live at [https://webgl-ray-tracer.orky.net](https://webgl-ray-tracer.orky.net). Warning! It does require a reasonably powerful GPU (e.g. an Nvidia Geforce 1080) and a browser that supports WebGL 2. It's been tested on Chrome, Firefox and Safari. Development took place entirely on Linux but the app has been tested on Windows and MacOS as well.
+Live at [https://webgl-ray-tracer.orky.net](https://webgl-ray-tracer.orky.net).
 
-## Game Developers Conference
+## 1. What you need
 
-I attended a talk given by Eric Haines at GDC 2019 titled 'A Fast Forward Through [Ray Tracing Gems](http://www.realtimerendering.com/raytracinggems)'. Real-time ray tracing was a hot topic at GDC 2019 and Peter Shirley's series of tutorials with regards to [writing a ray tracer in just one weekend](http://in1weekend.blogspot.com/2016/01/ray-tracing-in-one-weekend.html) was mentioned in passing. Very much inspired by what I'd read in those tutorials, I started working on this project in my spare time to see if I could write a ray tracer for the World Wide Web. Ideally, I wanted to utilize the awesome compute power of the GPU via a fragment shader, which fits the task of tracing rays in parallel almost perfectly.
+- A browser with WebGL 2 and the `EXT_color_buffer_float` and `EXT_float_blend` extensions. Recent Chrome, Firefox and Safari all qualify.
+- A reasonably powerful GPU. A desktop card such as an Nvidia GeForce GTX 1080 converges in seconds to minutes. Phones work too, in portrait and landscape, but render at half the width and height and take longer.
+- If something is missing, the page says what instead of showing a blank view.
 
-![shot1](./screenshots/shot1.png)
+## 2. Using it
 
-![shot2](./screenshots/shot2.png)
+| Action | Mouse                | Touch       |
+| ------ | -------------------- | ----------- |
+| Rotate | Left-drag            | One finger  |
+| Pan    | Right-drag           | Two fingers |
+| Zoom   | Wheel or middle-drag | Pinch       |
 
-At the end of the day I ended up with what's called a path tracer. It requires a large quantity of rays to be fired through each pixel in a stochastic manner for convergence thus removing noise from the rendered image. It's a brute force technique and you pay for it in terms of time and compute power but it does produce incredibly accurate visuals like soft shadows, ambient occlusion and blurred reflections. These effects are difficult to achieve using a real-time 3D rasterizer but here you essentially get them for free with little to no rendering tricks involved.
+- **Progress** is the ring at the top left, with the pass count, elapsed time, time remaining and the average time per pass beside it. The view restarts at pass 0 whenever the camera, a setting or the window size changes.
+- **Render settings** are in the card at the bottom left, and the chevron collapses it out of the way. They are field of view, samples per pixel, ray bounces, and Flat or Phong shading.
+- The buttons at the top right switch the theme and open the About card with these controls and the license.
 
-## Technical Details
+## 3. Running it locally
 
-This project started in 2019 and has under gone several updates over the years mainly to keep it current with the latest node/react packages.
+You need Node.js and [pnpm](https://pnpm.io).
 
-This app makes use of several features that were introduced in WebGL 2 including:
+```sh
+pnpm install
+pnpm dev
+```
 
-- Removal of loop restrictions (very important).
-- Use of new texture formats to hold random seed, mesh, material and BVH data.
-- Texture arrays to store multiple BVH trees.
-- Direct texel lookup using texelFetch.
+Then open the address Vite prints. [`RUNBOOK.md`](RUNBOOK.md) covers the other commands, checking a render and deploying.
 
-![shot3](./screenshots/shot3.png)
+## 4. Your own scene
 
-The Javascript portion of the app reads Wavefront OBJ and MTL files, creates one or more BVH trees before pushing all this data on to the GPU. It's other purpose is to handle user input and user interaction with the camera.
+The app loads `public/suzanne.glb`, a glTF 2.0 file compressed with Draco. Replace it with any glTF scene whose materials use plain PBR factors. A non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective, with `metalness` as the reflection ratio and `1 - roughness` as the gloss. Textures are ignored.
 
-The sample-fs.glsl fragment shader is the heart of the program. It handles:
+## 5. How it works
 
-- Pseudo random number generation.
-- Bounding volume hierarchy traversal.
-- Ray to AABB intersection testing.
-- Ray to triangle intersection testing.
-- Barycentric coordinates.
-- Recursion (via looping).
+I went to Eric Haines's GDC 2019 talk, "A Fast Forward Through [Ray Tracing Gems](http://www.realtimerendering.com/raytracinggems)", where real-time ray tracing was the hot topic. Peter Shirley's [Ray Tracing in One Weekend](http://in1weekend.blogspot.com/2016/01/ray-tracing-in-one-weekend.html) came up in passing. Inspired by it, I wanted to see whether a ray tracer could run on the web, using the GPU through a fragment shader, which suits tracing rays in parallel almost perfectly.
 
-![shot4](./screenshots/shot4.png)
+What I ended up with is a path tracer. It fires many random rays through each pixel and averages them, which removes noise as the image converges. It is a brute force technique that costs time and compute, but it produces soft shadows, ambient occlusion and blurred reflections with no rendering tricks.
 
-The fragment shader is used to progressively build the final image via multiple rendering passes. It's done this way so the browser doesn't kill the program thinking it's gone rogue, which would happen if the shader took too long to finish. A nice bonus is it also allows a decent level of real-time interaction to be programmed in.
+- **The scene** is loaded with three.js and React Three Fiber. A Web Worker builds a bounding volume hierarchy (BVH) for each mesh, so a large scene does not freeze the page, and the result is packed into float textures.
+- **The shader** in `src/shaders/pathTrace.frag.glsl` does the tracing: random numbers, BVH traversal, ray and box and triangle intersection, and bouncing off diffuse, reflective and glass surfaces.
+- **Each pass** adds one sample per pixel to a running sum in a float render target. The display shader divides the sum by the sample count and draws it.
+- **Passes are drawn in strips**, one strip per animation frame, with the strip count adapting to the frame time. That keeps the page responsive and stops the browser from killing a shader that runs too long.
+- **WebGL 2 features** it relies on are loops without fixed limits, which recursion-by-looping needs, texture arrays for the BVH trees, float texture formats, and `texelFetch` for exact texel lookups.
+
+[`ARCHITECTURE.md`](ARCHITECTURE.md) explains the design decisions, and [`AGENTS.md`](AGENTS.md) lists the gotchas and conventions for working on the code.
+
+## 6. License
+
+[MIT](LICENSE). Copyright © 2026 Kam Y Yip.
 
 Enjoy!
 
-Kam.
+Kam

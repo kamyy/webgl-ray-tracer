@@ -24,7 +24,7 @@ export default {
   // File-specific overrides
   overrides: [
     {
-      files: '*.{css,scss}',
+      files: '*.css',
       options: {
         singleQuote: false,
       },
