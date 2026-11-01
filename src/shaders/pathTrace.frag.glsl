@@ -65,7 +65,9 @@ const int FACE_MATERIAL_INDEX = 7;
 const int MATERIAL_ALBEDO_INDEX = 0;
 const int MATERIAL_ATTRIB_INDEX = 1;
 
-const int RAY_BOUNCE_MAX_STACK_SIZE = 16;
+// The bounce loop stores a hit at index `i` for every `i` up to `u_num_bounces`, so the stacks hold one more entry than
+// the largest Bounces setting (`maxBounces` in `src/components/renderSettings.tsx`).
+const int RAY_BOUNCE_MAX_STACK_SIZE = 17;
 
 // --- globals -------------------------------------------------------------------------
 uvec4 g_randGeneratorState; // random number generator current state
