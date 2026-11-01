@@ -39,7 +39,7 @@ A GPU path tracer that runs entirely in the browser through WebGL 2. React and T
 - **Keep parallel facts in parallel shapes, and prefer positive verbs.**
   - Several facts hung off one subject only read cleanly when they're the same kind of fact. A failure condition, an action, and a conditional action need their own sentences.
   - Don't coordinate a negated verb with a positive one, as in "won't run unless you're signed in, and prints the account". The reader has to work out that the second half applies in the case the first half rules out.
-- **Reference files by their full repo-relative path, not a bare filename** — `src/lib/webgl/scene.ts`, not `scene.ts`. Do this every time the file is named, even right next to an earlier mention that already gave the full path; don't rely on the reader having seen that earlier sentence.
+- **Reference files by their full repo-relative path, not a bare filename** — `src/lib/webgl/packScene.ts`, not `packScene.ts`. Do this every time the file is named, even right next to an earlier mention that already gave the full path; don't rely on the reader having seen that earlier sentence.
 - **A sentence naming more than one file path becomes a bulleted list instead, sorted, one path per line** — even where that costs a sub-bullet under the sentence introducing them.
   - Each path is then greppable, and adding or removing one touches one line of diff.
   - Write that introducing sentence as the rule the listed files share, rather than as a subject made of their names.
@@ -81,10 +81,9 @@ A single Vite + React app, with no server runtime.
 - `src/shaders/` — the GLSL vertex and fragment shaders, imported into the app as strings.
 - `src/components/` — React components, styled with Tailwind CSS utility classes.
 - `src/styles/` — `globals.css`, which imports Tailwind and holds the range slider rules that Tailwind has no utilities for.
-- `src/lib/math/` — vectors, matrices, rays, spheres and the `RefFrame` transform hierarchy.
 - `src/lib/store/` — the Zustand store for UI and rendering-status state only.
-- `src/lib/webgl/` — shader wrappers, textures, and scene loading with BVH construction.
-- `src/types/` — shared types, including `CanvasVars`.
+- `src/lib/hooks/` — custom React hooks, one per file.
+- `src/lib/webgl/` — the shader materials, texture helpers, and scene packing with its BVH worker.
 
 `@/*` maps to `src/*` in both `vite.config.ts` and `tsconfig.json`.
 
@@ -96,16 +95,16 @@ A single Vite + React app, with no server runtime.
   - The shader's BVH traversal stack is a fixed-size array with no bounds checking, so a deeper tree silently corrupts the render.
   - `BvhNode.subDivide` only calls `console.warn` when the limit is exceeded. It does not enforce it.
 - **The packed texture layout is defined twice and the two copies must change together.**
-  - `numFloatsPerFace`, `numFloatsPerBvhNode` and `numFloatsPerMaterial` in `src/lib/webgl/sceneLayout.ts` set the layout the CPU writes. `src/lib/webgl/bvhWorker.ts` packs the faces and BVH nodes with them, and `src/lib/webgl/scene.ts` packs the materials.
+  - `numFloatsPerFace`, `numFloatsPerBvhNode` and `numFloatsPerMaterial` in `src/lib/webgl/sceneLayout.ts` set the layout the CPU writes. `src/lib/webgl/bvhWorker.ts` packs the faces and BVH nodes with them, and `src/lib/webgl/packScene.ts` packs the materials.
   - The `*_INDEX` constants in `src/shaders/pathTrace.frag.glsl` set the layout the shader reads.
   - A mismatch renders wrong geometry or colors and reports no error.
-- **The BVH is built in a Web Worker.** `src/lib/webgl/scene.ts` sends world-space triangles to `src/lib/webgl/bvhWorker.ts` and receives the packed arrays back, so the worker cannot import anything that touches `window` or three.js.
-- **GLSL files are imported with Vite's `?raw` suffix.** `src/components/canvas.tsx` imports each file from `src/shaders/` as a string, so a renamed shader file fails the build. A GLSL syntax error still only shows up in the browser console when the shader compiles.
-- **Any camera, scene or parameter change calls `renderReset()` to restart accumulation at pass 0.** A new setting that affects the image needs the same reset, or the canvas blends old and new samples.
-- **While a mouse button is held, only pass 1 renders.** Accumulation resumes on release. This keeps dragging responsive ([Rendering](ARCHITECTURE.md#2-rendering-pipeline)).
-- **Material behavior comes from the glTF material fields.** `packMaterials` in `src/lib/webgl/scene.ts` reads them: a non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective with `metalness` as the reflection ratio and `1 - roughness` as the gloss. A glTF exported without these fields renders every surface as diffuse. Textures are ignored.
-- **The Zustand store holds UI and render-status state only.** Camera transforms, textures and WebGL handles live in the `CanvasVars` ref (`src/types/canvasVars.ts`), because they change every frame and must not trigger React re-renders.
-- **The app needs WebGL 2 with `EXT_color_buffer_float` and generous texture limits.** `checkGpuLimits` in `src/components/canvas.tsx` lists them. A GPU that fails the check leaves a blank canvas and only a console message.
+- **The BVH is built in a Web Worker.** `src/lib/webgl/packScene.ts` sends world-space triangles to `src/lib/webgl/bvhWorker.ts` and receives the packed arrays back, so the worker cannot import anything that touches `window` or three.js.
+- **GLSL files are imported with Vite's `?raw` suffix.** `src/lib/webgl/pathTraceMaterial.ts` and `src/lib/webgl/displayMaterial.ts` import each file from `src/shaders/` as a string, so a renamed shader file fails the build. A GLSL syntax error still only shows up in the browser console when the shader compiles. The GLSL files have no `#version` line, because the material's `glslVersion` writes it.
+- **Any camera or setting change restarts accumulation at pass 0.** `PathTracer` in `src/components/pathTracer.tsx` calls `renderReset` when the camera's world matrix changes, and when `cameraFov`, `numSamples`, `numBounces` or `shadingMethod` changes in the store. A new setting that affects the image must be added to that store subscription, or the canvas blends old and new samples.
+- **While the camera is being dragged, only pass 1 renders.** `CameraControls` sets `interactingRef` on `controlstart` and `controlend`, and accumulation resumes on release. This keeps dragging responsive ([Rendering](ARCHITECTURE.md#2-rendering-pipeline)).
+- **Material behavior comes from the glTF material fields.** `packMaterials` in `src/lib/webgl/packScene.ts` reads them: a non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective with `metalness` as the reflection ratio and `1 - roughness` as the gloss. A glTF exported without these fields renders every surface as diffuse. Textures are ignored.
+- **The Zustand store holds UI and render-status state only.** The camera, render targets, textures and pass counter live in React Three Fiber and `PathTracer`, because they change every frame and must not trigger React re-renders.
+- **The app needs WebGL 2 with `EXT_color_buffer_float` and generous texture limits.** `checkGpuLimits` in `src/components/viewport.tsx` lists them. A GPU that fails the check leaves a blank canvas and only a console message.
 
 ---
 
@@ -115,7 +114,7 @@ A single Vite + React app, with no server runtime.
 - **Style with Tailwind utility classes in the JSX.** Add CSS to `src/styles/globals.css` only for something Tailwind has no utility for. A class string shared by several elements in one file goes into a constant above the component ([Styling](ARCHITECTURE.md#8-styling)).
 - **Prefer `function` declarations over arrow functions**, except closures assigned to a local (`const handleClick = () => {...}`), inline arguments (`.map(x => ...)`, `useEffect(() => {...})`), or an arrow function returned from a function (`return x => doSomething(x)`). Top-level: `export function foo() {}`, not `export const foo = () => {}`.
 - **Use named exports. A file default exports only when the framework or tool that loads it accepts nothing else.** Config files for ESLint, Prettier and Vite are the usual cases.
-  - Existing files such as `src/lib/webgl/scene.ts` default export a class. Leave those as they are unless the file is being rewritten anyway.
+  - Existing files such as `src/components/forms.tsx` default export a component. Leave those as they are unless the file is being rewritten anyway.
 - **`if`/`for`/`while`/`do` bodies always use a `{ }` block** — never `if (x) return`.
 - **At file scope, constants and variables come first, then types and interfaces, then functions.** A reader meets the values and shapes a file works with before the code that uses them.
   - Module state such as `let cached` counts as a variable.

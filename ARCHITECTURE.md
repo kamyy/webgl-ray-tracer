@@ -6,7 +6,7 @@ Why the system is shaped this way: decisions, alternatives rejected, costs accep
 - [2. Rendering pipeline](#2-rendering-pipeline)
 - [3. Scene loading & BVH](#3-scene-loading--bvh)
 - [4. Ray tracing shader](#4-ray-tracing-shader)
-- [5. Scene graph](#5-scene-graph)
+- [5. Camera and controls](#5-camera-and-controls)
 - [6. State management](#6-state-management)
 - [7. Hosting & CI/CD](#7-hosting--cicd)
 - [8. Styling](#8-styling)
@@ -30,30 +30,31 @@ The cost accepted is a hardware floor: a recent GPU, WebGL 2 and the `EXT_color_
 
 ## 2. Rendering pipeline
 
-Each animation frame is one render pass made of two shaders.
+Each animation frame is one render pass made of two shaders. React Three Fiber owns the canvas, the camera and the controls, and `PathTracer` (`src/components/pathTracer.tsx`) does all the drawing.
 
 ```text
- ┌───────────────┐   one sample per pixel    ┌──────────────────────────┐
- │ SampleShader  ├──────────────────────────►│ ColorTextures            │
- │ pathTrace.frag│   added to the accumulator│ RGBA32F source ◄► target │
- └───────────────┘                           └────────────┬─────────────┘
-                                                          │ accumulated color
-                                                          ▼
-                                             ┌────────────────────────┐
-                                             │ CanvasShader           │
-                                             │ display.frag.glsl      │
-                                             │ color / render pass    │
-                                             └────────────┬───────────┘
-                                                          ▼
-                                                   visible canvas
+ ┌────────────────────┐   one sample per pixel    ┌──────────────────────────┐
+ │ PathTraceMaterial  ├──────────────────────────►│ two float render targets │
+ │ pathTrace.frag.glsl│   added to the accumulator│ RGBA32F source ◄► target │
+ └────────────────────┘                           └────────────┬─────────────┘
+                                                               │ accumulated color
+                                                               ▼
+                                                  ┌────────────────────────┐
+                                                  │ DisplayMaterial        │
+                                                  │ display.frag.glsl      │
+                                                  │ color / render pass    │
+                                                  └────────────┬───────────┘
+                                                               ▼
+                                                        visible canvas
 ```
 
-- **`SampleShader`** (`src/shaders/pathTrace.vert.glsl`, `src/shaders/pathTrace.frag.glsl`) path-traces one sample per pixel into an off-screen `RGBA32F` accumulator. `ColorTextures` keeps a source and target texture pair, because a shader can't read and write the same texture in one draw.
-- **`CanvasShader`** (`src/shaders/display.vert.glsl`, `src/shaders/display.frag.glsl`) divides the accumulated color by the pass count and draws it to the visible canvas.
+- **`PathTraceMaterial`** (`src/lib/webgl/pathTraceMaterial.ts`, with `src/shaders/pathTrace.vert.glsl` and `src/shaders/pathTrace.frag.glsl`) path-traces one sample per pixel into an off-screen `RGBA32F` accumulator. `PathTracer` keeps two render targets and swaps their roles every pass, because a shader can't read and write the same texture in one draw.
+- **`DisplayMaterial`** (`src/lib/webgl/displayMaterial.ts`, with `src/shaders/display.vert.glsl` and `src/shaders/display.frag.glsl`) divides the accumulated color by the pass count and draws it to the visible canvas.
+- **Both are raw shader materials drawn on one screen-covering triangle** (`src/lib/webgl/screenQuad.ts`). A raw material skips the code three.js adds to its built-in materials, which would clash with the GLSL's own inputs and outputs. The GLSL files have no `#version` line because the material's `glslVersion` writes it.
 
 Splitting them keeps the accumulator a plain running sum, and only the display shader normalizes it.
 
-Rendering runs until the pass count reaches the sample setting. A camera, scene or parameter change resets the pass count and restarts accumulation. While a mouse button is held, only pass 1 renders, which trades image quality for a responsive drag.
+Rendering runs until the pass count reaches the sample setting. A camera or setting change resets the pass count and restarts accumulation. `PathTracer` notices a camera change by comparing the camera's world matrix with the previous frame's, so it does not depend on which control moved the camera. While the camera is being dragged, only pass 1 renders, which trades image quality for a responsive drag.
 
 ---
 
@@ -83,19 +84,19 @@ The scene is a glTF 2.0 binary (`public/suzanne.glb`) loaded with three.js's `GL
 
 ---
 
-## 5. Scene graph
+## 5. Camera and controls
 
-`RefFrame` (`src/lib/math/refFrame.ts`) is a hierarchical transform node, linked as parent, child and next sibling. It recomputes world matrices lazily: a `validSubtree` flag is set dirty by `invalidateSubtree` and cleared by `validateAscending`. A camera drag only invalidates what moved.
+drei's `PerspectiveCamera` and `CameraControls` (`src/components/viewport.tsx`) replace the hand-written transform hierarchy and mouse handlers. The app uses three.js's axes everywhere: the world is Y-up, which is also glTF's native orientation, and the camera looks down its own -z axis. The shader builds each ray in that camera space and multiplies it by the camera's world matrix, so no axis conversion is needed anywhere.
 
-`Scene` wires `rootNode → parentNode → cameraNode`. The mouse handlers in `src/components/canvas.tsx` orbit, pan and dolly by changing `cameraNode` and `parentNode` directly.
+`CameraControls` gives rotate, pan and dolly with the mouse and touch for free. The cost is that it has no Ctrl + left-drag pan, so panning is right-drag or two fingers. Its rotate speed is set to 0.5 to match the sensitivity of the old controls.
 
 ---
 
 ## 6. State management
 
-A Zustand store (`src/lib/store/appStore.ts`) holds only state the UI displays: the loading spinner, shading method, render pass and timing counters, and the sample, bounce and field-of-view settings. Zustand needs no provider component, and the render loop reads the store directly with `useAppStore.getState()`, so the settings are not copied into a second place.
+A Zustand store (`src/lib/store/appStore.ts`) holds only state the UI displays: the shading method, render pass and timing counters, and the sample, bounce and field-of-view settings. Zustand needs no provider component, and the render loop reads the store directly with `useAppStore.getState()`, so the settings are not copied into a second place.
 
-Everything else lives in the `CanvasVars` ref (`src/types/canvasVars.ts`) held by `Canvas`: camera transforms, textures and WebGL handles. These change every animation frame, and storing them in the store would re-render React on each change for no benefit.
+Everything else lives in React Three Fiber and `PathTracer`: the camera, the render targets, the textures and the pass counter. These change every animation frame, and storing them in the store would re-render React on each change for no benefit.
 
 ---
 

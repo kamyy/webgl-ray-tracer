@@ -1,34 +1,28 @@
-export default class RandomTexture {
-  private source: WebGLTexture | null = null
+/**
+ * Creates the texture of random generator seeds, one per pixel.
+ *
+ * The path-tracing shader draws random numbers to pick each ray's jitter and bounce, so every pixel needs its own
+ * generator state. Four random 32-bit integers per pixel seed that generator, and the shader then perturbs them by
+ * the pass number so every pass draws different samples.
+ */
+import { DataTexture, NearestFilter, RGBAIntegerFormat, UnsignedIntType } from 'three'
 
-  constructor(gl: WebGL2RenderingContext, wd: number, ht: number) {
-    const data = new Uint32Array(wd * ht * 4) // require 4 random values for each fragment to seed
-    for (let i = 0; i < data.length; ++i) {
-      // tausworthe/LCG random number generator
-      let n = Math.random() * 4294967295
-      while (n < 129) {
-        // tausworthe/LCG random number generator seed must be 129 or larger
-        n = Math.random() * 4294967295
-      }
-      data[i] = n
+export function createRandomTexture(width: number, height: number): DataTexture {
+  const data = new Uint32Array(width * height * 4) // require 4 random values for each fragment to seed
+  for (let i = 0; i < data.length; ++i) {
+    // tausworthe/LCG random number generator
+    let n = Math.random() * 4294967295
+    while (n < 129) {
+      // tausworthe/LCG random number generator seed must be 129 or larger
+      n = Math.random() * 4294967295
     }
-
-    gl.activeTexture(gl.TEXTURE2)
-    this.source = gl.createTexture()
-    if (this.source) {
-      gl.bindTexture(gl.TEXTURE_2D, this.source)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32UI, wd, ht, 0, gl.RGBA_INTEGER, gl.UNSIGNED_INT, data)
-    }
+    data[i] = n
   }
 
-  bindToSampleShader(gl: WebGL2RenderingContext, program: WebGLProgram): void {
-    // using texture unit 2
-    gl.activeTexture(gl.TEXTURE2)
-    gl.bindTexture(gl.TEXTURE_2D, this.source)
-    gl.uniform1i(gl.getUniformLocation(program, 'u_random_sampler'), 2)
-  }
+  const texture = new DataTexture(data, width, height, RGBAIntegerFormat, UnsignedIntType)
+  texture.internalFormat = 'RGBA32UI'
+  texture.minFilter = NearestFilter
+  texture.magFilter = NearestFilter
+  texture.needsUpdate = true
+  return texture
 }

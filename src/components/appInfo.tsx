@@ -20,7 +20,7 @@ export default function AppInfo() {
           <span className="font-bold">* Rotate</span> Left click + drag.
         </p>
         <p className="my-4">
-          <span className="font-bold">* Translate</span> Right click + drag. Or ctrl + left click + drag.
+          <span className="font-bold">* Translate</span> Right click + drag.
         </p>
         <p className="my-4">
           <span className="font-bold">* Zoom In/Out</span> Mouse wheel. Or middle click + drag up/down.

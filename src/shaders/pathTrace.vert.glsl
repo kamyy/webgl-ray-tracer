@@ -1,4 +1,3 @@
-#version 300 es
 precision highp int;
 precision highp float;
 
@@ -11,19 +10,19 @@ uniform float u_half_ht;
 // ----------------------------------------------------------------------------
 // attributes
 //
-in vec2 a_vert_data;
+in vec3 position;
 
 // ----------------------------------------------------------------------------
 // varyings
 //
 out float v_eye_to_x;
-out float v_eye_to_z;
+out float v_eye_to_y;
 
 // ----------------------------------------------------------------------------
 // main
 //
 void main() {
-   v_eye_to_x = a_vert_data.x * u_half_wd;
-   v_eye_to_z = a_vert_data.y * u_half_ht;
-   gl_Position = vec4(a_vert_data, 0.0, 1.0);
+   v_eye_to_x = position.x * u_half_wd;
+   v_eye_to_y = position.y * u_half_ht;
+   gl_Position = vec4(position.xy, 0.0, 1.0);
 }

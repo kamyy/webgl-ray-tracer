@@ -1,4 +1,3 @@
-#version 300 es
 precision highp int;
 precision highp float;
 
@@ -81,15 +80,15 @@ uniform int u_render_pass; // current render pass number
 uniform int u_num_bounces; // max number of ray bounces
 uniform int u_shading_method; // flat or Phong shading
 
-uniform float u_eye_to_image; // y axis distance to image plane from eye in view space
+uniform float u_eye_to_image; // distance from the eye to the image plane along the camera's -z axis, in pixels
 uniform vec3  u_eye_position; // eye position in world space
-uniform mat4  u_eye_to_world; // eye to world space matrix (BVH, rays and triangles are all stored in world space)
+uniform mat4  u_eye_to_world; // camera to world space matrix (BVH, rays and triangles are all stored in world space)
 
 // ----------------------------------------------------------------------------
 // varyings
 //
 in float v_eye_to_x;
-in float v_eye_to_z;
+in float v_eye_to_y;
 
 // ----------------------------------------------------------------------------
 // outputs
@@ -364,10 +363,10 @@ void main() {
     g_randGeneratorState = texelFetch(u_random_sampler, fragCoord, 0)
                             + uvec4(u_render_pass, u_render_pass, u_render_pass, u_render_pass);
 
-    vec4 rayTarget = u_eye_to_world * vec4( // transform ray target pos on image plane from view space to world space
+    vec4 rayTarget = u_eye_to_world * vec4( // transform ray target pos on image plane from camera space (x right, y up, looking down -z) to world space
         v_eye_to_x + rand(),
-        u_eye_to_image,
-        v_eye_to_z + rand(),
+        v_eye_to_y + rand(),
+        -u_eye_to_image,
         1.0
     );
 
