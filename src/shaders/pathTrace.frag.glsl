@@ -62,6 +62,14 @@ const int VERTEX_1_NRM_INDEX = 5;
 const int VERTEX_2_NRM_INDEX = 6;
 const int FACE_MATERIAL_INDEX = 7;
 
+// Faces and BVH nodes wrap onto rows of this many entries, so a mesh with many faces needs a short texture instead of a
+// tall one. All four constants must equal their counterparts in `src/lib/webgl/sceneLayout.ts`: `facesPerRow`,
+// `bvhNodesPerRow`, `numTexelsPerFace` and `numTexelsPerBvhNode`.
+const int FACES_PER_ROW = 64;
+const int BVH_NODES_PER_ROW = 64;
+const int TEXELS_PER_FACE = 8;
+const int TEXELS_PER_BVH_NODE = 3;
+
 const int MATERIAL_ALBEDO_INDEX = 0;
 const int MATERIAL_ATTRIB_INDEX = 1;
 
@@ -122,24 +130,35 @@ vec3 randPosInUnitSphere() {
     return p;
 }
 
+// --- texel addresses -----------------------------------------------------------------
+// Texel `texel` of face `face` in object `obj`'s slice of the faces texture.
+ivec3 faceTexel(int texel, int face, int obj) {
+    return ivec3((face % FACES_PER_ROW) * TEXELS_PER_FACE + texel, face / FACES_PER_ROW, obj);
+}
+
+// Texel `texel` of BVH node `node` in object `obj`'s slice of the BVH texture.
+ivec3 bvhTexel(int texel, int node, int obj) {
+    return ivec3((node % BVH_NODES_PER_ROW) * TEXELS_PER_BVH_NODE + texel, node / BVH_NODES_PER_ROW, obj);
+}
+
 // --- ray intersect objects -----------------------------------------------------------
 bool rayIntersectFace(Ray r, int face_index, int obj_index, out RayHitResult res) {
-    res.fn = texelFetch(u_face_sampler, ivec3(FACE_NRM_INDEX, face_index, obj_index), 0).xyz; // face normal
+    res.fn = texelFetch(u_face_sampler, faceTexel(FACE_NRM_INDEX, face_index, obj_index), 0).xyz; // face normal
 
     float fn_dot_ray_dir = dot(res.fn, r.dir);
     if (abs(fn_dot_ray_dir) < EPSILON) {
         return false; // ray direction almost parallel
     }
 
-    vec3 p0 = texelFetch(u_face_sampler, ivec3(VERTEX_0_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 0 position
+    vec3 p0 = texelFetch(u_face_sampler, faceTexel(VERTEX_0_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 0 position
 
     // A(origin.x + t*dir.x) + B(origin.y + t*dir.y) + C(origin.z + t*dir.z) - D = 0 (solve for t)
     res.t = (dot(res.fn, p0) - dot(res.fn, r.origin)) / fn_dot_ray_dir;
     if (res.t < EPSILON) return false; // contact point behind ray
 
     res.p = r.origin + res.t * r.dir; // contact point on plane
-    vec3 p1 = texelFetch(u_face_sampler, ivec3(VERTEX_1_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 1 position
-    vec3 p2 = texelFetch(u_face_sampler, ivec3(VERTEX_2_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 2 position
+    vec3 p1 = texelFetch(u_face_sampler, faceTexel(VERTEX_1_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 1 position
+    vec3 p2 = texelFetch(u_face_sampler, faceTexel(VERTEX_2_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 2 position
 
     // from Real-Time Collision Detection (Morgan Kaufman) by Christer Ericson
     vec3 v0 = p1 - p0;
@@ -198,11 +217,11 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
         while (top > -1) {
             node_idx = stack[top--]; // pop node index from top of stack
             if (rayIntersectBvhNode(r,
-                texelFetch(u_bvh_sampler, ivec3(BVH_NODE_MIN_BOUNDS_INDEX, node_idx, obj_idx), 0).xyz,// node min bounds
-                texelFetch(u_bvh_sampler, ivec3(BVH_NODE_MAX_BOUNDS_INDEX, node_idx, obj_idx), 0).xyz,// node max bounds
+                texelFetch(u_bvh_sampler, bvhTexel(BVH_NODE_MIN_BOUNDS_INDEX, node_idx, obj_idx), 0).xyz,// node min bounds
+                texelFetch(u_bvh_sampler, bvhTexel(BVH_NODE_MAX_BOUNDS_INDEX, node_idx, obj_idx), 0).xyz,// node max bounds
                 tEnter
             ) && tEnter < nearest.t) { // skip subtrees that can't be closer than the nearest hit found so far
-                texel = texelFetch(u_bvh_sampler, ivec3(BVH_NODE_PAYLOAD_INDEX, node_idx, obj_idx), 0);
+                texel = texelFetch(u_bvh_sampler, bvhTexel(BVH_NODE_PAYLOAD_INDEX, node_idx, obj_idx), 0);
                 lt_idx = int(texel.r); // index of L child BV node
                 rt_idx = int(texel.g); // index of R child BV node
                 f0_idx = int(texel.b); // index of a face inside current BV bounds
@@ -231,12 +250,12 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
             int obj_index = nearest.oi;
             int face_index = nearest.fi;
             nearest.n = normalize(
-                (texelFetch(u_face_sampler, ivec3(VERTEX_0_NRM_INDEX, face_index, obj_index), 0).xyz * u) +
-                (texelFetch(u_face_sampler, ivec3(VERTEX_1_NRM_INDEX, face_index, obj_index), 0).xyz * v) +
-                (texelFetch(u_face_sampler, ivec3(VERTEX_2_NRM_INDEX, face_index, obj_index), 0).xyz * w)
+                (texelFetch(u_face_sampler, faceTexel(VERTEX_0_NRM_INDEX, face_index, obj_index), 0).xyz * u) +
+                (texelFetch(u_face_sampler, faceTexel(VERTEX_1_NRM_INDEX, face_index, obj_index), 0).xyz * v) +
+                (texelFetch(u_face_sampler, faceTexel(VERTEX_2_NRM_INDEX, face_index, obj_index), 0).xyz * w)
             );
         }
-        nearest.mi = int(texelFetch(u_face_sampler, ivec3(FACE_MATERIAL_INDEX, nearest.fi, nearest.oi), 0).x); // material index
+        nearest.mi = int(texelFetch(u_face_sampler, faceTexel(FACE_MATERIAL_INDEX, nearest.fi, nearest.oi), 0).x); // material index
         return true;
     }
     return false;

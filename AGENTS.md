@@ -97,6 +97,7 @@ A single Vite + React app, with no server runtime.
 - **The packed texture layout is defined twice and the two copies must change together.**
   - `numFloatsPerFace`, `numFloatsPerBvhNode` and `numFloatsPerMaterial` in `src/lib/webgl/sceneLayout.ts` set the layout the CPU writes. `src/lib/webgl/bvhWorker.ts` packs the faces and BVH nodes with them, and `src/lib/webgl/packScene.ts` packs the materials.
   - The `*_INDEX` constants in `src/shaders/pathTrace.frag.glsl` set the layout the shader reads.
+  - `bvhNodesPerRow`, `facesPerRow`, `numTexelsPerBvhNode` and `numTexelsPerFace` in `src/lib/webgl/sceneLayout.ts` must equal `BVH_NODES_PER_ROW`, `FACES_PER_ROW`, `TEXELS_PER_BVH_NODE` and `TEXELS_PER_FACE` in the shader. They wrap each mesh onto rows so the textures stay under a phone GPU's height limit.
   - A mismatch renders wrong geometry or colors and reports no error.
 - **The BVH is built in a Web Worker.** `src/lib/webgl/packScene.ts` sends world-space triangles to `src/lib/webgl/bvhWorker.ts` and receives the packed arrays back, so the worker cannot import anything that touches `window` or three.js.
 - **GLSL files are imported with Vite's `?raw` suffix.** `src/lib/webgl/pathTraceMaterial.ts` and `src/lib/webgl/displayMaterial.ts` import each file from `src/shaders/` as a string, so a renamed shader file fails the build. A GLSL syntax error still only shows up in the browser console when the shader compiles. The GLSL files have no `#version` line, because the material's `glslVersion` writes it.

@@ -5,7 +5,7 @@
  * ran on the main thread. `packScene` sends world-space triangles here, and the worker sends back the packed arrays as
  * transferable buffers, so nothing is copied. These are the arrays that become the faces and BVH textures.
  */
-import { bvhMaxStackSize, numFloatsPerBvhNode, numFloatsPerFace } from './sceneLayout'
+import { bvhMaxStackSize, bvhNodesPerRow, facesPerRow, numFloatsPerBvhNode, numFloatsPerFace } from './sceneLayout'
 
 enum Axis {
   x = 0,
@@ -359,11 +359,22 @@ function packBvhNodes(objects: { bvhNodes: BvhNode[] }[], maxNumBvhNodes: number
   return data
 }
 
+function roundUp(value: number, multiple: number) {
+  return Math.ceil(value / multiple) * multiple
+}
+
 self.onmessage = (event: MessageEvent<BvhRequest>) => {
   maxDepth = 0
   const objects = event.data.meshes.map(buildObject)
-  const maxNumFaces = objects.reduce((max, obj) => Math.max(max, obj.faces.length), 0)
-  const maxNumBvhNodes = objects.reduce((max, obj) => Math.max(max, obj.bvhNodes.length), 0)
+  // Each slice is a whole number of texture rows, so the counts round up to a multiple of the row length.
+  const maxNumFaces = roundUp(
+    objects.reduce((max, obj) => Math.max(max, obj.faces.length), 0),
+    facesPerRow,
+  )
+  const maxNumBvhNodes = roundUp(
+    objects.reduce((max, obj) => Math.max(max, obj.bvhNodes.length), 0),
+    bvhNodesPerRow,
+  )
 
   const result: BvhResult = {
     numObjects: objects.length,

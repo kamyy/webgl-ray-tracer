@@ -22,8 +22,10 @@ import {
 } from 'three'
 import type { BvhRequest, BvhRequestMesh, BvhResult } from './bvhWorker'
 import {
+  bvhNodesPerRow,
   DIELECTRIC_MATERIAL,
   EMISSIVE_MATERIAL,
+  facesPerRow,
   numFloatsPerMaterial,
   numTexelsPerBvhNode,
   numTexelsPerFace,
@@ -162,13 +164,24 @@ export async function packScene(root: Object3D): Promise<PackedScene> {
   })
   const bvh = await buildBvh({ meshes: triangles })
 
-  const facesTexture = new DataArrayTexture(bvh.faces, numTexelsPerFace, bvh.maxNumFaces, bvh.numObjects)
+  // `bvh.maxNumFaces` and `bvh.maxNumBvhNodes` are whole multiples of the row lengths, because the worker rounds them up.
+  const facesTexture = new DataArrayTexture(
+    bvh.faces,
+    numTexelsPerFace * facesPerRow,
+    bvh.maxNumFaces / facesPerRow,
+    bvh.numObjects,
+  )
   facesTexture.format = RGBFormat
   facesTexture.type = FloatType
   facesTexture.internalFormat = 'RGB32F'
   setExactTexels(facesTexture)
 
-  const bvhTexture = new DataArrayTexture(bvh.bvhNodes, numTexelsPerBvhNode, bvh.maxNumBvhNodes, bvh.numObjects)
+  const bvhTexture = new DataArrayTexture(
+    bvh.bvhNodes,
+    numTexelsPerBvhNode * bvhNodesPerRow,
+    bvh.maxNumBvhNodes / bvhNodesPerRow,
+    bvh.numObjects,
+  )
   bvhTexture.format = RGBAFormat
   bvhTexture.type = FloatType
   bvhTexture.internalFormat = 'RGBA32F'
