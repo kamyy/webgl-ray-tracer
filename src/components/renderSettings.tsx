@@ -4,10 +4,11 @@
  * Each slider is paired with a number field, so a value can be dragged to or typed exactly. Each control writes its
  * value to the app store. `PathTracer` watches those values and restarts accumulation when one changes.
  */
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { ShadingMethod, useAppStore } from '../lib/store/appStore'
 
-// The limits of each setting. They bound both the sliders and the number fields.
+// The limits of each setting. They bound both the sliders and the number fields. `RAY_BOUNCE_MAX_STACK_SIZE` in
+// `src/shaders/pathTrace.frag.glsl` must stay above `maxBounces`.
 const minSamples = 1
 const maxSamples = 10000
 const minBounces = 1
@@ -33,12 +34,26 @@ interface RangeRowProps {
 function RangeRow({ title, value, min, max, onChange }: RangeRowProps) {
   const id = useId()
 
-  // A half-typed number is ignored, so the field keeps its last valid value until the typing is a number in range.
+  // The text being typed, or null while the field shows the setting. Keeping the text lets the field hold a half-typed
+  // number such as the 4 on the way to 45, which is below `min` for a setting like the field of view.
+  const [draft, setDraft] = useState<string | null>(null)
+
+  // A number in range applies at once. Anything else waits in the field until the typing is finished.
   function onTyped(text: string) {
+    setDraft(text)
     const typed = parseInt(text)
+    if (typed >= min && typed <= max) {
+      onChange(typed)
+    }
+  }
+
+  // Leaving the field ends the typing, so a number out of range is clamped and a blank field returns to the setting.
+  function onTypingDone() {
+    const typed = parseInt(draft ?? '')
     if (!Number.isNaN(typed)) {
       onChange(Math.min(Math.max(typed, min), max))
     }
+    setDraft(null)
   }
 
   // `useId` links each label to its slider, so tapping the label focuses it.
@@ -61,9 +76,10 @@ function RangeRow({ title, value, min, max, onChange }: RangeRowProps) {
         type="number"
         min={min}
         max={max}
-        value={value}
+        value={draft ?? value}
         aria-label={`${title} value`}
         onChange={event => onTyped(event.target.value)}
+        onBlur={onTypingDone}
       />
     </div>
   )
