@@ -10,6 +10,7 @@ Why the system is shaped this way: decisions, alternatives rejected, costs accep
 - [6. State management](#6-state-management)
 - [7. Hosting & CI/CD](#7-hosting--cicd)
 - [8. Styling](#8-styling)
+- [9. Layout](#9-layout)
 
 ---
 
@@ -67,6 +68,26 @@ Rendering runs until the pass count reaches the sample setting. A camera or sett
 
 The scene is a glTF 2.0 binary (`public/suzanne.glb`) loaded with three.js's `GLTFLoader`. Each mesh becomes one object, and a bounding volume hierarchy (BVH) is built for each object so the shader tests a ray against a few boxes before it tests any triangle.
 
+```text
+ main thread                                             Web Worker
+ ┌──────────────────────────────┐   world-space triangles   ┌─────────────────────────────┐
+ │ GLTFLoader                   │   (transferred, not       │ src/lib/webgl/bvhWorker.ts  │
+ │   public/suzanne.glb         ├──────────────────────────►│   SAH split, one tree       │
+ │ usePackedScene ► packScene   │    copied)                │   per mesh                  │
+ │   extractTriangles           │◄──────────────────────────┤   packFaces, packBvhNodes   │
+ │   packMaterials              │   packed Float32Arrays    └─────────────────────────────┘
+ └──────────────┬───────────────┘
+                │ uploaded as textures
+                ▼
+ ┌─────────────────────────────────────────────────────────────┐
+ │ facesTexture and bvhTexture: one array layer per mesh       │
+ │ materialsTexture: one row per material                      │
+ └──────────────────────────────┬──────────────────────────────┘
+                                │ texelFetch
+                                ▼
+                     src/shaders/pathTrace.frag.glsl
+```
+
 - **The split uses the Surface Area Heuristic (SAH).** `BvhNode.findBestSplit` sweeps all three axes and every candidate position with prefix and suffix bounding-box sums. It picks the split minimizing `SA(left) * |left| + SA(right) * |right|`. This builds slower than a median split and gives faster traversal, which pays off because a tree is built once and traced millions of times.
 - **The tree is built in a Web Worker.** The SAH sweep sorts the faces three times per node, which takes seconds for a large mesh and freezes the page if it runs on the main thread. The main thread sends world-space triangles and receives the packed arrays as transferable buffers, so nothing is copied. The cost is that the BVH code can't use three.js types, because the worker has no use for them.
 - **Traversal uses a fixed-size stack, so tree depth is capped** at `bvhMaxStackSize`. GLSL has no recursion, and a dynamically sized stack isn't available.
@@ -101,6 +122,19 @@ drei's `PerspectiveCamera` and `CameraControls` (`src/components/viewport.tsx`) 
 
 A Zustand store (`src/lib/store/appStore.ts`) holds only state the UI displays: the shading method, render pass and timing counters, and the sample, bounce and field-of-view settings. Zustand needs no provider component, and the render loop reads the store directly with `useAppStore.getState()`, so the settings are not copied into a second place.
 
+```text
+ ┌────────────────────────────┐                                  ┌──────────────────────────────┐
+ │ PathTracer                 │   counters, about 4 a second     │ useAppStore                  │
+ │ src/components/            ├─────────────────────────────────►│   cameraFov, numSamples      │
+ │ pathTracer.tsx             │                                  │   numBounces, shadingMethod  │
+ │                            │◄─────────────────────────────────┤   renderingPass, the times   │
+ │ Owns, outside the store:   │   settings, read with getState() └──────────────┬───────────────┘
+ │   camera and controls      │                                                 │ selectors
+ │   render targets, textures │                                                 ▼
+ │   pass counter, strips     │                                    ProgressPill and SettingsPanel
+ └────────────────────────────┘                                    re-render when a value changes
+```
+
 Everything else lives in React Three Fiber and `PathTracer`: the camera, the render targets, the textures and the pass counter. These change every animation frame, and storing them in the store would re-render React on each change for no benefit.
 
 ---
@@ -121,3 +155,33 @@ Components are styled with Tailwind CSS utility classes in the JSX, not with CSS
 
 - **The cost is long `className` strings.** A string shared by several elements in one file goes into a constant above the component.
 - **The range slider track and thumb stay as CSS** in `src/styles/globals.css`, because Tailwind has no utilities for the vendor pseudo-elements that style them.
+
+---
+
+## 9. Layout
+
+The render view fills the whole screen, and everything else floats over it.
+
+```text
+ desktop                                       phone in portrait
+ ┌────────────────────────────────────────┐    ┌──────────────────────┐
+ │ ProgressPill              theme, About │    │ ProgressPill buttons │
+ │                                        │    │                      │
+ │            Viewport                    │    │      Viewport        │
+ │         (the whole of main)            │    │                      │
+ │                                        │    ├──────────────────────┤
+ │ SettingsPanel                          │    │ SettingsPanel        │
+ └────────────────────────────────────────┘    └──────────────────────┘
+   the floating layers sit over Viewport        the card becomes a bottom sheet
+   and never change its size
+```
+
+- **The view has no bars.** A header and a footer would take 100 to 200 px of height, most of it on a phone, for controls that sit idle while the image converges. A floating readout and a floating settings card cost no height, at the price of covering part of the image.
+- **The readout shows progress and the card holds the controls.** `src/components/hud.tsx` is a pill at the top left with the circular progress ring, the pass counter and the timing counters, plus an About button at the top right. The ring is the primary indicator, because a render converges over minutes and how far along it is matters more than any single setting. On a phone the pill shrinks to the ring, the pass count and the time left.
+- **The settings card collapses.** `src/components/settingsPanel.tsx` is a card at the bottom left with a slider and a number field for each of field of view, samples and bounces, plus the Flat/Phong control. Its title bar collapses it to a small Settings button, so the whole image can be seen. On a phone in portrait the open card is a bottom sheet across the full width.
+- **The theme is a `dark` class on the `<html>` element.** `src/lib/hooks/useTheme.ts` sets it from the saved choice, or from the operating system's setting on a first visit, and a button at the top right switches it. Tailwind's `dark:` variant and the color variables in `src/styles/globals.css` follow the class, so no reload is needed. The render itself does not change, because only the floating controls have a theme.
+- **Every floating element is absolutely positioned.** The card, the readout and the About popover overlap the view, so opening or collapsing them never changes the canvas size, rebuilds the render targets or restarts accumulation.
+- **The render view is capped at 2560 by 1440 CSS pixels from the `md` breakpoint up** (`src/lib/webgl/renderLimits.ts`). Every pixel is traced many times, so a maximized window on a 5K monitor, about 14.7 million pixels, would never converge. The cap is the size of a 1440p monitor, and a larger window shows the view centered. Phones are below the breakpoint, have few pixels, and use the whole window.
+- **Resizing the window resizes the canvas and restarts the render.** The new size rebuilds the render targets and `PathTracer` restarts accumulation at pass 0. The resize is debounced by 200 ms, so dragging a window edge does not rebuild them on every frame.
+- **Touch screens render at half the width and height.** A phone GPU is far slower than a desktop one, so a coarse pointer gives a quarter of the pixels, which the browser scales up. The canvas keeps its full CSS size. Rotating the phone resizes the view, which rebuilds the render targets and restarts accumulation. The resize is debounced by 200 ms so the rotation animation does not rebuild them repeatedly.
+- **GPU limits are checked against the loaded scene.** Phone GPUs often allow only 4096 or 8192 pixel textures, so the check compares the scene's real texture sizes with the GPU's limits, instead of demanding a fixed desktop-class minimum that would reject most phones. A failure is shown as a sentence in the view, because a blank canvas gives no hint. A lost WebGL context, which mobile GPUs trigger when a shader runs too long, shows a notice and restarts accumulation when the context returns.

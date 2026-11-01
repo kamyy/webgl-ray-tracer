@@ -14,16 +14,20 @@ export enum ShadingMethod {
 }
 
 interface AppState {
+  // Render settings. A change to any of them restarts accumulation.
   readonly shadingMethod: ShadingMethod
-  readonly renderingPass: number
-  readonly numSamples: number
-  readonly numBounces: number
-  readonly cameraFov: number
+  readonly numSamples: number // passes to accumulate before the render stops
+  readonly numBounces: number // most times a ray may bounce
+  readonly cameraFov: number // vertical field of view in degrees
+
+  // Render progress, written by `PathTracer` a few times a second. The times are text, ready to show.
+  readonly renderingPass: number // passes completed since the last restart
   readonly elapsedTime: string
   readonly etaTime: string
   readonly avgTime: string
 }
 
+// The ways to change the state. Each setter replaces one value.
 interface AppActions {
   setShadingMethod(shadingMethod: ShadingMethod): void
   setNumSamples(numSamples: number): void
@@ -40,15 +44,16 @@ export const useAppStore = create<AppState & AppActions>()(
     numSamples: 10,
     numBounces: 6,
     cameraFov: 45,
-    elapsedTime: '',
-    etaTime: '',
-    avgTime: '',
+    // A dash stands for a time that is not known yet.
+    elapsedTime: '--',
+    etaTime: '--',
+    avgTime: '--',
 
     setShadingMethod: shadingMethod => set({ shadingMethod }),
     setNumSamples: numSamples => set({ numSamples }),
     setNumBounces: numBounces => set({ numBounces }),
     setCameraFov: cameraFov => set({ cameraFov }),
     setStatus: status => set(status),
-    resetStatus: () => set({ renderingPass: 0, elapsedTime: '00:00:00', etaTime: '??:??:??', avgTime: '????' }),
+    resetStatus: () => set({ renderingPass: 0, elapsedTime: '--', etaTime: '--', avgTime: '--' }),
   })),
 )

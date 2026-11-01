@@ -79,7 +79,7 @@ A single Vite + React app, with no server runtime.
 
 - `public/` — the sample glTF scene (`suzanne.glb`) and the Draco decoder in `public/draco/`. Vite copies it into `dist/` as-is.
 - `src/shaders/` — the GLSL vertex and fragment shaders, imported into the app as strings.
-- `src/components/` — React components, styled with Tailwind CSS utility classes.
+- `src/components/` — React components, styled with Tailwind CSS utility classes. `src/components/hud.tsx` is the progress readout and About button, `src/components/settingsPanel.tsx` is the collapsible settings card, `src/components/popover.tsx` is the card the About button opens, the theme switch is in `src/components/hud.tsx`, and `src/components/viewport.tsx` is the render view.
 - `src/styles/` — `globals.css`, which imports Tailwind and holds the range slider rules that Tailwind has no utilities for.
 - `src/lib/store/` — the Zustand store for UI and rendering-status state only.
 - `src/lib/hooks/` — custom React hooks, one per file.
@@ -104,7 +104,9 @@ A single Vite + React app, with no server runtime.
 - **While the camera is being dragged, only pass 1 renders.** `CameraControls` sets `interactingRef` on `controlstart` and `controlend`, and accumulation resumes on release. This keeps dragging responsive ([Rendering](ARCHITECTURE.md#2-rendering-pipeline)).
 - **Material behavior comes from the glTF material fields.** `packMaterials` in `src/lib/webgl/packScene.ts` reads them: a non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective with `metalness` as the reflection ratio and `1 - roughness` as the gloss. A glTF exported without these fields renders every surface as diffuse. Textures are ignored.
 - **The Zustand store holds UI and render-status state only.** The camera, render targets, textures and pass counter live in React Three Fiber and `PathTracer`, because they change every frame and must not trigger React re-renders.
-- **The app needs WebGL 2 with `EXT_color_buffer_float`, `EXT_float_blend` and generous texture limits.** `checkGpuLimits` in `src/components/viewport.tsx` lists them. A GPU that fails the check leaves a blank canvas and only a console message.
+- **The render view's size cap comes from `src/lib/webgl/renderLimits.ts`.** `src/index.tsx` turns it into CSS variables for the `main` element that holds `Viewport`, `Hud` and `SettingsPanel`. Keep the readout, the settings card and the popover absolutely positioned inside `main`, or opening one resizes the canvas and restarts accumulation ([Layout](ARCHITECTURE.md#9-layout)).
+- **The app needs WebGL 2 with `EXT_color_buffer_float`, `EXT_float_blend` and enough texture units, and the GPU's texture limits must fit the scene.** `src/lib/webgl/checkGpuLimits.ts` checks them, and `src/components/viewport.tsx` shows the failure as a sentence in the view. The scene limits compare the real texture sizes with the GPU's limits, so a phone with small limits can still run a small scene.
+- **Touch devices render at half the width and height of the view.** `getPixelRatio` in `src/components/viewport.tsx` sets the canvas `dpr` to 0.5 when the primary pointer is coarse. The drawing buffer and the render targets are the view's CSS size times that ratio, so any code that sizes a texture to the view must multiply by `viewport.dpr`.
 
 ---
 
