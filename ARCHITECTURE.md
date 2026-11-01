@@ -59,12 +59,13 @@ Rendering runs until the pass count reaches the sample setting. A camera, scene 
 
 ## 3. Scene loading & BVH
 
-A Wavefront `.obj`/`.mtl` pair is parsed with `obj-file-parser` and `mtl-file-parser`. A bounding volume hierarchy (BVH) is built for each object so the shader tests a ray against a few boxes before it tests any triangle.
+The scene is a glTF 2.0 binary (`public/suzanne.glb`) loaded with three.js's `GLTFLoader`. Each mesh becomes one object, and a bounding volume hierarchy (BVH) is built for each object so the shader tests a ray against a few boxes before it tests any triangle.
 
-- **The split uses the Surface Area Heuristic (SAH).** `BV.findBestSplit` sweeps all three axes and every candidate position with prefix and suffix bounding-box sums. It picks the split minimizing `SA(left) * |left| + SA(right) * |right|`. This builds slower than a median split and gives faster traversal, which pays off because a tree is built once and traced millions of times.
+- **The split uses the Surface Area Heuristic (SAH).** `BvhNode.findBestSplit` sweeps all three axes and every candidate position with prefix and suffix bounding-box sums. It picks the split minimizing `SA(left) * |left| + SA(right) * |right|`. This builds slower than a median split and gives faster traversal, which pays off because a tree is built once and traced millions of times.
 - **Traversal uses a fixed-size stack, so tree depth is capped** at `bvhMaxStackSize`. GLSL has no recursion, and a dynamically sized stack isn't available.
 - **Faces, BVH nodes and materials are packed into `Float32Array`s** and uploaded as `TEXTURE_2D_ARRAY` and `TEXTURE_2D` textures, one array layer per mesh. `NEAREST` filtering with `texelFetch` reads the exact texel. Uniform buffers hold far less data than a texture.
-- **Material behavior comes from the material's name.** The names map to emissive, reflective and dielectric kinds. This was the quickest way to get lights and glass into the bundled scenes. The cost is that any other scene needs code changes ([State / what's next](AGENTS.md#6-state--whats-next)).
+- **glTF was chosen because its material fields already describe what the shader needs.** `metalness` becomes the reflection ratio, `1 - roughness` the gloss, `transmission` and `ior` select and drive dielectric materials, and `emissive` times `emissiveIntensity` makes a light. The alternative, OBJ with MTL, has no standard fields for emission, glass or roughness, so a scene needed hardcoded material names. The cost is that a scene must be authored or exported with these PBR fields set.
+- **The geometry is Draco-compressed** at 16-bit positions and 12-bit normals. The default quantization is coarse enough to show as faceting on smooth surfaces and as gaps between triangles. The file is about 6% of the size of the OBJ it replaced, and `DRACOLoader` decodes it in a web worker. The decoder is served from `public/draco/` instead of a CDN, so the app works offline and makes no third-party request.
 
 ---
 

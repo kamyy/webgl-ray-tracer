@@ -27,7 +27,7 @@ This app makes use of several features that were introduced in WebGL 2 including
 
 ![shot3](./screenshots/shot3.png)
 
-The Javascript portion of the app reads Wavefront OBJ and MTL files, creates one or more BVH trees before pushing all this data on to the GPU. It's other purpose is to handle user input and user interaction with the camera.
+The Javascript portion of the app loads a glTF scene, creates one or more BVH trees before pushing all this data on to the GPU. It's other purpose is to handle user input and user interaction with the camera.
 
 The pathTrace.frag.glsl fragment shader is the heart of the program. It handles:
 

@@ -210,7 +210,7 @@ export default function Canvas() {
             sampleShader.init(gl, pathTraceVertexShader, pathTraceFragmentShader)
             canvasShader.init(gl, displayVertexShader, displayFragmentShader)
             useAppStore.getState().setLoadingSpinner(LoadingSpinner.show)
-            cv.scene = new Scene(gl, '/suzanne.obj', '/suzanne.mtl')
+            cv.scene = new Scene(gl, '/suzanne.glb')
             return cv.scene.init()
           })
           .then(() => {
