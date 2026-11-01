@@ -16,5 +16,6 @@ export function usePackedScene(root: Object3D): PackedScene {
     packed = packScene(root)
     packedScenes.set(root, packed)
   }
+
   return use(packed)
 }

@@ -7,17 +7,25 @@
  */
 import { useEffect, useState } from 'react'
 
-type Theme = 'light' | 'dark'
-
 // The `localStorage` key that holds the saved choice.
 const storageKey = 'theme'
 
-// The saved choice if there is one, otherwise the operating system's setting.
+type Theme = 'light' | 'dark'
+
+// The saved choice if there is one, otherwise the operating system's setting. A browser that blocks site storage
+// throws when `localStorage` is touched, so that case falls back to the operating system's setting too.
 function getInitialTheme(): Theme {
-  const saved = localStorage.getItem(storageKey)
+  let saved: string | null = null
+  try {
+    saved = localStorage.getItem(storageKey)
+  } catch {
+    // Storage is blocked, so there is no saved choice.
+  }
+
   if (saved === 'light' || saved === 'dark') {
     return saved
   }
+
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
@@ -32,7 +40,11 @@ export function useTheme() {
   // Switches theme and saves the choice, so the next visit starts in it.
   function toggleTheme() {
     const next = theme === 'dark' ? 'light' : 'dark'
-    localStorage.setItem(storageKey, next)
+    try {
+      localStorage.setItem(storageKey, next)
+    } catch {
+      // Storage is blocked, so the choice lasts until the page closes.
+    }
     setTheme(next)
   }
 
