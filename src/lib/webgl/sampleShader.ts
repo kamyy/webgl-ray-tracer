@@ -44,7 +44,7 @@ export default class SampleShader extends Shader {
       gl.uniform1i(gl.getUniformLocation(this.pgm, 'u_num_objects'), scene.objCount)
       gl.uniform1i(gl.getUniformLocation(this.pgm, 'u_render_pass'), renderingPass)
       gl.uniform1i(gl.getUniformLocation(this.pgm, 'u_num_bounces'), renderingPass === 1 ? 1 : numBounces)
-      gl.uniform1i(gl.getUniformLocation(this.pgm, 'u_shadingMethod'), shadingMethod)
+      gl.uniform1i(gl.getUniformLocation(this.pgm, 'u_shading_method'), shadingMethod)
       gl.uniform1f(
         gl.getUniformLocation(this.pgm, 'u_eye_to_image'),
         (canvasHt * 0.5) / Math.tan(cameraFov * 0.5 * (Math.PI / 180.0)),

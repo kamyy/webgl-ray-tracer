@@ -77,7 +77,8 @@ A GPU path tracer that runs entirely in the browser through WebGL 2. React and T
 
 A single Vite + React app, with no server runtime.
 
-- `public/` — the GLSL shaders and the sample OBJ/MTL scene. Vite copies it into `dist/` as-is.
+- `public/` — the sample OBJ/MTL scene. Vite copies it into `dist/` as-is.
+- `src/shaders/` — the GLSL vertex and fragment shaders, imported into the app as strings.
 - `src/components/` — React components, styled with Tailwind CSS utility classes.
 - `src/styles/` — `globals.css`, which imports Tailwind and holds the range slider rules that Tailwind has no utilities for.
 - `src/lib/math/` — vectors, matrices, rays, spheres and the `RefFrame` transform hierarchy.
@@ -91,19 +92,19 @@ A single Vite + React app, with no server runtime.
 
 ## 3. Rendering gotchas
 
-- **`bvMaxStackSize` in `src/lib/webgl/scene.ts` must equal `BV_MAX_STACK_SIZE` in `public/sample-fs.glsl`.**
+- **`bvhMaxStackSize` in `src/lib/webgl/scene.ts` must equal `BVH_MAX_STACK_SIZE` in `src/shaders/pathTrace.frag.glsl`.**
   - The shader's BVH traversal stack is a fixed-size array with no bounds checking, so a deeper tree silently corrupts the render.
   - `subDivide` only calls `console.warn` when the limit is exceeded. It does not enforce it.
 - **The packed texture layout is defined twice and the two copies must change together.**
-  - `numFloatsPerFace`, `numFloatsPerBV` and `numFloatsPerMtl` in `src/lib/webgl/scene.ts` set the layout the CPU writes.
-  - The `*_INDEX` constants in `public/sample-fs.glsl` set the layout the shader reads.
+  - `numFloatsPerFace`, `numFloatsPerBvhNode` and `numFloatsPerMaterial` in `src/lib/webgl/scene.ts` set the layout the CPU writes.
+  - The `*_INDEX` constants in `src/shaders/pathTrace.frag.glsl` set the layout the shader reads.
   - A mismatch renders wrong geometry or colors and reports no error.
-- **GLSL files are fetched at runtime from `public/`, not bundled by Vite.** `Shader.init` in `src/lib/webgl/shader.ts` calls `fetch()`, so a renamed shader file breaks at runtime and `tsc` stays green.
+- **GLSL files are imported with Vite's `?raw` suffix.** `src/components/canvas.tsx` imports each file from `src/shaders/` as a string, so a renamed shader file fails the build. A GLSL syntax error still only shows up in the browser console when the shader compiles.
 - **Any camera, scene or parameter change calls `renderReset()` to restart accumulation at pass 0.** A new setting that affects the image needs the same reset, or the canvas blends old and new samples.
 - **While a mouse button is held, only pass 1 renders.** Accumulation resumes on release. This keeps dragging responsive ([Rendering](ARCHITECTURE.md#2-rendering-pipeline)).
 - **Material behavior is chosen by hardcoded MTL name matches in `Scene.init`** (`'light'`, `'glass'`, `'suzanne'`, `'teapot'`, `'ladder'`). A new scene with other material names renders every material as reflective.
 - **The Zustand store holds UI and render-status state only.** Camera transforms, textures and WebGL handles live in the `CanvasVars` ref (`src/types/canvasVars.ts`), because they change every frame and must not trigger React re-renders.
-- **The app needs WebGL 2 with `EXT_color_buffer_float` and generous texture limits.** `GPU_MeetsRequirements` in `src/components/canvas.tsx` lists them. A GPU that fails the check leaves a blank canvas and only a console message.
+- **The app needs WebGL 2 with `EXT_color_buffer_float` and generous texture limits.** `checkGpuLimits` in `src/components/canvas.tsx` lists them. A GPU that fails the check leaves a blank canvas and only a console message.
 
 ---
 

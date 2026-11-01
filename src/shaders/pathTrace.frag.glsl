@@ -23,17 +23,8 @@ struct RayHitResult {
     int oi; // obj index
 };
 
-/*
-struct Sphere {
-    vec3  center;
-    float radius;
-    float radiusSquared;
-    int   materialIndex;
-};
-*/
-
-struct Mtl {
-    int   mtlCls;
+struct Material {
+    int   materialClass;
     vec3  albedo;
     float reflectionRatio;
     float reflectionGloss;
@@ -52,10 +43,10 @@ const int EMISSIVE_MATERIAL   = 0;
 const int REFLECTIVE_MATERIAL = 1;
 const int DIELECTRIC_MATERIAL = 2;
 
-const int BV_MAX_STACK_SIZE = 16;
-const int BV_MIN_BOUNDS_INDEX = 0;
-const int BV_MAX_BOUNDS_INDEX = 1;
-const int BV_PAYLOAD_INDEX = 2;
+const int BVH_MAX_STACK_SIZE = 16;
+const int BVH_NODE_MIN_BOUNDS_INDEX = 0;
+const int BVH_NODE_MAX_BOUNDS_INDEX = 1;
+const int BVH_NODE_PAYLOAD_INDEX = 2;
 
 const int FACE_NRM_INDEX = 0;
 const int VERTEX_0_POS_INDEX = 1;
@@ -64,10 +55,10 @@ const int VERTEX_2_POS_INDEX = 3;
 const int VERTEX_0_NRM_INDEX = 4;
 const int VERTEX_1_NRM_INDEX = 5;
 const int VERTEX_2_NRM_INDEX = 6;
-const int FACE_MTL_INDEX = 7;
+const int FACE_MATERIAL_INDEX = 7;
 
-const int MTL_ALBEDO_INDEX = 0;
-const int MTL_ATTRIB_INDEX = 1;
+const int MATERIAL_ALBEDO_INDEX = 0;
+const int MATERIAL_ATTRIB_INDEX = 1;
 
 const int RAY_BOUNCE_MAX_STACK_SIZE = 16;
 
@@ -82,13 +73,13 @@ uvec4 g_randGeneratorState; // random number generator current state
 uniform highp sampler2D u_color_sampler; // texture unit 1
 uniform highp usampler2D u_random_sampler; // texture unit 2
 uniform highp sampler2DArray u_face_sampler; // texture unit 3
-uniform highp sampler2DArray u_aabb_sampler; // texture unit 4
-uniform highp sampler2D u_mtl_sampler; // texture unit 5
+uniform highp sampler2DArray u_bvh_sampler; // texture unit 4
+uniform highp sampler2D u_material_sampler; // texture unit 5
 
 uniform int u_num_objects; // number of models/objects to render
 uniform int u_render_pass; // current render pass number
 uniform int u_num_bounces; // max number of ray bounces
-uniform int u_shadingMethod; // flat or Phong shading
+uniform int u_shading_method; // flat or Phong shading
 
 uniform float u_eye_to_image; // y axis distance to image plane from eye in view space
 uniform vec3  u_eye_position; // eye position in world space
@@ -181,9 +172,9 @@ bool rayIntersectFace(Ray r, int face_index, int obj_index, out RayHitResult res
     return true;
 }
 
-bool rayIntersectBV(Ray r, vec3 bvMin, vec3 bvMax, out float tEnter) { // ray intersect AABB slabs method sped up using intrinsics
-    vec3 t0 = (bvMin - r.origin) / r.dir;
-    vec3 t1 = (bvMax - r.origin) / r.dir;
+bool rayIntersectBvhNode(Ray r, vec3 nodeMin, vec3 nodeMax, out float tEnter) { // ray intersect AABB slabs method sped up using intrinsics
+    vec3 t0 = (nodeMin - r.origin) / r.dir;
+    vec3 t1 = (nodeMax - r.origin) / r.dir;
     vec3 tmin = min(t0, t1);
     vec3 tmax = max(t0, t1);
 
@@ -194,13 +185,13 @@ bool rayIntersectBV(Ray r, vec3 bvMin, vec3 bvMax, out float tEnter) { // ray in
 }
 
 bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
-    int stack[BV_MAX_STACK_SIZE];
+    int stack[BVH_MAX_STACK_SIZE];
     RayHitResult current;
     vec4 texel;
 
     int lt_idx, rt_idx;
     int f0_idx, f1_idx;
-    int bv_idx;
+    int node_idx;
     int top;
     float tEnter;
 
@@ -211,13 +202,13 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
         top = 0;
 
         while (top > -1) {
-            bv_idx = stack[top--]; // pop BV index from top of stack
-            if (rayIntersectBV(r,
-                texelFetch(u_aabb_sampler, ivec3(BV_MIN_BOUNDS_INDEX, bv_idx, obj_idx), 0).xyz,// BV AABB min bounds
-                texelFetch(u_aabb_sampler, ivec3(BV_MAX_BOUNDS_INDEX, bv_idx, obj_idx), 0).xyz,// BV AABB max bounds
+            node_idx = stack[top--]; // pop node index from top of stack
+            if (rayIntersectBvhNode(r,
+                texelFetch(u_bvh_sampler, ivec3(BVH_NODE_MIN_BOUNDS_INDEX, node_idx, obj_idx), 0).xyz,// node min bounds
+                texelFetch(u_bvh_sampler, ivec3(BVH_NODE_MAX_BOUNDS_INDEX, node_idx, obj_idx), 0).xyz,// node max bounds
                 tEnter
             ) && tEnter < nearest.t) { // skip subtrees that can't be closer than the nearest hit found so far
-                texel = texelFetch(u_aabb_sampler, ivec3(BV_PAYLOAD_INDEX, bv_idx, obj_idx), 0);
+                texel = texelFetch(u_bvh_sampler, ivec3(BVH_NODE_PAYLOAD_INDEX, node_idx, obj_idx), 0);
                 lt_idx = int(texel.r); // index of L child BV node
                 rt_idx = int(texel.g); // index of R child BV node
                 f0_idx = int(texel.b); // index of a face inside current BV bounds
@@ -237,7 +228,7 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     }
 
     if (nearest.t != MAX_FLT) { // ray has a nearest hit
-        if (u_shadingMethod == FLAT_SHADING) { // use the face normal for flat shading
+        if (u_shading_method == FLAT_SHADING) { // use the face normal for flat shading
             nearest.n = nearest.fn;
         } else { // interpolate vertex normals using barycentric coordinates to implement Phong shading
             float u = nearest.u;
@@ -251,59 +242,11 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
                 (texelFetch(u_face_sampler, ivec3(VERTEX_2_NRM_INDEX, face_index, obj_index), 0).xyz * w)
             );
         }
-        nearest.mi = int(texelFetch(u_face_sampler, ivec3(FACE_MTL_INDEX, nearest.fi, nearest.oi), 0).x); // material index
+        nearest.mi = int(texelFetch(u_face_sampler, ivec3(FACE_MATERIAL_INDEX, nearest.fi, nearest.oi), 0).x); // material index
         return true;
     }
     return false;
 }
-
-/*
-bool rayIntersectSphere(Ray r, Sphere s, out RayHitResult res) {
-    vec3  l = r.origin - s.center;
-    float a = dot(r.dir, r.dir);
-    float b = dot(r.dir, l);
-    float c = dot(l, l) - s.radiusSquared;
-
-    float discriminant = (b * b) - (a * c);
-    if (discriminant > 0.0) {
-        float sq = sqrt(discriminant);
-        float t;
-
-        t = (-b - sq) / a;
-        if (t > 0.0) {
-            res.t = t;
-            res.p = r.origin + r.dir * t;
-            res.n = (res.p - s.center) / s.radius;
-            res.m = s.materialIndex;
-            return true;
-        }
-        t = (-b + sq) / a;
-        if (t > 0.0) {
-            res.t = t;
-            res.p = r.origin + r.dir * t;
-            res.n = (res.p - s.center) / s.radius;
-            res.m = s.materialIndex;
-            return true;
-        }
-    }
-    return false;
-}
-
-bool rayIntersectNearestSphere(Ray r, out RayHitResult nearest) {
-    RayHitResult current;
-    bool contact = false;
-
-    for (int i = 0; i < u_num_spheres; ++i) {
-        if (rayIntersectSphere(r, u_spheres[i], current)) {
-            if (!contact || current.t < nearest.t) {
-                nearest = current;
-                contact = true;
-            }
-        }
-    }
-    return contact;
-}
-*/
 
 // ----------------------------------------------------------------------------
 // ray cast from eye through image pixel
@@ -313,16 +256,16 @@ float schlick(float cosine, float rindex) {
     return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
 }
 
-void rayBounceOffReflectiveSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
+void rayBounceOffReflectiveSurface(inout Ray ray, RayHitResult res, Material material) {
     ray.origin = res.p + res.fn * EPSILON;
-    if (rand() < mtl.reflectionRatio) {
-        ray.dir = normalize(reflect(ray.dir, res.n) + (1.0 - mtl.reflectionGloss) * randPosInUnitSphere());
+    if (rand() < material.reflectionRatio) {
+        ray.dir = normalize(reflect(ray.dir, res.n) + (1.0 - material.reflectionGloss) * randPosInUnitSphere());
     } else {
         ray.dir = normalize(res.p + res.n + randPosInUnitSphere() - res.p);
     }
 }
 
-void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
+void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Material material) {
     float refractionRatio;
     float reflectionProb;
     float cosine;
@@ -330,18 +273,18 @@ void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
     vec3  n;
 
     if (dot(ray.dir, res.n) < 0.0) { // into liquid/solid from air
-        refractionRatio = 1.0 / mtl.refractionIndex;
+        refractionRatio = 1.0 / material.refractionIndex;
         n  = +res.n;
         cosine = -dot(ray.dir, res.n);
     } else { // from object into air
-        refractionRatio = mtl.refractionIndex;
+        refractionRatio = material.refractionIndex;
         n  = -res.n;
-        cosine =  dot(ray.dir, res.n) * mtl.refractionIndex;
+        cosine =  dot(ray.dir, res.n) * material.refractionIndex;
     }
 
     refraction = refract(ray.dir, n, refractionRatio);
     if (dot(refraction, refraction) > 0.0) {
-        reflectionProb = schlick(cosine, mtl.refractionIndex);
+        reflectionProb = schlick(cosine, material.refractionIndex);
     } else {
         reflectionProb = 1.0;
     }
@@ -357,29 +300,29 @@ void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Mtl mtl) {
 
 vec3 pathTrace(Ray ray) {
     RayHitResult hitStack[RAY_BOUNCE_MAX_STACK_SIZE];
-    Mtl          mtlStack[RAY_BOUNCE_MAX_STACK_SIZE];
+    Material          materialStack[RAY_BOUNCE_MAX_STACK_SIZE];
     vec3 color = vec3(0.0, 0.0, 0.0);
     vec4 texel;
     bool bLoop = true;
     int  i = 0;
 
     while (bLoop && rayIntersectBVH(ray, hitStack[i])) {
-        mtlStack[i].albedo = texelFetch(u_mtl_sampler, ivec2(MTL_ALBEDO_INDEX, hitStack[i].mi), 0).xyz;
-        texel              = texelFetch(u_mtl_sampler, ivec2(MTL_ATTRIB_INDEX, hitStack[i].mi), 0);
-        mtlStack[i].mtlCls = int(texel.x);
-        mtlStack[i].reflectionRatio = texel.y;
-        mtlStack[i].reflectionGloss = texel.z;
-        mtlStack[i].refractionIndex = texel.w;
+        materialStack[i].albedo = texelFetch(u_material_sampler, ivec2(MATERIAL_ALBEDO_INDEX, hitStack[i].mi), 0).xyz;
+        texel              = texelFetch(u_material_sampler, ivec2(MATERIAL_ATTRIB_INDEX, hitStack[i].mi), 0);
+        materialStack[i].materialClass = int(texel.x);
+        materialStack[i].reflectionRatio = texel.y;
+        materialStack[i].reflectionGloss = texel.z;
+        materialStack[i].refractionIndex = texel.w;
 
-        switch (mtlStack[i].mtlCls) {
+        switch (materialStack[i].materialClass) {
         case EMISSIVE_MATERIAL:
-            color = mtlStack[i].albedo;
+            color = materialStack[i].albedo;
             bLoop = false;
             break;
 
         case REFLECTIVE_MATERIAL:
             if (i < u_num_bounces) {
-                rayBounceOffReflectiveSurface(ray, hitStack[i], mtlStack[i]);
+                rayBounceOffReflectiveSurface(ray, hitStack[i], materialStack[i]);
                 if (dot(ray.dir, hitStack[i].n) < 0.0) { // absorb ray
                     color = vec3(0.0, 0.0, 0.0);
                     bLoop = false;
@@ -388,16 +331,16 @@ vec3 pathTrace(Ray ray) {
                     i++;
                 }
             } else {
-                color = mtlStack[i].albedo;
+                color = materialStack[i].albedo;
                 bLoop = false;
             }
             break;
 
         case DIELECTRIC_MATERIAL:
             if (i < u_num_bounces) {
-                rayBounceOffDielectricSurface(ray, hitStack[i], mtlStack[i]); ++i;
+                rayBounceOffDielectricSurface(ray, hitStack[i], materialStack[i]); ++i;
             } else {
-                color = mtlStack[i].albedo;
+                color = materialStack[i].albedo;
                 bLoop = false;
             }
             break;
@@ -405,7 +348,7 @@ vec3 pathTrace(Ray ray) {
     }
 
     while (i > 0) {
-        color *= mtlStack[--i].albedo;
+        color *= materialStack[--i].albedo;
     }
 
     return color;
@@ -436,7 +379,7 @@ void main() {
     }
 
     /*
-    vec3 texel = texelFetch(u_mtl_sampler, ivec2(MTL_ATTRIB_INDEX, 0), 0).xyz;
+    vec3 texel = texelFetch(u_material_sampler, ivec2(MATERIAL_ATTRIB_INDEX, 0), 0).xyz;
     if (texel.z == 1.0) o_color = vec4(0.0, 1.0, 0.0, 1.0); else o_color = vec4(1.0, 0.0, 0.0, 1.0);
     */
 }
