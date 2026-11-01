@@ -37,6 +37,10 @@ interface Face {
   faceNormal: Vec3
   faceIndex: number // index into root face array
   materialIndex: number // index into material array
+
+  min: Vec3 // min corner of the face's bounding box
+  max: Vec3 // max corner of the face's bounding box
+  centroid: Vec3 // average of the three vertex positions, which the split sorts by
 }
 
 /** One mesh as world-space triangles, 9 floats per face (three corners of x, y, z). */
@@ -67,6 +71,39 @@ function component(v: Vec3, axis: Axis): number {
   return axis === Axis.x ? v.x : axis === Axis.y ? v.y : v.z
 }
 
+// Bounds with nothing inside yet, so the first face that is added sets both corners.
+function emptyBounds() {
+  return {
+    min: vec3(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER),
+    max: vec3(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER),
+  }
+}
+
+// The box around a group of faces. A box thinner than `bvMinDelta` on an axis is widened to that thickness, so a flat
+// group never gets a 2D box.
+function boundsOf(faces: Face[]) {
+  const { min, max } = emptyBounds()
+  faces.forEach(f => {
+    min.x = Math.min(min.x, f.min.x)
+    min.y = Math.min(min.y, f.min.y)
+    min.z = Math.min(min.z, f.min.z)
+    max.x = Math.max(max.x, f.max.x)
+    max.y = Math.max(max.y, f.max.y)
+    max.z = Math.max(max.z, f.max.z)
+  })
+  if (max.x - min.x < bvMinDelta) {
+    max.x += bvMinDelta
+  }
+  if (max.y - min.y < bvMinDelta) {
+    max.y += bvMinDelta
+  }
+  if (max.z - min.z < bvMinDelta) {
+    max.z += bvMinDelta
+  }
+
+  return { min, max }
+}
+
 class BvhNode {
   // axis-aligned bounding box node of the bounding volume hierarchy (BVH)
   min: Vec3 // min corner
@@ -89,31 +126,16 @@ class BvhNode {
       faces.forEach((face, i) => (this.faceIndices[i] = face.faceIndex))
     } else {
       maxDepth = Math.max(maxDepth, depth)
-      if (depth >= bvhMaxStackSize) {
+      // Traversal pops a node and pushes both children, so a node split at depth d leaves d + 2 entries on the stack.
+      if (depth + 2 > bvhMaxStackSize) {
         console.warn(
-          `BVH depth ${depth} reached the fragment shader's traversal stack limit (${bvhMaxStackSize}); raise BVH_MAX_STACK_SIZE in pathTrace.frag.glsl`,
+          `BVH depth ${depth} reached the fragment shader's traversal stack limit (${bvhMaxStackSize}); raise BVH_MAX_STACK_SIZE in src/shaders/pathTrace.frag.glsl`,
         )
       }
       // pick the axis/position that minimizes expected ray traversal cost (SAH)
       const { index, sorted } = BvhNode.findBestSplit(faces)
       this.splitAcross(index, sorted, bvhNodes, depth)
     }
-  }
-
-  static faceMin(face: Face): Vec3 {
-    return vec3(
-      Math.min(face.p0.x, face.p1.x, face.p2.x),
-      Math.min(face.p0.y, face.p1.y, face.p2.y),
-      Math.min(face.p0.z, face.p1.z, face.p2.z),
-    )
-  }
-
-  static faceMax(face: Face): Vec3 {
-    return vec3(
-      Math.max(face.p0.x, face.p1.x, face.p2.x),
-      Math.max(face.p0.y, face.p1.y, face.p2.y),
-      Math.max(face.p0.z, face.p1.z, face.p2.z),
-    )
   }
 
   static surfaceArea(min: Vec3, max: Vec3): number {
@@ -131,11 +153,9 @@ class BvhNode {
     let bestSorted = faces
 
     ;[Axis.x, Axis.y, Axis.z].forEach(axis => {
-      const sorted = [...faces].sort((faceA, faceB) => {
-        const a = (component(faceA.p0, axis) + component(faceA.p1, axis) + component(faceA.p2, axis)) / 3.0
-        const b = (component(faceB.p0, axis) + component(faceB.p1, axis) + component(faceB.p2, axis)) / 3.0
-        return a - b
-      })
+      const sorted = [...faces].sort(
+        (faceA, faceB) => component(faceA.centroid, axis) - component(faceB.centroid, axis),
+      )
       const n = sorted.length
 
       // prefix[i]/suffix[i] = bounds of sorted[0..i) / sorted[i..n)
@@ -144,11 +164,11 @@ class BvhNode {
       const suffixMin: Vec3[] = new Array(n + 1)
       const suffixMax: Vec3[] = new Array(n + 1)
 
-      prefixMin[0] = vec3(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
-      prefixMax[0] = vec3(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER)
+      const empty = emptyBounds()
+      prefixMin[0] = empty.min
+      prefixMax[0] = empty.max
       for (let i = 0; i < n; i++) {
-        const fMin = BvhNode.faceMin(sorted[i])
-        const fMax = BvhNode.faceMax(sorted[i])
+        const { min: fMin, max: fMax } = sorted[i]
         prefixMin[i + 1] = vec3(
           Math.min(prefixMin[i].x, fMin.x),
           Math.min(prefixMin[i].y, fMin.y),
@@ -161,11 +181,10 @@ class BvhNode {
         )
       }
 
-      suffixMin[n] = vec3(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
-      suffixMax[n] = vec3(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER)
+      suffixMin[n] = empty.min
+      suffixMax[n] = empty.max
       for (let i = n - 1; i >= 0; i--) {
-        const fMin = BvhNode.faceMin(sorted[i])
-        const fMax = BvhNode.faceMax(sorted[i])
+        const { min: fMin, max: fMax } = sorted[i]
         suffixMin[i] = vec3(
           Math.min(suffixMin[i + 1].x, fMin.x),
           Math.min(suffixMin[i + 1].y, fMin.y),
@@ -202,52 +221,14 @@ class BvhNode {
     let rightNode = null
 
     if (leftFaces.length > 0) {
-      const min = vec3(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
-      const max = vec3(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER)
-      leftFaces.forEach(f => {
-        min.x = Math.min(min.x, f.p0.x, f.p1.x, f.p2.x)
-        min.y = Math.min(min.y, f.p0.y, f.p1.y, f.p2.y)
-        min.z = Math.min(min.z, f.p0.z, f.p1.z, f.p2.z)
-        max.x = Math.max(max.x, f.p0.x, f.p1.x, f.p2.x)
-        max.y = Math.max(max.y, f.p0.y, f.p1.y, f.p2.y)
-        max.z = Math.max(max.z, f.p0.z, f.p1.z, f.p2.z)
-      })
-      if (max.x - min.x < bvMinDelta) {
-        max.x += bvMinDelta
-      }
-      if (max.y - min.y < bvMinDelta) {
-        max.y += bvMinDelta
-      }
-      if (max.z - min.z < bvMinDelta) {
-        max.z += bvMinDelta
-      }
-
+      const { min, max } = boundsOf(leftFaces)
       this.leftChild = bvhNodes.length
       leftNode = new BvhNode(min, max)
       bvhNodes.push(leftNode)
     }
 
     if (rightFaces.length > 0) {
-      const min = vec3(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
-      const max = vec3(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER)
-      rightFaces.forEach(f => {
-        min.x = Math.min(min.x, f.p0.x, f.p1.x, f.p2.x)
-        min.y = Math.min(min.y, f.p0.y, f.p1.y, f.p2.y)
-        min.z = Math.min(min.z, f.p0.z, f.p1.z, f.p2.z)
-        max.x = Math.max(max.x, f.p0.x, f.p1.x, f.p2.x)
-        max.y = Math.max(max.y, f.p0.y, f.p1.y, f.p2.y)
-        max.z = Math.max(max.z, f.p0.z, f.p1.z, f.p2.z)
-      })
-      if (max.x - min.x < bvMinDelta) {
-        max.x += bvMinDelta
-      }
-      if (max.y - min.y < bvMinDelta) {
-        max.y += bvMinDelta
-      }
-      if (max.z - min.z < bvMinDelta) {
-        max.z += bvMinDelta
-      }
-
+      const { min, max } = boundsOf(rightFaces)
       this.rightChild = bvhNodes.length
       rightNode = new BvhNode(min, max)
       bvhNodes.push(rightNode)
@@ -259,13 +240,6 @@ class BvhNode {
     if (rightNode) {
       rightNode.subDivide(rightFaces, bvhNodes, depth + 1)
     }
-  }
-}
-
-function emptyBounds() {
-  return {
-    min: vec3(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER),
-    max: vec3(Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER),
   }
 }
 
@@ -307,28 +281,13 @@ function buildObject(mesh: BvhRequestMesh): { faces: Face[]; bvhNodes: BvhNode[]
       faceNormal,
       materialIndex: mesh.materialIndex,
       faceIndex,
+      min: vec3(Math.min(p0.x, p1.x, p2.x), Math.min(p0.y, p1.y, p2.y), Math.min(p0.z, p1.z, p2.z)),
+      max: vec3(Math.max(p0.x, p1.x, p2.x), Math.max(p0.y, p1.y, p2.y), Math.max(p0.z, p1.z, p2.z)),
+      centroid: vec3((p0.x + p1.x + p2.x) / 3.0, (p0.y + p1.y + p2.y) / 3.0, (p0.z + p1.z + p2.z) / 3.0),
     })
   }
 
-  // root bounding box over all faces
-  const { min, max } = emptyBounds()
-  faces.forEach(f => {
-    min.x = Math.min(min.x, f.p0.x, f.p1.x, f.p2.x)
-    min.y = Math.min(min.y, f.p0.y, f.p1.y, f.p2.y)
-    min.z = Math.min(min.z, f.p0.z, f.p1.z, f.p2.z)
-    max.x = Math.max(max.x, f.p0.x, f.p1.x, f.p2.x)
-    max.y = Math.max(max.y, f.p0.y, f.p1.y, f.p2.y)
-    max.z = Math.max(max.z, f.p0.z, f.p1.z, f.p2.z)
-  })
-  if (max.x - min.x < bvMinDelta) {
-    max.x += bvMinDelta
-  } // don't allow a 2D AABB
-  if (max.y - min.y < bvMinDelta) {
-    max.y += bvMinDelta
-  }
-  if (max.z - min.z < bvMinDelta) {
-    max.z += bvMinDelta
-  }
+  const { min, max } = boundsOf(faces) // root bounding box over all faces
 
   const bvhNodes: BvhNode[] = []
   const root = new BvhNode(min, max)
