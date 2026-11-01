@@ -12,13 +12,21 @@ export const bvhMaxStackSize = 24
 
 // A face is eight texels: the face normal, three vertex positions, three vertex normals and the material index. Each
 // texel is three floats, so a face is 24 floats.
-export const numTexelsPerFace = 8 // RGB texels
+export const numTexelsPerFace = 8 // RGB texels. Must equal TEXELS_PER_FACE in src/shaders/pathTrace.frag.glsl.
 export const numFloatsPerFace = 24
+
+// Each object's faces wrap onto rows of this many faces. A row is `facesPerRow * numTexelsPerFace` texels wide, so the
+// texture's height is the face count divided by this, which keeps it under a phone GPU's texture size limit. Must
+// equal FACES_PER_ROW in src/shaders/pathTrace.frag.glsl.
+export const facesPerRow = 64
 
 // A BVH node is three texels: the box's minimum corner, its maximum corner, and the two child indices with up to two
 // face indices. Each texel is four floats, so a node is 12 floats.
-export const numTexelsPerBvhNode = 3 // RGBA texels
+export const numTexelsPerBvhNode = 3 // RGBA texels. Must equal TEXELS_PER_BVH_NODE in src/shaders/pathTrace.frag.glsl.
 export const numFloatsPerBvhNode = 12
+
+// BVH nodes wrap onto rows the same way. Must equal BVH_NODES_PER_ROW in src/shaders/pathTrace.frag.glsl.
+export const bvhNodesPerRow = 64
 
 // A material is two texels: the albedo color, then the class, reflection ratio, gloss and refractive index. Each texel
 // is four floats, so a material is eight floats.
