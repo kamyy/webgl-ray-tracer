@@ -1,9 +1,17 @@
+// Fragment shader for the path-tracing pass: traces one sample of light through every pixel.
+//
+// Each pixel fires a ray from the camera through its position on the image plane, with a random jitter inside the
+// pixel. The ray is followed through the scene by walking a bounding volume hierarchy (BVH) of triangles, and bounces
+// off diffuse, reflective and glass surfaces until it reaches a light or runs out of bounces. The result is added to
+// the accumulation texture, which averages many such samples.
+//
+// The scene arrives as packed textures. The `*_INDEX` and `*_MATERIAL` constants below must match
+// `src/lib/webgl/sceneLayout.ts`, which sets the layout the CPU writes.
+
 precision highp int;
 precision highp float;
 
-// ----------------------------------------------------------------------------
-// structures
-//
+// --- structures ----------------------------------------------------------------------
 struct Ray {
     vec3 origin; // ray origin
     vec3 dir;    // ray direction
@@ -30,9 +38,7 @@ struct Material {
     float refractionIndex;
 };
 
-// ----------------------------------------------------------------------------
-// constants
-//
+// --- constants -----------------------------------------------------------------------
 const float MAX_FLT = intBitsToFloat(2139095039);
 const float EPSILON = 0.001;
 
@@ -42,7 +48,7 @@ const int EMISSIVE_MATERIAL   = 0;
 const int REFLECTIVE_MATERIAL = 1;
 const int DIELECTRIC_MATERIAL = 2;
 
-const int BVH_MAX_STACK_SIZE = 16;
+const int BVH_MAX_STACK_SIZE = 24;
 const int BVH_NODE_MIN_BOUNDS_INDEX = 0;
 const int BVH_NODE_MAX_BOUNDS_INDEX = 1;
 const int BVH_NODE_PAYLOAD_INDEX = 2;
@@ -61,14 +67,10 @@ const int MATERIAL_ATTRIB_INDEX = 1;
 
 const int RAY_BOUNCE_MAX_STACK_SIZE = 16;
 
-// ----------------------------------------------------------------------------
-// globals
-//
+// --- globals -------------------------------------------------------------------------
 uvec4 g_randGeneratorState; // random number generator current state
 
-// ----------------------------------------------------------------------------
-// uniforms
-//
+// --- uniforms ------------------------------------------------------------------------
 uniform highp usampler2D u_random_sampler;
 uniform highp sampler2DArray u_face_sampler;
 uniform highp sampler2DArray u_bvh_sampler;
@@ -83,20 +85,14 @@ uniform float u_eye_to_image; // distance from the eye to the image plane along 
 uniform vec3  u_eye_position; // eye position in world space
 uniform mat4  u_eye_to_world; // camera to world space matrix (BVH, rays and triangles are all stored in world space)
 
-// ----------------------------------------------------------------------------
-// varyings
-//
+// --- varyings ------------------------------------------------------------------------
 in float v_eye_to_x;
 in float v_eye_to_y;
 
-// ----------------------------------------------------------------------------
-// outputs
-//
+// --- outputs -------------------------------------------------------------------------
 layout (location = 0) out vec4 o_color;
 
-// ----------------------------------------------------------------------------
-// randomness
-//
+// --- randomness ----------------------------------------------------------------------
 uint tauswortheGenerator(uint z, int S1, int S2, int S3, uint M) {
     return ((z & M) << S3) ^ (((z << S1) ^ z) >> S2);
 }
@@ -124,9 +120,7 @@ vec3 randPosInUnitSphere() {
     return p;
 }
 
-// ----------------------------------------------------------------------------
-// ray intersect objects
-//
+// --- ray intersect objects -----------------------------------------------------------
 bool rayIntersectFace(Ray r, int face_index, int obj_index, out RayHitResult res) {
     res.fn = texelFetch(u_face_sampler, ivec3(FACE_NRM_INDEX, face_index, obj_index), 0).xyz; // face normal
 
@@ -246,9 +240,7 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     return false;
 }
 
-// ----------------------------------------------------------------------------
-// ray cast from eye through image pixel
-//
+// --- ray cast from eye through image pixel -------------------------------------------
 float schlick(float cosine, float rindex) {
     float  r0 = (1.0 - rindex) / (1.0 + rindex); r0 *= r0;
     return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
@@ -352,9 +344,7 @@ vec3 pathTrace(Ray ray) {
     return color;
 }
 
-// ----------------------------------------------------------------------------
-// main
-//
+// --- main ----------------------------------------------------------------------------
 void main() {
     ivec2 fragCoord = ivec2(gl_FragCoord.xy);
 
@@ -373,9 +363,4 @@ void main() {
     // The render target adds this output to what it already holds (additive blending). Alpha adds up to the number
     // of samples the pixel has received, which the display shader divides by.
     o_color = vec4(pathTrace(ray), 1.0);
-
-    /*
-    vec3 texel = texelFetch(u_material_sampler, ivec2(MATERIAL_ATTRIB_INDEX, 0), 0).xyz;
-    if (texel.z == 1.0) o_color = vec4(0.0, 1.0, 0.0, 1.0); else o_color = vec4(1.0, 0.0, 0.0, 1.0);
-    */
 }

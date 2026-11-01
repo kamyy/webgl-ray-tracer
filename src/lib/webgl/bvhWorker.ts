@@ -2,7 +2,7 @@
  * Web Worker that builds the bounding volume hierarchy (BVH) and packs faces and BVH nodes into float arrays.
  *
  * Building the tree with the surface area heuristic takes seconds for a large mesh, which would freeze the page if it
- * ran on the main thread. `Scene` sends world-space triangles here, and the worker sends back the packed arrays as
+ * ran on the main thread. `packScene` sends world-space triangles here, and the worker sends back the packed arrays as
  * transferable buffers, so nothing is copied. These are the arrays that become the faces and BVH textures.
  */
 import { bvhMaxStackSize, numFloatsPerBvhNode, numFloatsPerFace } from './sceneLayout'
@@ -13,6 +13,8 @@ enum Axis {
   z = 2,
 }
 
+// The thinnest a bounding box is allowed to be on any axis. A flat group of faces would otherwise get a zero-width box
+// that rays miss through rounding.
 const bvMinDelta = 0.01
 
 let maxDepth = 0 // deepest BVH tree level reached while building, reported back to the main thread
