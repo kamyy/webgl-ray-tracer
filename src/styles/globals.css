@@ -1,45 +1,62 @@
-:root {
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.875em; /* 14px if default font size is 16px */
-  box-sizing: border-box;
-}
+@import "tailwindcss";
 
-*,
-::before,
-::after {
-  box-sizing: inherit; /* inherit border-box universally */
-}
+/* --- Base ------------------------------------------------------------------------- */
 
-.spinner {
-  position: absolute;
-  top: 28%;
-  left: 50%;
-  margin: auto;
-  border-radius: 50%;
-  border-top: 16px solid blue;
-  border-right: 16px solid green;
-  border-bottom: 16px solid red;
-  border-left: 16px solid yellow;
-  width: 12px;
-  height: 12px;
-  -webkit-animation: spin 2s linear infinite;
-  animation: spin 1s linear infinite;
-}
-
-@-webkit-keyframes spin {
-  0% {
-    -webkit-transform: rotate(0deg);
+@layer base {
+  :root {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 0.875em; /* 14px if default font size is 16px */
   }
-  100% {
-    -webkit-transform: rotate(360deg);
+
+  body {
+    margin: 8px;
   }
 }
 
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
+/* --- Range slider ----------------------------------------------------------------- */
+
+/* Tailwind has no utilities for the slider track and thumb, so they are styled here. */
+@layer base {
+  input[type="range"] {
+    -webkit-appearance: none;
+    background: transparent; /* otherwise white in Chrome */
+    cursor: pointer;
+
+    &::-webkit-slider-runnable-track {
+      -webkit-appearance: none;
+      height: 2px;
+      background: lightgray;
+    }
+    &::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 1em;
+      height: 1em;
+      border: none;
+      border-radius: 50%;
+      background: darkgreen;
+      box-shadow:
+        2px 2px 2px #000000,
+        0px 0px 2px #0d0d0d;
+      margin-top: -5px; /* specify margin in Chrome, in Firefox and IE it is automatic */
+    }
+
+    &::-moz-range-track {
+      height: 2px;
+      background: lightgray;
+    }
+    &::-moz-range-thumb {
+      width: 1em;
+      height: 1em;
+      border: none;
+      border-radius: 50%;
+      background: darkgreen;
+      box-shadow:
+        2px 2px 2px #000000,
+        0px 0px 2px #0d0d0d;
+    }
+
+    &:focus {
+      outline: none; /* remove blue border */
+    }
   }
 }

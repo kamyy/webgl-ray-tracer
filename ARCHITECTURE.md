@@ -9,6 +9,7 @@ Why the system is shaped this way: decisions, alternatives rejected, costs accep
 - [5. Scene graph](#5-scene-graph)
 - [6. State management](#6-state-management)
 - [7. Hosting & CI/CD](#7-hosting--cicd)
+- [8. Styling](#8-styling)
 
 ---
 
@@ -103,3 +104,12 @@ The app is fully client-side rendered, with the default Vite React setup and no 
 - **The bucket is served directly, with no CDN.** A new deploy is visible at once, and there is no cache to invalidate.
 - **CI deploys on every push to `main`.** The `build` job gates the `deploy` job, and the deploy assumes an AWS role through GitHub's OIDC token, so the repo stores no long-lived AWS keys.
 - **A push that changes only Markdown or `LICENSE` skips CI and deploy.** The built `dist/` would be identical, so the sync would do nothing.
+
+---
+
+## 8. Styling
+
+Components are styled with Tailwind CSS utility classes in the JSX, not with CSS modules or Sass. The markup and its look then change in one place, and a responsive layout is a breakpoint prefix on the element it affects (`md:flex-row`) rather than a media query in a second file.
+
+- **The cost is long `className` strings.** A string shared by several elements in one file goes into a constant above the component.
+- **The range slider track and thumb stay as CSS** in `src/styles/globals.css`, because Tailwind has no utilities for the vendor pseudo-elements that style them.

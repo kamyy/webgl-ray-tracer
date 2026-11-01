@@ -78,7 +78,8 @@ A GPU path tracer that runs entirely in the browser through WebGL 2. React and T
 A single Vite + React app, with no server runtime.
 
 - `public/` — the GLSL shaders and the sample OBJ/MTL scene. Vite copies it into `dist/` as-is.
-- `src/components/` — React components, each with a matching `*.module.scss`.
+- `src/components/` — React components, styled with Tailwind CSS utility classes.
+- `src/styles/` — `globals.css`, which imports Tailwind and holds the range slider rules that Tailwind has no utilities for.
 - `src/lib/math/` — vectors, matrices, rays, spheres and the `RefFrame` transform hierarchy.
 - `src/lib/store/` — the Redux Toolkit store for UI and rendering-status state only.
 - `src/lib/webgl/` — shader wrappers, textures, and scene loading with BVH construction.
@@ -109,6 +110,7 @@ A single Vite + React app, with no server runtime.
 ## 4. Coding standards
 
 - **Don't overengineer.** Solve the problem in front of you, not the general case it might become. Add no abstraction, config option, or extensibility hook for a second use case that doesn't exist yet. Add it when that use case actually shows up.
+- **Style with Tailwind utility classes in the JSX.** Add CSS to `src/styles/globals.css` only for something Tailwind has no utility for. A class string shared by several elements in one file goes into a constant above the component ([Styling](ARCHITECTURE.md#8-styling)).
 - **Prefer `function` declarations over arrow functions**, except closures assigned to a local (`const handleClick = () => {...}`), inline arguments (`.map(x => ...)`, `useEffect(() => {...})`), or an arrow function returned from a function (`return x => doSomething(x)`). Top-level: `export function foo() {}`, not `export const foo = () => {}`.
 - **Use named exports. A file default exports only when the framework or tool that loads it accepts nothing else.** Config files for ESLint, Prettier and Vite are the usual cases.
   - Existing files such as `src/lib/webgl/scene.ts` default export a class. Leave those as they are unless the file is being rewritten anyway.
@@ -119,7 +121,7 @@ A single Vite + React app, with no server runtime.
   - A constant computed by calling a helper in the same file sits directly below that helper, because it can't run before the helper's own inputs exist.
 - **Separate logical groups at file scope with a banner.** When a file's top-level declarations cover more than one subject, a banner names each group. A file with one subject has none.
   - The constants-then-types-then-functions order stays uncommented. So do the steps inside a function, which a blank line already separates.
-  - The banner is `// --- Name ` in TypeScript, JavaScript and GLSL, and `/* --- Name ` closed by ` */` in CSS and SCSS. Dashes pad the line to 88 characters.
+  - The banner is `// --- Name ` in TypeScript, JavaScript and GLSL, and `/* --- Name ` closed by ` */` in CSS. Dashes pad the line to 88 characters.
   - The name is the subject, in the words the code uses. A sentence that explains the group stays a normal comment directly under the banner.
 - **Define a file's sub-components and helpers above the component that uses them**, so a file reads bottom-up to its main export. A sub-component used by another sub-component goes above that one too.
 - **A helper that only one file uses is defined in that file, not in a module of its own.** Once a second file uses it, move it under `src/lib/`.
@@ -148,7 +150,7 @@ A single Vite + React app, with no server runtime.
 
 ### 5.1 Workflow & deploy
 
-`.github/workflows/ci.yml` runs on every push and pull request to `main`.
+`.github/workflows/ci.yml` runs on every push to `main` and on every pull request, whatever its base branch. That lets a PR stacked on another PR's branch get a CI result ([Git workflow](#53-git-workflow)).
 
 - The `build` job runs `format:check`, `lint`, `typecheck` and `build`. A push to `main` also uploads `dist/` as an artifact.
 - The `deploy` job needs the `build` job and runs only for a push to `main`. It assumes the AWS role in `secrets.AWS_DEPLOY_ROLE_ARN` and syncs `dist/` to the S3 bucket `webgl-ray-tracer.orky.net`.
@@ -167,6 +169,9 @@ A single Vite + React app, with no server runtime.
 
 - **`main` is push-protected.** All changes land via PR, including edits to docs and config.
 - **Leave changes uncommitted for the user to review.** Commit, push, open the PR and merge only when asked. Each request authorizes that one action, so "commit" does not mean "merge". The `ship` skill (`.claude/skills/ship/SKILL.md`) is the procedure once the user asks for all of them.
+- **Stack dependent PRs.** Create the next branch from the previous PR's branch and open the PR with `gh pr create --base <previous branch>`. Start the description with "Stacked on #<number>".
+  - Merge the bottom PR first, then run `gh pr edit <next PR> --base main` before merging the next one.
+  - After changing a lower PR, run `git rebase <lower branch>` and `git push --force-with-lease` on each branch above it, bottom to top.
 - **Branch names are type-prefixed** (`chore/`, `refactor/`, `docs/`, `fix/`, …).
 - **Split a change into one commit per logical step**, so a reviewer can read each one on its own.
 - **Commit messages end with the `Co-Authored-By` trailer and PR descriptions end with the "Generated with Claude Code" line**, using the exact lines the session's attribution reminder gives.

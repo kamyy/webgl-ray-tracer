@@ -233,7 +233,9 @@ export default function Canvas() {
 
   return (
     <>
-      {loadingSpinner === LoadingSpinner.show && <div className="spinner" />}
+      {loadingSpinner === LoadingSpinner.show && (
+        <div className="absolute top-[28%] left-1/2 m-auto h-3 w-3 animate-spin rounded-full border-[16px] border-t-[blue] border-r-[green] border-b-[red] border-l-[yellow]" />
+      )}
       <canvas ref={canvasCb} width={defaultCanvasVars.canvasWd} height={defaultCanvasVars.canvasHt}>
         Please use a GPU and browser that supports WebGL 2
       </canvas>
