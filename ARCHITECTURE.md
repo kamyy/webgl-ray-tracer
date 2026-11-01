@@ -101,7 +101,7 @@ The scene is a glTF 2.0 binary (`public/suzanne.glb`) loaded with three.js's `GL
 
 `src/shaders/pathTrace.frag.glsl` traces one sample per pixel.
 
-- **The random number generator combines three Tausworthe steps with a linear congruential generator.** Each pixel is seeded from `RandomTexture` and perturbed by the pass number, so every pass draws different samples and the average converges.
+- **The random number generator combines three Tausworthe steps with a linear congruential generator.** Each pixel is seeded from the texture that `createRandomTexture` in `src/lib/webgl/randomTexture.ts` builds, and perturbed by the pass number, so every pass draws different samples and the average converges.
 - **`rayIntersectBVH` walks every object's tree with an explicit stack.** It skips any subtree whose entry distance is farther than the nearest hit found so far.
 - **`pathTrace` unrolls the recursive algorithm into a loop** with a fixed-size stack, `RAY_BOUNCE_MAX_STACK_SIZE`, because GLSL can't recurse. It stops at an emissive material.
   - Reflective surfaces (`rayBounceOffReflectiveSurface`) blend glossy reflection with diffuse scattering through `reflectionRatio` and `reflectionGloss`.

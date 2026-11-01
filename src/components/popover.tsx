@@ -1,9 +1,8 @@
 /**
  * A small card that floats next to its anchor and closes on Escape or on a click outside it.
  *
- * The progress readout uses it for the About card. The caller positions it with a `className` such as `top-full right-0`, and
- * the card is absolutely placed inside the nearest positioned ancestor, so it overlaps the render view instead of
- * resizing it.
+ * The caller positions it with a `className` such as `top-full right-0`. The card is absolutely placed inside the
+ * nearest positioned ancestor, so it overlaps the render view instead of resizing it.
  */
 import { ReactNode, useEffect, useRef } from 'react'
 

@@ -116,7 +116,6 @@ A single Vite + React app, with no server runtime.
 - **Style with Tailwind utility classes in the JSX.** Add CSS to `src/styles/globals.css` only for something Tailwind has no utility for. A class string shared by several elements in one file goes into a constant above the component ([Styling](ARCHITECTURE.md#8-styling)).
 - **Prefer `function` declarations over arrow functions**, except closures assigned to a local (`const handleClick = () => {...}`), inline arguments (`.map(x => ...)`, `useEffect(() => {...})`), or an arrow function returned from a function (`return x => doSomething(x)`). Top-level: `export function foo() {}`, not `export const foo = () => {}`.
 - **Use named exports. A file default exports only when the framework or tool that loads it accepts nothing else.** Config files for ESLint, Prettier and Vite are the usual cases.
-  - Existing files such as `src/components/forms.tsx` default export a component. Leave those as they are unless the file is being rewritten anyway.
 - **`if`/`for`/`while`/`do` bodies always use a `{ }` block** — never `if (x) return`.
 - **At file scope, constants and variables come first, then types and interfaces, then functions.** A reader meets the values and shapes a file works with before the code that uses them.
   - Module state such as `let cached` counts as a variable.

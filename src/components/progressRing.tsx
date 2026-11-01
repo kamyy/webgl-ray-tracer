@@ -3,7 +3,7 @@
  *
  * The ring is a conic gradient: the accent color fills a pie slice from the top, and a white disc covers the middle so
  * only a ring shows. The caller sets the size with a Tailwind size class, so the ring can be bigger on a desktop than
- * on a phone. It repeats numbers that the header already prints, so it is hidden from screen readers.
+ * on a phone. It repeats the pass count that the progress pill already prints, so it is hidden from screen readers.
  */
 interface ProgressRingProps {
   proportion: number // 0.0 - 1.0

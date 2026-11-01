@@ -54,7 +54,7 @@ A shader, BVH or scene change needs a look in the browser, because nothing else 
 1. Run `pnpm dev` and open `http://localhost:3000`.
 2. Open the browser console. `BvhNode.subDivide` in the BVH worker warns if the BVH is too deep.
 3. Wait for the pass counter to reach the sample setting. The image should converge from noise to a smooth scene.
-4. Drag to orbit, then release. Accumulation should restart from pass 1.
+4. Drag to orbit, then release. Accumulation should restart at pass 0.
 5. Resize the window, or use the browser's device toolbar, and check the readout and the settings card in portrait and landscape, collapse the card, and open the About popover. The render should restart when the size changes. A window above the `md` breakpoint should show a view no larger than 2560 by 1440.
 
 ### 1.5 Changing the scene
