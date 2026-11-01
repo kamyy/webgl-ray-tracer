@@ -8,13 +8,18 @@
  */
 import { CameraControls, PerspectiveCamera, useGLTF } from '@react-three/drei'
 import { Canvas, useThree } from '@react-three/fiber'
-import { RefObject, Suspense, useEffect, useRef, useState } from 'react'
+import { Component, RefObject, Suspense, useEffect, useRef, useState } from 'react'
 import { usePackedScene } from '../lib/hooks/usePackedScene'
 import { useAppStore } from '../lib/store/appStore'
 import { checkGpuLimits, checkSceneLimits, supportsWebGL2 } from '../lib/webgl/checkGpuLimits'
 import { PathTracer } from './pathTracer'
 
 useGLTF.setDecoderPath('/draco/')
+
+interface SceneErrorBoundaryProps {
+  onError: (problem: string) => void
+  children: React.ReactNode
+}
 
 // Starts in front of the room, looking straight along -z at the objects. drei makes a new controls instance when
 // the default camera changes, so this runs on the instance that is actually used.
@@ -66,6 +71,25 @@ function TracedScene({
   return problem ? null : <PathTracer packed={packed} interactingRef={interactingRef} />
 }
 
+// Catches a failure to load, decode or pack the scene and reports it as a sentence for the view. Without it the error
+// reaches the root of the page and unmounts the whole app. React has no hook for catching a render error, so this
+// one is a class.
+class SceneErrorBoundary extends Component<SceneErrorBoundaryProps, { failed: boolean }> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidCatch(error: Error) {
+    this.props.onError(`The scene could not be loaded: ${error.message}`)
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children
+  }
+}
+
 // The camera, its controls and the traced scene. `interactingRef` tells `PathTracer` when the user is dragging.
 function Scene({
   onLoadingChange,
@@ -88,9 +112,11 @@ function Scene({
         onControlStart={() => (interactingRef.current = true)}
         onControlEnd={() => (interactingRef.current = false)}
       />
-      <Suspense fallback={<LoadingNotice onLoadingChange={onLoadingChange} />}>
-        <TracedScene interactingRef={interactingRef} onProblem={onProblem} />
-      </Suspense>
+      <SceneErrorBoundary onError={onProblem}>
+        <Suspense fallback={<LoadingNotice onLoadingChange={onLoadingChange} />}>
+          <TracedScene interactingRef={interactingRef} onProblem={onProblem} />
+        </Suspense>
+      </SceneErrorBoundary>
     </>
   )
 }
