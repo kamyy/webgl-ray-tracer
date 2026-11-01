@@ -1,7 +1,5 @@
 import { ReactElement } from 'react'
-import { appActions, ShadingMethod } from '../lib/store/appSlice'
-import { useAppDispatch, useAppSelector } from '../lib/store/hooks'
-import type { RootState } from '../lib/store/store'
+import { ShadingMethod, useAppStore } from '../lib/store/appStore'
 
 const minSamples = 1
 const maxSamples = 10000
@@ -19,11 +17,14 @@ const rangeMaxClass = 'basis-[5%] text-left'
 const rangeInputClass = 'mx-4 grow'
 
 export default function RenderingParams(): ReactElement {
-  const dispatch = useAppDispatch()
-  const cameraFov = useAppSelector((state: RootState) => state.cameraFov)
-  const numSamples = useAppSelector((state: RootState) => state.numSamples)
-  const numBounces = useAppSelector((state: RootState) => state.numBounces)
-  const shadingMethod = useAppSelector((state: RootState) => state.shadingMethod)
+  const cameraFov = useAppStore(state => state.cameraFov)
+  const numSamples = useAppStore(state => state.numSamples)
+  const numBounces = useAppStore(state => state.numBounces)
+  const shadingMethod = useAppStore(state => state.shadingMethod)
+  const setCameraFov = useAppStore(state => state.setCameraFov)
+  const setNumSamples = useAppStore(state => state.setNumSamples)
+  const setNumBounces = useAppStore(state => state.setNumBounces)
+  const setShadingMethod = useAppStore(state => state.setShadingMethod)
 
   return (
     <form className="flex p-8">
@@ -40,7 +41,7 @@ export default function RenderingParams(): ReactElement {
             min={minCameraFov}
             max={maxCameraFov}
             value={cameraFov}
-            onChange={event => dispatch(appActions.setCameraFov(parseInt(event.target.value)))}
+            onChange={event => setCameraFov(parseInt(event.target.value))}
           />
           <label className={rangeMaxClass}>{maxCameraFov}</label>
         </div>
@@ -57,7 +58,7 @@ export default function RenderingParams(): ReactElement {
             min={minSamples}
             max={maxSamples}
             value={numSamples}
-            onChange={event => dispatch(appActions.setNumSamples(parseInt(event.target.value)))}
+            onChange={event => setNumSamples(parseInt(event.target.value))}
           />
           <label className={rangeMaxClass}>{maxSamples}</label>
         </div>
@@ -74,7 +75,7 @@ export default function RenderingParams(): ReactElement {
             min={minBounces}
             max={maxBounces}
             value={numBounces}
-            onChange={event => dispatch(appActions.setNumBounces(parseInt(event.target.value)))}
+            onChange={event => setNumBounces(parseInt(event.target.value))}
           />
           <label className={rangeMaxClass}>{maxBounces}</label>
         </div>
@@ -90,7 +91,7 @@ export default function RenderingParams(): ReactElement {
             type="radio"
             value={ShadingMethod.flat}
             checked={shadingMethod === ShadingMethod.flat}
-            onChange={event => dispatch(appActions.setShadingMethod(parseInt(event.target.value)))}
+            onChange={event => setShadingMethod(parseInt(event.target.value))}
           />
           <label className="mt-2" htmlFor="flat">
             Flat
@@ -102,7 +103,7 @@ export default function RenderingParams(): ReactElement {
             type="radio"
             value={ShadingMethod.phong}
             checked={shadingMethod === ShadingMethod.phong}
-            onChange={event => dispatch(appActions.setShadingMethod(parseInt(event.target.value)))}
+            onChange={event => setShadingMethod(parseInt(event.target.value))}
           />
           <label className="mt-2" htmlFor="phong">
             Phong

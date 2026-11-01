@@ -81,7 +81,7 @@ A single Vite + React app, with no server runtime.
 - `src/components/` — React components, styled with Tailwind CSS utility classes.
 - `src/styles/` — `globals.css`, which imports Tailwind and holds the range slider rules that Tailwind has no utilities for.
 - `src/lib/math/` — vectors, matrices, rays, spheres and the `RefFrame` transform hierarchy.
-- `src/lib/store/` — the Redux Toolkit store for UI and rendering-status state only.
+- `src/lib/store/` — the Zustand store for UI and rendering-status state only.
 - `src/lib/webgl/` — shader wrappers, textures, and scene loading with BVH construction.
 - `src/types/` — shared types, including `CanvasVars` and the typings for the OBJ and MTL parsers.
 
@@ -102,7 +102,7 @@ A single Vite + React app, with no server runtime.
 - **Any camera, scene or parameter change calls `renderReset()` to restart accumulation at pass 0.** A new setting that affects the image needs the same reset, or the canvas blends old and new samples.
 - **While a mouse button is held, only pass 1 renders.** Accumulation resumes on release. This keeps dragging responsive ([Rendering](ARCHITECTURE.md#2-rendering-pipeline)).
 - **Material behavior is chosen by hardcoded MTL name matches in `Scene.init`** (`'light'`, `'glass'`, `'suzanne'`, `'teapot'`, `'ladder'`). A new scene with other material names renders every material as reflective.
-- **Redux holds UI and render-status state only.** Camera transforms, textures and WebGL handles live in the `CanvasVars` ref (`src/types/canvasVars.ts`), because they change every frame and must not trigger React re-renders.
+- **The Zustand store holds UI and render-status state only.** Camera transforms, textures and WebGL handles live in the `CanvasVars` ref (`src/types/canvasVars.ts`), because they change every frame and must not trigger React re-renders.
 - **The app needs WebGL 2 with `EXT_color_buffer_float` and generous texture limits.** `GPU_MeetsRequirements` in `src/components/canvas.tsx` lists them. A GPU that fails the check leaves a blank canvas and only a console message.
 
 ---

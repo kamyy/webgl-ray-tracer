@@ -1,4 +1,3 @@
-import { initialAppState } from '../lib/store/appSlice'
 import CanvasShader from '../lib/webgl/canvasShader'
 import ColorTextures from '../lib/webgl/colorTextures'
 import RandomTexture from '../lib/webgl/randomTexture'
@@ -8,11 +7,6 @@ import Scene from '../lib/webgl/scene'
 export interface CanvasVars {
   canvasWd: number
   canvasHt: number
-
-  cameraFov: number
-  numSamples: number
-  numBounces: number
-  shadingMethod: number
 
   renderingPass: number
   restartRenderTimestamp: number
@@ -39,11 +33,6 @@ export interface CanvasVars {
 export const defaultCanvasVars: Readonly<CanvasVars> = {
   canvasWd: 1280,
   canvasHt: 720,
-
-  cameraFov: initialAppState.cameraFov,
-  numSamples: initialAppState.numSamples,
-  numBounces: initialAppState.numBounces,
-  shadingMethod: initialAppState.shadingMethod,
 
   renderingPass: 0,
   restartRenderTimestamp: Date.now(),
