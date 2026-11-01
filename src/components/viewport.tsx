@@ -19,6 +19,10 @@ function checkGpuLimits(gl: WebGL2RenderingContext) {
     console.log('EXT_color_buffer_float not supported')
     return false
   }
+  if (!gl.getExtension('EXT_float_blend')) {
+    console.log('EXT_float_blend not supported')
+    return false
+  }
 
   const MAX_ARRAY_TEXTURE_LAYERS = gl.getParameter(gl.MAX_ARRAY_TEXTURE_LAYERS)
   const MAX_TEXTURE_IMAGE_UNITS = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS)

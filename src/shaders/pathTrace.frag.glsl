@@ -69,11 +69,10 @@ uvec4 g_randGeneratorState; // random number generator current state
 // ----------------------------------------------------------------------------
 // uniforms
 //
-uniform highp sampler2D u_color_sampler; // texture unit 1
-uniform highp usampler2D u_random_sampler; // texture unit 2
-uniform highp sampler2DArray u_face_sampler; // texture unit 3
-uniform highp sampler2DArray u_bvh_sampler; // texture unit 4
-uniform highp sampler2D u_material_sampler; // texture unit 5
+uniform highp usampler2D u_random_sampler;
+uniform highp sampler2DArray u_face_sampler;
+uniform highp sampler2DArray u_bvh_sampler;
+uniform highp sampler2D u_material_sampler;
 
 uniform int u_num_objects; // number of models/objects to render
 uniform int u_render_pass; // current render pass number
@@ -93,7 +92,7 @@ in float v_eye_to_y;
 // ----------------------------------------------------------------------------
 // outputs
 //
-layout (location = 0) out vec4 o_color; // texture unit 0, COLOR_ATTACHMENT0
+layout (location = 0) out vec4 o_color;
 
 // ----------------------------------------------------------------------------
 // randomness
@@ -371,11 +370,9 @@ void main() {
     );
 
     Ray ray = Ray(u_eye_position, normalize(rayTarget.xyz - u_eye_position));
-    if (u_render_pass == 1) { // o_color is a RGBAF32 texture render target
-        o_color = vec4(pathTrace(ray), 1.0); // very 1st render pass (initialize RGBAF32 texture render target)
-    } else { // add sample color into RGBA32F texture render target
-        o_color = vec4(pathTrace(ray), 0.0) + texelFetch(u_color_sampler, fragCoord, 0);
-    }
+    // The render target adds this output to what it already holds (additive blending). Alpha adds up to the number
+    // of samples the pixel has received, which the display shader divides by.
+    o_color = vec4(pathTrace(ray), 1.0);
 
     /*
     vec3 texel = texelFetch(u_material_sampler, ivec2(MATERIAL_ATTRIB_INDEX, 0), 0).xyz;

@@ -24,33 +24,38 @@ A fragment shader does the tracing because every pixel is independent, which is 
 - Texture arrays, which hold one BVH per mesh.
 - `texelFetch`, which reads exact texels with no filtering.
 
-The cost accepted is a hardware floor: a recent GPU, WebGL 2 and the `EXT_color_buffer_float` extension.
+The cost accepted is a hardware floor: a recent GPU, WebGL 2 and the `EXT_color_buffer_float` and `EXT_float_blend` extensions.
 
 ---
 
 ## 2. Rendering pipeline
 
-Each animation frame is one render pass made of two shaders. React Three Fiber owns the canvas, the camera and the controls, and `PathTracer` (`src/components/pathTracer.tsx`) does all the drawing.
+Each animation frame draws one strip of a render pass, using two shaders. React Three Fiber owns the canvas, the camera and the controls, and `PathTracer` (`src/components/pathTracer.tsx`) does all the drawing.
 
 ```text
- ┌────────────────────┐   one sample per pixel    ┌──────────────────────────┐
- │ PathTraceMaterial  ├──────────────────────────►│ two float render targets │
- │ pathTrace.frag.glsl│   added to the accumulator│ RGBA32F source ◄► target │
+ ┌────────────────────┐   one strip of samples    ┌──────────────────────────┐
+ │ PathTraceMaterial  ├──────────────────────────►│ one float render target  │
+ │ pathTrace.frag.glsl│   added by blending       │ RGBA32F, sum + count     │
  └────────────────────┘                           └────────────┬─────────────┘
                                                                │ accumulated color
                                                                ▼
                                                   ┌────────────────────────┐
                                                   │ DisplayMaterial        │
                                                   │ display.frag.glsl      │
-                                                  │ color / render pass    │
+                                                  │ color / sample count   │
                                                   └────────────┬───────────┘
                                                                ▼
                                                         visible canvas
 ```
 
-- **`PathTraceMaterial`** (`src/lib/webgl/pathTraceMaterial.ts`, with `src/shaders/pathTrace.vert.glsl` and `src/shaders/pathTrace.frag.glsl`) path-traces one sample per pixel into an off-screen `RGBA32F` accumulator. `PathTracer` keeps two render targets and swaps their roles every pass, because a shader can't read and write the same texture in one draw.
-- **`DisplayMaterial`** (`src/lib/webgl/displayMaterial.ts`, with `src/shaders/display.vert.glsl` and `src/shaders/display.frag.glsl`) divides the accumulated color by the pass count and draws it to the visible canvas.
+- **`PathTraceMaterial`** (`src/lib/webgl/pathTraceMaterial.ts`, with `src/shaders/pathTrace.vert.glsl` and `src/shaders/pathTrace.frag.glsl`) path-traces samples into an off-screen `RGBA32F` target with additive blending. The rgb channels hold the running sum of sample colors, and alpha counts the samples each pixel has received.
+- **`DisplayMaterial`** (`src/lib/webgl/displayMaterial.ts`, with `src/shaders/display.vert.glsl` and `src/shaders/display.frag.glsl`) divides the sum by the per-pixel count and draws it to the visible canvas.
+- **A pass is drawn as horizontal strips, one strip per animation frame.** A full pass on a mid-range GPU or a phone can take hundreds of milliseconds. The page cannot repaint while the GPU is busy, so one long draw makes the whole page stutter, and mobile browsers may reset the WebGL context. Strips keep each GPU job short.
+  - The strip count adapts to the frame time, between 1 and 32. It doubles after consecutive frames over 24 ms and halves after about half a second of frames under 18 ms. It changes only between passes, so each pass covers every row exactly once.
+  - The cost is that the target must be additive, which needs the `EXT_float_blend` extension, and that rows can briefly hold different sample counts. The per-pixel count in alpha makes that invisible.
+  - The first pass after a restart is a one-bounce preview drawn whole, so a moving camera always shows a complete image.
 - **Both are raw shader materials drawn on one screen-covering triangle** (`src/lib/webgl/screenQuad.ts`). A raw material skips the code three.js adds to its built-in materials, which would clash with the GLSL's own inputs and outputs. The GLSL files have no `#version` line because the material's `glslVersion` writes it.
+- **Pass and timing counters reach the store about four times a second**, not every frame, so React does not re-render at the frame rate.
 
 Splitting them keeps the accumulator a plain running sum, and only the display shader normalizes it.
 
