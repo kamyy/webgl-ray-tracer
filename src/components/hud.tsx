@@ -4,7 +4,7 @@
  * The pill's ring and counters are read-only. Their values come from the app store, where `PathTracer` writes them a
  * few times a second. Everything is absolutely positioned over the render view, so the render keeps the whole screen
  * and opening the About popover never resizes the canvas. On a phone the pill shrinks to the ring, the pass count and
- * the time left.
+ * the time left. Pressing the pill folds it down to the ring alone.
  */
 import { useCallback, useState } from 'react'
 import { useTheme } from '../lib/hooks/useTheme'
@@ -66,31 +66,55 @@ function ProgressPill() {
   const avgTime = useAppStore(state => state.avgTime)
   const proportion = Math.min(renderingPass / numSamples, 1)
 
+  // Pressing the pill folds it down to just the ring, and pressing it again unfolds the counters.
+  const [collapsed, setCollapsed] = useState(false)
+
+  let counters: React.ReactNode = null
+  if (!collapsed) {
+    counters = (
+      <>
+        {/* The pass counter. The number has a minimum width so a 1 digit and a 2 digit count take the same room. */}
+        <div className="leading-tight">
+          <div className="font-medium tabular-nums">
+            <span className="inline-block min-w-[3ch] text-right text-xl md:text-3xl">{renderingPass}</span>
+            <span className={`text-base ${mutedText}`}> / {numSamples} passes</span>
+          </div>
+          <div className={`text-sm ${mutedText}`}>
+            {/* A phone has no room for the three counters, so its second line shows the time left instead of the name. */}
+            <span className="md:hidden">{etaTime} left</span>
+            <span className="hidden md:inline">WebGL Ray Tracer</span>
+          </div>
+        </div>
+
+        {/* The timing counters, from the tablet breakpoint up. */}
+        <div className="hidden gap-10 md:flex">
+          <Stat label="Elapsed" value={elapsedTime} />
+          <Stat label="Remaining" value={etaTime} />
+          <Stat label="Avg. per pass" value={avgTime} />
+        </div>
+      </>
+    )
+  }
+
+  const padding = collapsed ? '' : 'pr-5 md:pr-7'
+
   return (
     <div
-      className={`absolute z-10 flex items-center gap-3 rounded-full p-1.5 pr-5 md:gap-5 md:pr-7 ${topEdge} ${leftEdge} ${glass}`}
+      role="button"
+      tabIndex={0}
+      aria-expanded={!collapsed}
+      aria-label={collapsed ? 'Show render stats' : 'Hide render stats'}
+      className={`absolute z-10 flex cursor-pointer items-center gap-3 rounded-full p-1.5 select-none md:gap-5 ${padding} ${topEdge} ${leftEdge} ${glass}`}
+      onClick={() => setCollapsed(!collapsed)}
+      onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          setCollapsed(!collapsed)
+        }
+      }}
     >
       <ProgressRing proportion={proportion} className="size-13 md:size-16" />
-
-      {/* The pass counter. The number has a minimum width so a 1 digit and a 2 digit count take the same room. */}
-      <div className="leading-tight">
-        <div className="font-medium tabular-nums">
-          <span className="inline-block min-w-[3ch] text-right text-xl md:text-3xl">{renderingPass}</span>
-          <span className={`text-base ${mutedText}`}> / {numSamples} passes</span>
-        </div>
-        <div className={`text-sm ${mutedText}`}>
-          {/* A phone has no room for the three counters, so its second line shows the time left instead of the name. */}
-          <span className="md:hidden">{etaTime} left</span>
-          <span className="hidden md:inline">WebGL Ray Tracer</span>
-        </div>
-      </div>
-
-      {/* The timing counters, from the tablet breakpoint up. */}
-      <div className="hidden gap-10 md:flex">
-        <Stat label="Elapsed" value={elapsedTime} />
-        <Stat label="Remaining" value={etaTime} />
-        <Stat label="Avg. per pass" value={avgTime} />
-      </div>
+      {counters}
     </div>
   )
 }

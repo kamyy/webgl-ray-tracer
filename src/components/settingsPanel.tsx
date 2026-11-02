@@ -56,7 +56,7 @@ export function SettingsPanel() {
   return (
     <section
       aria-label="Render settings"
-      className={`${position} w-72 rounded-2xl bg-white/70 backdrop-blur-md p-3 shadow-xl dark:bg-gray-900/70 md:w-80 max-md:portrait:right-0 max-md:portrait:bottom-0 max-md:portrait:left-0 max-md:portrait:w-auto max-md:portrait:rounded-b-none max-md:portrait:pb-[max(0.75rem,env(safe-area-inset-bottom))]`}
+      className={`${position} max-h-[calc(100dvh-7.5rem)] w-72 overflow-y-auto rounded-2xl bg-white/70 backdrop-blur-md p-3 shadow-xl dark:bg-gray-900/70 md:w-80 max-md:portrait:right-0 max-md:portrait:bottom-0 max-md:portrait:left-0 max-md:portrait:w-auto max-md:portrait:rounded-b-none max-md:portrait:pb-[max(0.75rem,env(safe-area-inset-bottom))]`}
     >
       <button
         type="button"

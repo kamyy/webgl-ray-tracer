@@ -66,13 +66,13 @@ Rendering runs until the pass count reaches the sample setting. A camera or sett
 
 ## 3. Scene loading & BVH
 
-The scene is a glTF 2.0 binary (`public/suzanne.glb`) loaded with three.js's `GLTFLoader`. Each mesh becomes one object, and a bounding volume hierarchy (BVH) is built for each object so the shader tests a ray against a few boxes before it tests any triangle.
+The scene is a glTF 2.0 binary, bundled in `public/` or opened from the user's drive, loaded with three.js's `GLTFLoader`. Each mesh becomes one object, and a bounding volume hierarchy (BVH) is built for each object so the shader tests a ray against a few boxes before it tests any triangle.
 
 ```text
  main thread                                             Web Worker
  ┌──────────────────────────────┐   world-space triangles   ┌─────────────────────────────┐
  │ GLTFLoader                   │   (transferred, not       │ src/lib/webgl/bvhWorker.ts  │
- │   public/suzanne.glb         ├──────────────────────────►│   SAH split, one tree       │
+ │   the chosen .glb file       ├──────────────────────────►│   SAH split, one tree       │
  │ usePackedScene ► packScene   │    copied)                │   per mesh                  │
  │   extractTriangles           │◄──────────────────────────┤   packFaces, packBvhNodes   │
  │   packMaterials              │   packed Float32Arrays    └─────────────────────────────┘
@@ -120,7 +120,7 @@ drei's `PerspectiveCamera` and `CameraControls` (`src/components/viewport.tsx`) 
 
 ## 6. State management
 
-A Zustand store (`src/lib/store/appStore.ts`) holds only state the UI displays: the shading method, render pass and timing counters, and the sample, bounce and field-of-view settings. Zustand needs no provider component, and the render loop reads the store directly with `useAppStore.getState()`, so the settings are not copied into a second place.
+A Zustand store (`src/lib/store/appStore.ts`) holds only state the UI displays: the chosen scene, the shading method, render pass and timing counters, and the sample, bounce and field-of-view settings. Zustand needs no provider component, and the render loop reads the store directly with `useAppStore.getState()`, so the settings are not copied into a second place.
 
 ```text
  ┌────────────────────────────┐                                  ┌──────────────────────────────┐
@@ -183,7 +183,7 @@ The render view fills the whole screen, and everything else floats over it.
 
 - **The view has no bars.** A header and a footer would take 100 to 200 px of height, most of it on a phone, for controls that sit idle while the image converges. A floating readout and a floating settings card cost no height, at the price of covering part of the image.
 - **The readout shows progress and the card holds the controls.** `src/components/hud.tsx` is a pill at the top left with the circular progress ring, the pass counter and the timing counters, plus an About button at the top right. The ring is the primary indicator, because a render converges over minutes and how far along it is matters more than any single setting. On a phone the pill shrinks to the ring, the pass count and the time left.
-- **The settings card collapses.** `src/components/settingsPanel.tsx` is a card at the bottom left with a slider and a number field for each of field of view, samples and bounces, plus the Flat/Phong control. Its title bar collapses it to a small Settings button, so the whole image can be seen. On a phone in portrait the open card is a bottom sheet across the full width.
+- **The settings card collapses.** `src/components/settingsPanel.tsx` is a card at the bottom left with a row of scene cards, a slider and a number field for each of field of view, samples and bounces, plus the Flat/Phong control. It scrolls when the window is too short to show all of it. Its title bar collapses it to a small Settings button, so the whole image can be seen. On a phone in portrait the open card is a bottom sheet across the full width.
 - **The theme is a `dark` class on the `<html>` element.** `src/lib/hooks/useTheme.ts` sets it from the saved choice, or from the operating system's setting on a first visit, and a button at the top right switches it. Tailwind's `dark:` variant and the color variables in `src/styles/globals.css` follow the class, so no reload is needed. The render itself does not change, because only the floating controls have a theme.
 - **Every floating element is absolutely positioned.** The card, the readout and the About popover overlap the view, so opening or collapsing them never changes the canvas size, rebuilds the render targets or restarts accumulation.
 - **The render view is capped at 2560 by 1440 CSS pixels from the `md` breakpoint up** (`src/lib/webgl/renderLimits.ts`). Every pixel is traced many times, so a maximized window on a 5K monitor, about 14.7 million pixels, would never converge. The cap is the size of a 1440p monitor, and a larger window shows the view centered. Phones are below the breakpoint, have few pixels, and use the whole window.

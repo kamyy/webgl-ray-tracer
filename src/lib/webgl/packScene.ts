@@ -13,6 +13,7 @@ import {
   Matrix3,
   Mesh,
   MeshPhysicalMaterial,
+  MeshStandardMaterial,
   NearestFilter,
   Object3D,
   RGBAFormat,
@@ -22,16 +23,23 @@ import {
 } from 'three'
 import type { BvhRequest, BvhRequestMesh, BvhResult } from './bvhWorker'
 import {
+  bvhMaxStackSize,
   bvhNodesPerRow,
   DIELECTRIC_MATERIAL,
   EMISSIVE_MATERIAL,
   facesPerRow,
+  numFloatsPerBvhNode,
+  numFloatsPerFace,
   numFloatsPerMaterial,
   numTexelsPerBvhNode,
   numTexelsPerFace,
   numTexelsPerMaterial,
   REFLECTIVE_MATERIAL,
 } from './sceneLayout'
+
+// The most memory the packed face and BVH arrays may take. Both are padded to the largest mesh in the scene, so a scene
+// with many meshes and one huge mesh costs far more than its triangle count suggests.
+const maxPackedBytes = 1024 * 1024 * 1024
 
 export interface PackedScene {
   numObjects: number
@@ -100,7 +108,7 @@ function buildBvh(request: BvhRequest): Promise<BvhResult> {
     }
     worker.onerror = event => {
       worker.terminate()
-      reject(new Error(event.message))
+      reject(new Error(event.message || 'the BVH worker failed, probably because the scene is too large.'))
     }
     worker.postMessage(
       request,
@@ -145,6 +153,31 @@ function setExactTexels(texture: Texture) {
   texture.needsUpdate = true
 }
 
+// Rejects materials the shader cannot light, with a message that says how to fix the file. `GLTFLoader` makes a basic
+// material for `KHR_materials_unlit`, and that has no emission, metalness or roughness to read.
+function checkMaterial(material: Mesh['material']) {
+  if (!(material instanceof MeshStandardMaterial)) {
+    throw new Error(
+      'a material is unlit (KHR_materials_unlit) or of an unsupported kind. Re-export the scene with standard PBR materials.',
+    )
+  }
+}
+
+// Stops a scene whose padded arrays would be too big to allocate. The BVH has at most two nodes per face.
+function checkPackedSize(triangles: BvhRequestMesh[]) {
+  const largestMesh = triangles.reduce((most, mesh) => Math.max(most, mesh.positions.length / 9), 0)
+  const paddedFaces = Math.ceil(largestMesh / facesPerRow) * facesPerRow
+  const paddedNodes = Math.ceil((largestMesh * 2) / bvhNodesPerRow) * bvhNodesPerRow
+  const bytes = 4 * triangles.length * (paddedFaces * numFloatsPerFace + paddedNodes * numFloatsPerBvhNode)
+  if (bytes > maxPackedBytes) {
+    const megabytes = Math.round(bytes / (1024 * 1024))
+    throw new Error(
+      `the scene is too large to render. Its ${triangles.length} meshes are each padded to the largest one, ` +
+        `${Math.round(largestMesh)} triangles, which needs about ${megabytes} MB. Merge small meshes or reduce the biggest one.`,
+    )
+  }
+}
+
 export async function packScene(root: Object3D): Promise<PackedScene> {
   root.updateMatrixWorld(true)
   const meshes: Mesh[] = []
@@ -154,15 +187,31 @@ export async function packScene(root: Object3D): Promise<PackedScene> {
     }
   })
 
+  // A file the user opened may hold no geometry, and the textures cannot be built without at least one mesh.
+  if (meshes.length === 0) {
+    throw new Error('the file has no meshes to render.')
+  }
+
   const materials: MeshPhysicalMaterial[] = []
   const triangles = meshes.map(mesh => {
+    checkMaterial(mesh.material)
     const material = mesh.material as MeshPhysicalMaterial
     if (!materials.includes(material)) {
       materials.push(material)
     }
     return extractTriangles(mesh, materials.indexOf(material))
   })
+  checkPackedSize(triangles)
   const bvh = await buildBvh({ meshes: triangles })
+
+  // Traversal pops a node and pushes both children, so a node split at depth d leaves d + 2 entries on the shader's
+  // stack. A deeper tree would overflow it and corrupt the render without any error.
+  if (bvh.maxDepth + 2 > bvhMaxStackSize) {
+    throw new Error(
+      `a mesh is too deeply nested for the renderer (BVH depth ${bvh.maxDepth}, limit ${bvhMaxStackSize - 2}). ` +
+        'Split the largest meshes into several smaller ones.',
+    )
+  }
 
   // `bvh.maxNumFaces` and `bvh.maxNumBvhNodes` are whole multiples of the row lengths, because the worker rounds them up.
   const facesTexture = new DataArrayTexture(

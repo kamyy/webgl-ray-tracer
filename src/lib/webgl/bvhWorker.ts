@@ -5,7 +5,7 @@
  * ran on the main thread. `packScene` sends world-space triangles here, and the worker sends back the packed arrays as
  * transferable buffers, so nothing is copied. These are the arrays that become the faces and BVH textures.
  */
-import { bvhMaxStackSize, bvhNodesPerRow, facesPerRow, numFloatsPerBvhNode, numFloatsPerFace } from './sceneLayout'
+import { bvhNodesPerRow, facesPerRow, numFloatsPerBvhNode, numFloatsPerFace } from './sceneLayout'
 
 enum Axis {
   x = 0,
@@ -17,7 +17,7 @@ enum Axis {
 // that rays miss through rounding.
 const bvMinDelta = 0.01
 
-let maxDepth = 0 // deepest BVH tree level reached while building, reported back to the main thread
+let maxDepth = 0 // deepest BVH tree level split while building, reported back so `packScene` can check it against the shader's stack
 
 interface Vec3 {
   x: number
@@ -126,12 +126,6 @@ class BvhNode {
       faces.forEach((face, i) => (this.faceIndices[i] = face.faceIndex))
     } else {
       maxDepth = Math.max(maxDepth, depth)
-      // Traversal pops a node and pushes both children, so a node split at depth d leaves d + 2 entries on the stack.
-      if (depth + 2 > bvhMaxStackSize) {
-        console.warn(
-          `BVH depth ${depth} reached the fragment shader's traversal stack limit (${bvhMaxStackSize}); raise BVH_MAX_STACK_SIZE in src/shaders/pathTrace.frag.glsl`,
-        )
-      }
       // pick the axis/position that minimizes expected ray traversal cost (SAH)
       const { index, sorted } = BvhNode.findBestSplit(faces)
       this.splitAcross(index, sorted, bvhNodes, depth)

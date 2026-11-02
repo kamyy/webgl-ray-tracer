@@ -86,7 +86,7 @@ interface PassInputs {
 }
 
 interface PathTracerProps {
-  packed: PackedScene
+  packed: PackedScene | null // null while no scene is ready, and nothing is drawn
   interactingRef: RefObject<boolean> // true while the user is dragging the camera
 }
 
@@ -293,10 +293,11 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
     configureRenderer(gl)
   }, [gl])
 
-  // A new view size means new render targets, which start empty, so accumulation starts over.
+  // A new view size means new render targets, which start empty, and a new scene means new geometry, so accumulation
+  // starts over.
   useEffect(() => {
     renderReset(state)
-  }, [state, width, height])
+  }, [state, width, height, packed])
 
   // Any setting that changes the image restarts accumulation.
   useEffect(
@@ -324,6 +325,16 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
     }
   }, [randomTexture])
 
+  // The packed textures leave the GPU when the scene is replaced. A bundled scene keeps its packed data in memory, so
+  // choosing it again uploads the textures again.
+  useEffect(() => {
+    return () => {
+      packed?.facesTexture.dispose()
+      packed?.bvhTexture.dispose()
+      packed?.materialsTexture.dispose()
+    }
+  }, [packed])
+
   useEffect(() => {
     return () => {
       pathTrace.material.dispose()
@@ -333,6 +344,10 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
 
   // Priority above 0 turns off React Three Fiber's own rendering, so this callback does all the drawing.
   useFrame((_, deltaSeconds) => {
+    if (!packed) {
+      return
+    }
+
     const inputs = { gl, camera, width, height, packed, accumulation, randomTexture, pathTrace, display }
     frame(state, inputs, interactingRef.current, deltaSeconds * 1000)
   }, 1)

@@ -63,7 +63,9 @@ A shader, BVH or scene change needs a look in the browser, because nothing else 
 
 ### 1.5 Changing the scene
 
-`public/suzanne.glb` is the only scene. To replace it, export a glTF binary (`.glb`) from Blender with Draco compression on, positions at 16 bits and normals at 12 bits. Set each material's base color, metallic, roughness and (for lights) emission strength, and (for glass) transmission and IOR. Then pass the new URL to `useGLTF` in `src/components/viewport.tsx`.
+A user opens their own scene at run time. The settings card shows each bundled scene as a picture card, plus an "Open .glb" card that opens the browser's file picker. A file opened this way is loaded in the browser and never uploaded.
+
+To add a bundled scene, export a glTF binary (`.glb`) from Blender with Draco compression on, positions at 16 bits and normals at 12 bits. Set each material's base color, metallic, roughness and (for lights) emission strength, and (for glass) transmission and IOR. Put the file in `public/` and a small picture of it in `public/thumbs/`, then add an entry to `scenes` in `src/lib/scenes.ts` with the picture's URL and the camera's starting `view`.
 
 The Draco decoder in `public/draco/` is copied from `node_modules/three/examples/jsm/libs/draco/gltf/`. Copy the three files again after upgrading `three`, because the decoder must match the loader.
 
@@ -143,6 +145,6 @@ To preview a change before merging, run `terraform plan` from `infra/` after the
 ## 4. Troubleshooting
 
 - **The view shows a sentence about WebGL 2, a missing extension or a GPU limit.** The GPU or browser fails a check in `src/lib/webgl/checkGpuLimits.ts`. Try another browser or a newer GPU.
-- **The render is corrupted or has black holes, and the console says `BVH depth … reached the fragment shader's traversal stack limit`.** The tree is deeper than the shader's stack. Raise `bvhMaxStackSize` in `src/lib/webgl/sceneLayout.ts` and `BVH_MAX_STACK_SIZE` in `src/shaders/pathTrace.frag.glsl` together ([Rendering gotchas](AGENTS.md#3-rendering-gotchas)).
+- **The view says `The scene could not be loaded: a mesh is too deeply nested for the renderer`.** A mesh's BVH tree is deeper than the shader's stack. Split the mesh in the file, or raise `bvhMaxStackSize` in `src/lib/webgl/sceneLayout.ts` and `BVH_MAX_STACK_SIZE` in `src/shaders/pathTrace.frag.glsl` together ([Rendering gotchas](AGENTS.md#3-rendering-gotchas)).
 - **Wrong geometry or colors with no error.** The packed layout constants in `src/lib/webgl/sceneLayout.ts` and `src/shaders/pathTrace.frag.glsl` have drifted apart ([Rendering gotchas](AGENTS.md#3-rendering-gotchas)).
 - **The `deploy` job fails at the credentials step.** Check that `secrets.AWS_DEPLOY_ROLE_ARN` is set and that the job still has `id-token: write` ([Workflow & deploy](AGENTS.md#51-workflow--deploy)).

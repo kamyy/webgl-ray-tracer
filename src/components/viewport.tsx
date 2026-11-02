@@ -8,10 +8,12 @@
  */
 import { CameraControls, PerspectiveCamera, useGLTF } from '@react-three/drei'
 import { Canvas, useThree } from '@react-three/fiber'
-import { Component, RefObject, Suspense, useEffect, useRef, useState } from 'react'
+import { Component, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Box3, Sphere, Vector3, type Object3D } from 'three'
 import { usePackedScene } from '../lib/hooks/usePackedScene'
 import { useAppStore } from '../lib/store/appStore'
 import { checkGpuLimits, checkSceneLimits, supportsWebGL2 } from '../lib/webgl/checkGpuLimits'
+import type { PackedScene } from '../lib/webgl/packScene'
 import { PathTracer } from './pathTracer'
 
 useGLTF.setDecoderPath('/draco/')
@@ -19,12 +21,6 @@ useGLTF.setDecoderPath('/draco/')
 interface SceneErrorBoundaryProps {
   onError: (problem: string) => void
   children: React.ReactNode
-}
-
-// Starts in front of the room, looking straight along -z at the objects. drei makes a new controls instance when
-// the default camera changes, so this runs on the instance that is actually used.
-function startInFrontOfRoom(controls: CameraControls | null) {
-  controls?.setLookAt(0, 2, 10, 0, 2, 0, false)
 }
 
 // Rendered as the Suspense fallback inside the canvas. The spinner itself is plain HTML outside the canvas, so this
@@ -43,20 +39,47 @@ function getPixelRatio() {
   return window.matchMedia('(pointer: coarse)').matches ? 0.5 : 1
 }
 
-// Loads the glTF file, packs it for the shader, checks that the GPU can hold it, and then runs the path tracer. Both
-// the load and the packing suspend, so the nearest `<Suspense>` shows the spinner until they finish.
+// Points the camera at the middle of the scene from the front and a little above, far enough back that the whole scene
+// fits in the view.
+function frameCamera(controls: CameraControls, root: Object3D, fovDegrees: number) {
+  const box = new Box3().setFromObject(root)
+  if (box.isEmpty()) {
+    return
+  }
+
+  const center = box.getCenter(new Vector3())
+  const radius = box.getBoundingSphere(new Sphere()).radius
+  const distance = (radius / Math.sin((fovDegrees * Math.PI) / 360)) * 0.75
+  const eye = center.clone().add(new Vector3(0, 0.25, 1).normalize().multiplyScalar(distance))
+  controls.setLookAt(eye.x, eye.y, eye.z, center.x, center.y, center.z, false)
+}
+
+// Loads the glTF file, packs it for the shader, checks that the GPU can hold it, and then hands the packed scene to the
+// path tracer. Both the load and the packing suspend, so the nearest `<Suspense>` shows the spinner until they finish.
+// The path tracer lives outside this component, so a new scene reuses its compiled shaders and render targets.
 function TracedScene({
-  interactingRef,
+  url,
+  frame,
+  onPacked,
   onProblem,
 }: {
-  interactingRef: RefObject<boolean>
+  url: string
+  frame: boolean // whether to point the camera at the scene once it has loaded, for a scene with no starting view
+  onPacked: (packed: PackedScene | null) => void
   onProblem: (problem: string | null) => void
 }) {
   const gl = useThree(state => state.gl)
   const size = useThree(state => state.size)
   const dpr = useThree(state => state.viewport.dpr)
-  const gltf = useGLTF('/suzanne.glb')
+  const gltf = useGLTF(url)
   const packed = usePackedScene(gltf.scene)
+  const controls = useThree(state => state.controls) as CameraControls | null
+
+  useEffect(() => {
+    if (frame && controls) {
+      frameCamera(controls, gltf.scene, useAppStore.getState().cameraFov)
+    }
+  }, [frame, controls, gltf.scene])
 
   const problem = checkSceneLimits(
     gl.getContext() as WebGL2RenderingContext,
@@ -68,7 +91,16 @@ function TracedScene({
     onProblem(problem)
   }, [problem, onProblem])
 
-  return problem ? null : <PathTracer packed={packed} interactingRef={interactingRef} />
+  // The path tracer draws this scene while it is mounted and the GPU can hold it.
+  useEffect(() => {
+    if (problem) {
+      return
+    }
+    onPacked(packed)
+    return () => onPacked(null)
+  }, [problem, packed, onPacked])
+
+  return null
 }
 
 // Catches a failure to load, decode or pack the scene and reports it as a sentence for the view. Without it the error
@@ -99,22 +131,38 @@ function Scene({
   onProblem: (problem: string | null) => void
 }) {
   const cameraFov = useAppStore(state => state.cameraFov)
+  const scene = useAppStore(state => state.scene)
   const interactingRef = useRef(false)
+  const [packed, setPacked] = useState<PackedScene | null>(null)
+
+  // Puts the camera at the scene's starting view. drei makes a new controls instance when the default camera changes,
+  // so this runs on the instance that is actually used, and again when the scene changes.
+  const startAtScene = useCallback(
+    (controls: CameraControls | null) => {
+      if (scene.view) {
+        controls?.setLookAt(...scene.view.eye, ...scene.view.target, false)
+      }
+    },
+    [scene],
+  )
 
   return (
     <>
-      <PerspectiveCamera makeDefault fov={cameraFov} near={0.1} far={100} position={[0, 2, 10]} />
+      <PerspectiveCamera makeDefault fov={cameraFov} near={0.1} far={100} position={scene.view?.eye} />
       <CameraControls
-        ref={startInFrontOfRoom}
+        ref={startAtScene}
         makeDefault
         azimuthRotateSpeed={0.5}
         polarRotateSpeed={0.5}
+        dollyDragInverted
         onControlStart={() => (interactingRef.current = true)}
         onControlEnd={() => (interactingRef.current = false)}
       />
-      <SceneErrorBoundary onError={onProblem}>
+      <PathTracer packed={packed} interactingRef={interactingRef} />
+      {/* The key remounts the boundary, the spinner and the traced scene together, so a new scene starts clean. */}
+      <SceneErrorBoundary key={scene.id} onError={onProblem}>
         <Suspense fallback={<LoadingNotice onLoadingChange={onLoadingChange} />}>
-          <TracedScene interactingRef={interactingRef} onProblem={onProblem} />
+          <TracedScene url={scene.url} frame={!scene.view} onPacked={setPacked} onProblem={onProblem} />
         </Suspense>
       </SceneErrorBoundary>
     </>
