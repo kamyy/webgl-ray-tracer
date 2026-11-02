@@ -167,7 +167,7 @@ A single Vite + React app, with no server runtime.
 `.github/workflows/ci.yml` runs on every push to `main` and on every pull request, whatever its base branch. That lets a PR stacked on another PR's branch get a CI result ([Git workflow](#53-git-workflow)).
 
 - The `build` job runs `format:check`, `lint`, `typecheck` and `build`. A push to `main` also uploads `dist/` as an artifact.
-- The `deploy` job needs the `build` job and runs only for a push to `main`. It assumes the AWS role in `secrets.AWS_DEPLOY_ROLE_ARN`, and syncs `dist/` to the S3 bucket `webgl-ray-tracer.orky.net`.
+- The `deploy` job needs the `build` job and runs only for a push to `main`. It assumes the AWS role in `secrets.AWS_DEPLOY_ROLE_ARN`, and syncs `dist/` to the S3 bucket in the `SITE_BUCKET` repository variable.
 - **Merging to `main` deploys.** Never run `aws s3 sync` by hand. The `deploy` job is the only path ([Deploying](RUNBOOK.md#2-deploying)).
 - **A push that changes only Markdown, `LICENSE` or files under `infra/` starts no `CI` run.** The `push` trigger in `.github/workflows/ci.yml` lists them under `paths-ignore`. The `pull_request` trigger has no filter, so a docs or infrastructure PR still gets a CI result. A push under `infra/` still starts the `Terraform` workflow.
 - **A file with a fixed name must stay out of `dist/assets/`.** The `deploy` job marks everything in that folder immutable for a year ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)).
