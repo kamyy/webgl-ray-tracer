@@ -1,0 +1,69 @@
+name: Terraform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - infra/**
+      - .github/workflows/terraform.yml
+  pull_request:
+    paths:
+      - infra/**
+      - .github/workflows/terraform.yml
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: version
+        run: echo "version=$(grep -oP 'required_version = "\K[^"]+' providers.tf)" >> "$GITHUB_OUTPUT"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ steps.version.outputs.version }}
+
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false
+      - run: terraform validate
+
+  apply:
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # One apply at a time. The S3 state lock would also stop a second run, but queuing is kinder than failing. The group
+    # is on this job rather than the workflow, so a pull request's validate run never replaces a queued apply.
+    concurrency:
+      group: terraform-apply
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: version
+        run: echo "version=$(grep -oP 'required_version = "\K[^"]+' providers.tf)" >> "$GITHUB_OUTPUT"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ steps.version.outputs.version }}
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - run: >-
+          terraform init
+          -backend-config="bucket=webgl-ray-tracer-tfstate-570846794821"
+          -backend-config="key=webgl-ray-tracer.tfstate"
+          -backend-config="region=us-west-2"
+      - run: terraform apply -auto-approve
