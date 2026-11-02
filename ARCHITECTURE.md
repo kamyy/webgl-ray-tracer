@@ -150,7 +150,7 @@ The app is fully client-side rendered, with the default Vite React setup and no 
 - **The site has its own ACM certificate for `webgl-ray-tracer.orky.net`, not the wildcard `*.orky.net` one.** A certificate shared with the `d3d-to-webgl` site would tie the two sites together, so a mistake in one repo could expire the other site's certificate. CloudFront reads certificates only from us-east-1, so Terraform creates this one there.
 - **Terraform does not own the hosted zone or the GitHub OIDC provider.** Other projects in the account use both, so a change here must not be able to delete them.
 - **The `apply` job runs as its own AWS role, `github-actions-webgl-ray-tracer-terraform`.** That role can change Identity and Access Management (IAM) objects for the deploy role and policy only, and can change only CloudFront distributions and ACM certificates tagged `Project=webgl-ray-tracer`. The cost is that anyone who can merge to `main` can change those two, and the role itself is created by hand ([Managing AWS with Terraform](RUNBOOK.md#3-managing-aws-with-terraform)).
-- **A push that changes only Markdown or `LICENSE` skips CI and deploy.** The built `dist/` would be identical, so the sync would do nothing.
+- **A push that changes only Markdown, `LICENSE` or files under `infra/` skips CI and deploy.** The built `dist/` would be identical, so the sync would do nothing. A deploy running while the `apply` job changes the same bucket, distribution or role could also fail partway.
 
 ---
 

@@ -90,7 +90,7 @@ gh run list --branch main --limit 1
 gh run watch
 ```
 
-A merge that changes only Markdown or `LICENSE` starts no run. To redeploy without a code change, re-run the last `CI` workflow run on `main` from the Actions tab.
+A merge that changes only Markdown, `LICENSE` or files under `infra/` starts no `CI` run. To redeploy without a code change, re-run the last `CI` workflow run on `main` from the Actions tab.
 
 ---
 
