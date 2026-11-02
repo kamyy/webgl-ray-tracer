@@ -35,21 +35,15 @@ Then open the address Vite prints. [`RUNBOOK.md`](RUNBOOK.md) covers the other c
 
 ## 4. Your own scene
 
-The scene cards in the settings card pick one of the bundled glTF 2.0 scenes, and the "Open .glb" card loads a `.glb` file from your own drive. The file is read in the browser and never uploaded. It must be a self-contained `.glb` whose materials use plain PBR factors. A non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective, with `metalness` as the reflection ratio and `1 - roughness` as the gloss. Textures are ignored.
+The scene cards in the settings card pick one of the bundled glTF 2.0 scenes, and the "Open .glb" card loads a `.glb` file from your own drive. The file is read in the browser and never uploaded. It must be a self-contained `.glb` whose materials use plain PBR factors, because textures are ignored. [Rendering gotchas](AGENTS.md#3-rendering-gotchas) in [`AGENTS.md`](AGENTS.md) lists how each material field is read.
 
 ## 5. How it works
 
 I went to Eric Haines's GDC 2019 talk, "A Fast Forward Through [Ray Tracing Gems](http://www.realtimerendering.com/raytracinggems)", where real-time ray tracing was the hot topic. Peter Shirley's [Ray Tracing in One Weekend](http://in1weekend.blogspot.com/2016/01/ray-tracing-in-one-weekend.html) came up in passing. Inspired by it, I wanted to see whether a ray tracer could run on the web, using the GPU through a fragment shader, which suits tracing rays in parallel almost perfectly.
 
-What I ended up with is a path tracer. It fires many random rays through each pixel and averages them, which removes noise as the image converges. It is a brute force technique that costs time and compute, but it produces soft shadows, ambient occlusion and blurred reflections with no rendering tricks.
+What I ended up with is a path tracer, which averages many random rays per pixel so the image sharpens as it converges. [Rendering approach](ARCHITECTURE.md#1-rendering-approach) says why, and [Rendering pipeline](ARCHITECTURE.md#2-rendering-pipeline) and [Scene loading & BVH](ARCHITECTURE.md#3-scene-loading--bvh) follow a frame from the glTF file to the screen.
 
-- **The scene** is loaded with three.js and React Three Fiber. A Web Worker builds a bounding volume hierarchy (BVH) for each mesh, so a large scene does not freeze the page, and the result is packed into float textures.
-- **The shader** in `src/shaders/pathTrace.frag.glsl` does the tracing: random numbers, BVH traversal, ray and box and triangle intersection, and bouncing off diffuse, reflective and glass surfaces.
-- **Each pass** adds one sample per pixel to a running sum in a float render target. The display shader divides the sum by the sample count and draws it.
-- **Passes are drawn in strips**, one strip per animation frame, with the strip count adapting to the frame time. That keeps the page responsive and stops the browser from killing a shader that runs too long.
-- **WebGL 2 features** it relies on are loops without fixed limits, which recursion-by-looping needs, texture arrays for the BVH trees, float texture formats, and `texelFetch` for exact texel lookups.
-
-[`ARCHITECTURE.md`](ARCHITECTURE.md) explains the design decisions, and [`AGENTS.md`](AGENTS.md) lists the gotchas and conventions for working on the code.
+[`AGENTS.md`](AGENTS.md) lists the gotchas and conventions for working on the code.
 
 ## 6. License
 
