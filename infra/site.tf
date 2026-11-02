@@ -126,7 +126,7 @@ resource "aws_route53_record" "site" {
 
 # --- Certificate ----------------------------------------------------------------------
 
-# CloudFront serves the app over HTTPS with an AWS Certificate Manager (ACM) certificate for webgl-ray-tracer.orky.net
+# CloudFront serves the app over HTTPS with an AWS Certificate Manager (ACM) certificate for the site hostname
 # alone. CloudFront only reads certificates from us-east-1, so this one is created there with the aws.us_east_1
 # provider. ACM issues it once the validation CNAME exists in the hosted zone, and renews it automatically for as long as
 # that CNAME stays. Deleting the record makes the renewal fail, and the certificate then expires.

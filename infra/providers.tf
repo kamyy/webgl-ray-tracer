@@ -23,7 +23,7 @@ terraform {
   }
 
   # terraform init -backend-config adds these three arguments to the backend "s3" block:
-  #   - bucket = webgl-ray-tracer-tfstate-570846794821
+  #   - bucket = the account's state bucket, webgl-ray-tracer-tfstate-<account id>
   #   - key    = webgl-ray-tracer.tfstate
   #   - region = us-west-2
   # They are not written in HCL here, so the workflow and a local run pass the same values (RUNBOOK.md).

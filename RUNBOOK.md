@@ -73,7 +73,7 @@ The Draco decoder in `public/draco/` is copied from `node_modules/three/examples
 
 ## 2. Deploying
 
-Merging to `main` deploys. The `deploy` job in `.github/workflows/ci.yml` syncs `dist/` to the S3 bucket `webgl-ray-tracer.orky.net` with cache headers once the `build` job passes ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)).
+Merging to `main` deploys. The `deploy` job in `.github/workflows/ci.yml` syncs `dist/` to the S3 bucket named by the `SITE_BUCKET` repository variable with cache headers once the `build` job passes ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)).
 
 ```text
  pull request ──► build job ──► merge to main ──► build job ──► deploy job ──► S3 bucket ──► CloudFront
@@ -98,7 +98,7 @@ A merge that changes only Markdown, `LICENSE` or files under `infra/` starts no 
 
 ## 3. Managing AWS with Terraform
 
-`infra/` holds the AWS resources behind the site: the S3 bucket, the CloudFront distribution, the DNS records and the deploy role ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)). The first two steps are one-time setup, for recreating this stack in a fresh AWS account. Do them in order before the `apply` job in `.github/workflows/terraform.yml` first runs, or it tries to create resources that already exist.
+`infra/` holds the AWS resources behind the site: the S3 bucket, the CloudFront distribution, the DNS records and the deploy role ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)). The first two steps are one-time setup, for recreating this stack in a fresh AWS account, which is also how a fork sets up its own. A fork first needs a Route 53 hosted zone for its domain in that account, with the domain delegated to it, and its own values for `domain_zone_name`, `hosted_zone_id` and `github_repo` in `infra/terraform.tfvars`. The site bucket is named after the hostname and S3 bucket names are global, so moving the same hostname to a new account needs the old bucket and DNS record deleted first. Do the steps in order before the `apply` job in `.github/workflows/terraform.yml` first runs, or it tries to create resources that already exist.
 
 1. [Create the state bucket and the Terraform role](#31-create-the-state-bucket-and-the-terraform-role).
 2. [Apply for the first time](#32-apply-for-the-first-time).
@@ -106,13 +106,13 @@ A merge that changes only Markdown, `LICENSE` or files under `infra/` starts no 
 
 ### 3.1 Create the state bucket and the Terraform role
 
-Terraform cannot create the bucket that stores its state or the IAM role the `apply` job runs as. Run the script once with admin AWS credentials and an authenticated `gh`:
+Terraform cannot create the bucket that stores its state or the IAM role the `apply` job runs as. The account, the GitHub repo and the domain come from the signed-in AWS credentials, `gh` and `infra/terraform.tfvars`. Run the script once with admin AWS credentials and an authenticated `gh`:
 
 ```bash
 infra/bootstrap/bootstrap.sh
 ```
 
-It creates the `webgl-ray-tracer-tfstate-570846794821` bucket (versioned, encrypted, not public) and the `github-actions-webgl-ray-tracer-terraform` role, then stores the role's ARN in the `AWS_TERRAFORM_ROLE_ARN` GitHub secret. Running it again only creates what is missing and rewrites the role's policies from these files:
+It creates the `webgl-ray-tracer-tfstate-<account id>` bucket (versioned, encrypted, not public), the account's GitHub OIDC provider when it is missing, and the `github-actions-webgl-ray-tracer-terraform` role. It then sets the `AWS_TERRAFORM_ROLE_ARN` and `AWS_DEPLOY_ROLE_ARN` GitHub secrets and the `TFSTATE_BUCKET` and `SITE_BUCKET` GitHub variables. Running it again only creates what is missing and rewrites the role's policies from these files:
 
 - `infra/bootstrap/permissions-policy.json`
 - `infra/bootstrap/trust-policy.json`
@@ -123,14 +123,14 @@ Terraform creates every resource, including the site's own ACM certificate. Run 
 
 ```bash
 terraform init \
-  -backend-config="bucket=webgl-ray-tracer-tfstate-570846794821" \
+  -backend-config="bucket=webgl-ray-tracer-tfstate-<account id>" \
   -backend-config="key=webgl-ray-tracer.tfstate" \
   -backend-config="region=us-west-2"
 terraform plan
 terraform apply
 ```
 
-The apply waits a few minutes while ACM validates the certificate. The role it creates has the name that `secrets.AWS_DEPLOY_ROLE_ARN` already points at, so that secret needs no change.
+The apply waits a few minutes while ACM validates the certificate. The role it creates has the name that `secrets.AWS_DEPLOY_ROLE_ARN` already points at.
 
 The site stays empty until the next merge to `main` runs the `deploy` job in `.github/workflows/ci.yml`.
 

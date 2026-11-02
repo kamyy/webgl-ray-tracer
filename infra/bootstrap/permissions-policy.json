@@ -5,13 +5,13 @@
       "Sid": "StateBucketList",
       "Effect": "Allow",
       "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::webgl-ray-tracer-tfstate-570846794821"
+      "Resource": "arn:aws:s3:::webgl-ray-tracer-tfstate-__ACCOUNT_ID__"
     },
     {
       "Sid": "StateObjects",
       "Effect": "Allow",
       "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-      "Resource": "arn:aws:s3:::webgl-ray-tracer-tfstate-570846794821/*"
+      "Resource": "arn:aws:s3:::webgl-ray-tracer-tfstate-__ACCOUNT_ID__/*"
     },
     {
       "Sid": "SiteOriginAccessControl",
@@ -29,13 +29,13 @@
       "Sid": "SiteBucketConfig",
       "Effect": "Allow",
       "Action": "s3:*",
-      "Resource": "arn:aws:s3:::webgl-ray-tracer.orky.net"
+      "Resource": "arn:aws:s3:::__HOSTNAME__"
     },
     {
       "Sid": "SiteDistributionCreate",
       "Effect": "Allow",
       "Action": ["cloudfront:CreateDistributionWithTags", "cloudfront:TagResource"],
-      "Resource": "arn:aws:cloudfront::570846794821:distribution/*",
+      "Resource": "arn:aws:cloudfront::__ACCOUNT_ID__:distribution/*",
       "Condition": {
         "StringEquals": {
           "aws:RequestTag/Project": "webgl-ray-tracer"
@@ -46,7 +46,7 @@
       "Sid": "SiteDistributionManage",
       "Effect": "Allow",
       "Action": "cloudfront:*",
-      "Resource": "arn:aws:cloudfront::570846794821:distribution/*",
+      "Resource": "arn:aws:cloudfront::__ACCOUNT_ID__:distribution/*",
       "Condition": {
         "StringEquals": {
           "aws:ResourceTag/Project": "webgl-ray-tracer"
@@ -57,19 +57,16 @@
       "Sid": "ZoneRecords",
       "Effect": "Allow",
       "Action": ["route53:GetHostedZone", "route53:ListResourceRecordSets", "route53:ListTagsForResource"],
-      "Resource": "arn:aws:route53:::hostedzone/Z0138073181F1OW1ADWJW"
+      "Resource": "arn:aws:route53:::hostedzone/__HOSTED_ZONE_ID__"
     },
     {
       "Sid": "ZoneRecordChanges",
       "Effect": "Allow",
       "Action": "route53:ChangeResourceRecordSets",
-      "Resource": "arn:aws:route53:::hostedzone/Z0138073181F1OW1ADWJW",
+      "Resource": "arn:aws:route53:::hostedzone/__HOSTED_ZONE_ID__",
       "Condition": {
         "ForAllValues:StringLike": {
-          "route53:ChangeResourceRecordSetsNormalizedRecordNames": [
-            "webgl-ray-tracer.orky.net",
-            "*.webgl-ray-tracer.orky.net"
-          ]
+          "route53:ChangeResourceRecordSetsNormalizedRecordNames": ["__HOSTNAME__", "*.__HOSTNAME__"]
         },
         "ForAllValues:StringEquals": {
           "route53:ChangeResourceRecordSetsRecordTypes": ["CNAME"]
@@ -109,18 +106,18 @@
         "iam:UpdateAssumeRolePolicy"
       ],
       "Resource": [
-        "arn:aws:iam::570846794821:role/github-actions-webgl-ray-tracer-deploy",
-        "arn:aws:iam::570846794821:policy/webgl-ray-tracer-deploy-policy"
+        "arn:aws:iam::__ACCOUNT_ID__:role/github-actions-webgl-ray-tracer-deploy",
+        "arn:aws:iam::__ACCOUNT_ID__:policy/webgl-ray-tracer-deploy-policy"
       ]
     },
     {
       "Sid": "DeployRoleAttachment",
       "Effect": "Allow",
       "Action": ["iam:AttachRolePolicy", "iam:DetachRolePolicy"],
-      "Resource": "arn:aws:iam::570846794821:role/github-actions-webgl-ray-tracer-deploy",
+      "Resource": "arn:aws:iam::__ACCOUNT_ID__:role/github-actions-webgl-ray-tracer-deploy",
       "Condition": {
         "ArnEquals": {
-          "iam:PolicyARN": "arn:aws:iam::570846794821:policy/webgl-ray-tracer-deploy-policy"
+          "iam:PolicyARN": "arn:aws:iam::__ACCOUNT_ID__:policy/webgl-ray-tracer-deploy-policy"
         }
       }
     },
@@ -128,7 +125,7 @@
       "Sid": "GitHubOidcProviderRead",
       "Effect": "Allow",
       "Action": "iam:GetOpenIDConnectProvider",
-      "Resource": "arn:aws:iam::570846794821:oidc-provider/token.actions.githubusercontent.com"
+      "Resource": "arn:aws:iam::__ACCOUNT_ID__:oidc-provider/token.actions.githubusercontent.com"
     },
     {
       "Sid": "SiteCertificateRequest",
@@ -152,7 +149,7 @@
         "acm:AddTagsToCertificate",
         "acm:RemoveTagsFromCertificate"
       ],
-      "Resource": "arn:aws:acm:us-east-1:570846794821:certificate/*",
+      "Resource": "arn:aws:acm:us-east-1:__ACCOUNT_ID__:certificate/*",
       "Condition": {
         "StringEquals": {
           "aws:ResourceTag/Project": "webgl-ray-tracer"
