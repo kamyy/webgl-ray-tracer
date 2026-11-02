@@ -84,6 +84,7 @@ A single Vite + React app, with no server runtime.
 - `src/lib/store/` — the Zustand store for UI and rendering-status state only.
 - `src/lib/hooks/` — custom React hooks, one per file.
 - `src/lib/webgl/` — the shader materials, texture helpers, and scene packing with its BVH worker.
+- `infra/` — the Terraform for the S3 bucket, CloudFront distribution, DNS records and deploy role, with one state ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)). `infra/bootstrap/` holds the policies for the Terraform role, which is created by hand.
 
 `@/*` maps to `src/*` in both `vite.config.ts` and `tsconfig.json`.
 
@@ -156,9 +157,12 @@ A single Vite + React app, with no server runtime.
 `.github/workflows/ci.yml` runs on every push to `main` and on every pull request, whatever its base branch. That lets a PR stacked on another PR's branch get a CI result ([Git workflow](#53-git-workflow)).
 
 - The `build` job runs `format:check`, `lint`, `typecheck` and `build`. A push to `main` also uploads `dist/` as an artifact.
-- The `deploy` job needs the `build` job and runs only for a push to `main`. It assumes the AWS role in `secrets.AWS_DEPLOY_ROLE_ARN` and syncs `dist/` to the S3 bucket `webgl-ray-tracer.orky.net`.
+- The `deploy` job needs the `build` job and runs only for a push to `main`. It assumes the AWS role in `secrets.AWS_DEPLOY_ROLE_ARN`, and syncs `dist/` to the S3 bucket `webgl-ray-tracer.orky.net`.
 - **Merging to `main` deploys.** Never run `aws s3 sync` by hand. The `deploy` job is the only path ([Deploying](RUNBOOK.md#2-deploying)).
 - **A push that changes only Markdown or `LICENSE` starts no run at all.** The `push` trigger in `.github/workflows/ci.yml` lists them under `paths-ignore`. The `pull_request` trigger has no filter, so a docs PR still gets a CI result.
+- **A file with a fixed name must stay out of `dist/assets/`.** The `deploy` job marks everything in that folder immutable for a year ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)).
+- **Change AWS resources only through `infra/`.** An edit in the console or with the AWS CLI is reverted by the next `apply` job in `.github/workflows/terraform.yml`. The Terraform role in `infra/bootstrap/permissions-policy.json` lists the only IAM objects it may change, so a new resource of another kind needs that policy extended by hand first ([Managing AWS with Terraform](RUNBOOK.md#3-managing-aws-with-terraform)).
+- **Never remove the `aws_route53_record.cert_validation` record in `infra/cert.tf`.** AWS Certificate Manager (ACM) needs it to renew the site's certificate, and the renewal fails without it.
 - **The `deploy` job's `id-token: write` permission is what lets it assume the AWS role.** Removing it fails the deploy at the credentials step.
 
 ### 5.2 Formatting & linting
