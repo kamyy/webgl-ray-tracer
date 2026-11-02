@@ -56,9 +56,9 @@ Each animation frame draws one strip of a render pass, using two shaders. React 
   - The cost is that the target must be additive, which needs the `EXT_float_blend` extension, and that rows can briefly hold different sample counts. The per-pixel count in alpha makes that invisible.
   - The first pass after a restart is a one-bounce preview drawn whole, so a moving camera always shows a complete image.
 - **Both are raw shader materials drawn on one screen-covering triangle** (`src/lib/webgl/screenQuad.ts`). A raw material skips the code three.js adds to its built-in materials, which would clash with the GLSL's own inputs and outputs.
-- **Pass and timing counters reach the store about four times a second**, not every frame, so React does not re-render at the frame rate.
+- **Pass and timing counters reach the store about twice a second**, not every frame, so React does not re-render at the frame rate.
 
-Rendering runs until the pass count reaches the sample setting. A camera or setting change resets the pass count and restarts accumulation. `PathTracer` notices a camera change by comparing the camera's world matrix with the previous frame's, so it does not depend on which control moved the camera. While the camera is being dragged, only pass 1 renders, which trades image quality for a responsive drag.
+Rendering runs until the pass count reaches the sample setting, which can change mid-render without a reset. A camera or image setting change resets the pass count and restarts accumulation. `PathTracer` notices a camera change by comparing the camera's world matrix with the previous frame's, so it does not depend on which control moved the camera. While the camera is being dragged, only pass 1 renders, which trades image quality for a responsive drag.
 
 ---
 
