@@ -56,7 +56,7 @@ The pre-commit hook runs `format-staged`, `lint` and `typecheck`. CI runs `forma
 A shader, BVH or scene change needs a look in the browser, because nothing else catches it.
 
 1. Run `pnpm dev` and open `http://localhost:3000`.
-2. Open the browser console. `BvhNode.subDivide` in the BVH worker warns if the BVH is too deep.
+2. Check that the view shows no error. A mesh whose BVH is too deep for the shader fails with a "too deeply nested" sentence in the view ([Troubleshooting](#4-troubleshooting)).
 3. Wait for the pass counter to reach the sample setting. The image should converge from noise to a smooth scene.
 4. Drag to orbit, then release. Accumulation should restart at pass 0.
 5. Resize the window, or use the browser's device toolbar, and check the readout and the settings card in portrait and landscape, collapse the card, and open the About popover. The render should restart when the size changes. A window above the `md` breakpoint should show a view no larger than 2560 by 1440.
@@ -98,7 +98,7 @@ A merge that changes only Markdown, `LICENSE` or files under `infra/` starts no 
 
 ## 3. Managing AWS with Terraform
 
-`infra/` holds the AWS resources behind the site: the S3 bucket, the CloudFront distribution, the DNS records and the deploy role ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)). Do the first two steps once, in order, before merging the pull request that adds `infra/`. Otherwise the `apply` job in `.github/workflows/terraform.yml` tries to create resources that already exist.
+`infra/` holds the AWS resources behind the site: the S3 bucket, the CloudFront distribution, the DNS records and the deploy role ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)). The first two steps are one-time setup, for recreating this stack in a fresh AWS account. Do them in order before the `apply` job in `.github/workflows/terraform.yml` first runs, or it tries to create resources that already exist.
 
 1. [Create the state bucket and the Terraform role](#31-create-the-state-bucket-and-the-terraform-role).
 2. [Apply for the first time](#32-apply-for-the-first-time).
