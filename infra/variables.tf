@@ -1,11 +1,7 @@
-# The inputs to infra/ (every ID that belongs to one AWS account) and the values to read after an apply.
+# The inputs to infra/ (every ID that belongs to one AWS account).
 #
 # The values are in infra/terraform.tfvars, which Terraform loads on its own. None of them is a secret. Each variable
 # has a validation block, so a malformed value fails before Terraform reaches AWS.
-#
-# `deploy_role_arn` is what the AWS_DEPLOY_ROLE_ARN GitHub secret must hold.
-
-# --- Inputs ---------------------------------------------------------------------------
 
 variable "domain_zone_name" {
   description = "Public DNS zone the site's hostname sits under. The site is served at webgl-ray-tracer.<this>."
@@ -37,21 +33,4 @@ variable "github_repo" {
     condition     = can(regex("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$", var.github_repo))
     error_message = "github_repo must look like owner/name."
   }
-}
-
-# --- Outputs --------------------------------------------------------------------------
-
-output "cloudfront_distribution_id" {
-  description = "ID of the CloudFront distribution in front of the site bucket."
-  value       = aws_cloudfront_distribution.site.id
-}
-
-output "site_bucket" {
-  description = "Name of the S3 bucket that holds the built app."
-  value       = aws_s3_bucket.site.id
-}
-
-output "deploy_role_arn" {
-  description = "ARN to store in the AWS_DEPLOY_ROLE_ARN GitHub secret."
-  value       = aws_iam_role.deploy.arn
 }

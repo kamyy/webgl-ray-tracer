@@ -176,7 +176,7 @@ A single Vite + React app, with no server runtime.
 - **A push that changes only Markdown, `LICENSE` or files under `infra/` starts no `CI` run.** The `push` trigger in `.github/workflows/ci.yml` lists them under `paths-ignore`. The `pull_request` trigger has no filter, so a docs or infrastructure PR still gets a CI result. A push under `infra/` still starts the `Terraform` workflow.
 - **A file with a fixed name must stay out of `dist/assets/`.** The `deploy` job marks everything in that folder immutable for a year ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)).
 - **Change AWS resources only through `infra/`.** An edit in the console or with the AWS CLI is reverted by the next `apply` job in `.github/workflows/terraform.yml`. The Terraform role in `infra/bootstrap/permissions-policy.json` lists the only IAM objects it may change, so a new resource of another kind needs that policy extended by hand first ([Managing AWS with Terraform](RUNBOOK.md#3-managing-aws-with-terraform)).
-- **Never remove the `aws_route53_record.cert_validation` record in `infra/site.tf`.** AWS Certificate Manager (ACM) needs it to renew the site's certificate, and the renewal fails without it.
+- **Never remove the `aws_route53_record.cert_validation` record in `infra/certificate.tf`.** AWS Certificate Manager (ACM) needs it to renew the site's certificate, and the renewal fails without it.
 - **The `deploy` job's `id-token: write` permission is what lets it assume the AWS role.** Removing it fails the deploy at the credentials step.
 
 ### 5.2 Formatting & linting
