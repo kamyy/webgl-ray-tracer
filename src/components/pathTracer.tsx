@@ -48,7 +48,8 @@ const slowFrameMs = 24 // a frame this long means a strip is too much work for o
 const slowFramesBeforeMoreStrips = 2
 const fastFrameMs = 18 // at 60 Hz an idle frame is about 16.7 ms, so a faster-than-this frame has headroom
 const fastFramesBeforeFewerStrips = 30
-const statusIntervalMs = 250 // how often the status counters are written to the store
+const statusIntervalMs = 500 // how often the status counters are written to the store
+const bouncesSettleMs = 500 // how long the bounce setting must stay unchanged before it restarts accumulation
 
 // Everything the render loop remembers between frames. It lives in a plain object rather than React state, because
 // it changes every frame and must not re-render the page.
@@ -58,6 +59,7 @@ interface PassState {
   numStrips: number // strips per pass, only changed between passes so every pass covers each row once
   wantedNumStrips: number // the strip count that `adaptNumStrips` wants to switch to at the next pass boundary
   strip: number // next strip of the current pass
+  numBounces: number // the bounce depth the accumulated passes were traced at, which trails the setting while it is dragged
   needsClear: boolean // true after a restart, so the next draw empties the accumulation target first
   drewLastFrame: boolean // false after a frame with no strip drawn, because the preview is no measure of a strip
   slowFrames: number // consecutive frames over `slowFrameMs`
@@ -99,6 +101,7 @@ function createPassState(): PassState {
     numStrips: 4,
     wantedNumStrips: 4,
     strip: 0,
+    numBounces: useAppStore.getState().numBounces,
     needsClear: true,
     drewLastFrame: false,
     slowFrames: 0,
@@ -124,6 +127,7 @@ function renderReset(state: PassState) {
   state.renderingPass = 0
   state.strip = 0
   state.needsClear = true
+  state.numBounces = useAppStore.getState().numBounces
   state.restartTimestamp = Date.now()
   useAppStore.getState().resetStatus()
 }
@@ -197,7 +201,7 @@ function updateStatus(state: PassState, numSamples: number, force: boolean) {
 // Adds one strip of samples to the running sum, then draws the average of everything accumulated so far.
 function drawStrip(state: PassState, inputs: PassInputs, numStrips: number) {
   const { gl, camera, width, height, packed, accumulation, randomTexture, pathTrace, display } = inputs
-  const { numBounces, shadingMethod, numSamples } = useAppStore.getState()
+  const { shadingMethod, numSamples } = useAppStore.getState()
 
   // Empty the running sum after a restart. This must happen with the scissor off, or only one strip would be cleared.
   accumulation.scissorTest = false
@@ -219,7 +223,7 @@ function drawStrip(state: PassState, inputs: PassInputs, numStrips: number) {
   uniforms.u_half_ht.value = height * 0.5
   uniforms.u_num_objects.value = packed.numObjects
   uniforms.u_render_pass.value = state.renderingPass + 1
-  uniforms.u_num_bounces.value = state.renderingPass === 0 ? 1 : numBounces
+  uniforms.u_num_bounces.value = state.renderingPass === 0 ? 1 : state.numBounces
   uniforms.u_shading_method.value = shadingMethod
   uniforms.u_eye_to_image.value = (height * 0.5) / Math.tan(camera.fov * 0.5 * (Math.PI / 180.0))
   uniforms.u_eye_position.value.setFromMatrixPosition(camera.matrixWorld)
@@ -263,10 +267,11 @@ function frame(state: PassState, inputs: PassInputs, interacting: boolean, frame
   state.drewLastFrame = false
 
   // The first pass after a restart is a quick one-bounce preview, drawn whole so a moving camera always shows a
-  // complete image. While dragging, no later pass is drawn.
+  // complete image. While dragging, no later pass is drawn. A pass that has started is finished even when the sample
+  // ceiling drops below it, so no rows end up one sample behind the rest.
   const { numSamples } = useAppStore.getState()
   const isPreview = state.renderingPass === 0
-  if (state.renderingPass < numSamples && (isPreview || !interacting)) {
+  if ((state.strip > 0 || state.renderingPass < numSamples) && (isPreview || !interacting)) {
     drawStrip(state, inputs, isPreview ? 1 : state.numStrips)
     state.drewLastFrame = !isPreview
   }
@@ -299,13 +304,46 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
     renderReset(state)
   }, [state, width, height, packed])
 
-  // Any setting that changes the image restarts accumulation.
+  // Any setting that changes the image restarts accumulation. A new one belongs in this list, except one that is
+  // dragged on a slider, which needs a delay like the bounce count below.
   useEffect(
     () =>
       useAppStore.subscribe(
-        s => [s.cameraFov, s.numSamples, s.numBounces, s.shadingMethod],
+        s => [s.cameraFov, s.shadingMethod],
         () => renderReset(state),
         { equalityFn: shallow },
+      ),
+    [state],
+  )
+
+  // Dragging the bounce slider would restart accumulation at every tick. Instead the render keeps its current depth
+  // until the setting has stopped changing, then restarts once at the new depth.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const unsubscribe = useAppStore.subscribe(
+      s => s.numBounces,
+      numBounces => {
+        clearTimeout(timer)
+        timer = setTimeout(() => {
+          if (numBounces !== state.numBounces) {
+            renderReset(state)
+          }
+        }, bouncesSettleMs)
+      },
+    )
+    return () => {
+      clearTimeout(timer)
+      unsubscribe()
+    }
+  }, [state])
+
+  // The sample count only moves the stop ceiling, so accumulation continues. The readout is refreshed because a stopped
+  // render draws nothing that would update it.
+  useEffect(
+    () =>
+      useAppStore.subscribe(
+        s => s.numSamples,
+        numSamples => updateStatus(state, numSamples, true),
       ),
     [state],
   )
