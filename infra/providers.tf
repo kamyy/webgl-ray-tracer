@@ -45,7 +45,7 @@ provider "aws" {
 }
 
 # CloudFront only reads ACM certificates from us-east-1, wherever the rest of the stack runs.
-# This provider creates `aws_acm_certificate.site` in infra/site.tf.
+# This provider creates `aws_acm_certificate.site` in infra/certificate.tf.
 provider "aws" {
   alias  = "us_east_1"
   region = "us-east-1"
