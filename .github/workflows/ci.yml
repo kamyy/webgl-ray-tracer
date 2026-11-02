@@ -56,13 +56,18 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-west-2
 
+      - name: Require the SITE_BUCKET variable
+        env:
+          SITE_BUCKET: ${{ vars.SITE_BUCKET }}
+        run: test -n "$SITE_BUCKET" || { echo "Set the SITE_BUCKET repository variable by running infra/bootstrap/bootstrap.sh." >&2; exit 1; }
+
       # The new hashed assets go up first and the old ones are pruned last, so a visitor who still has the previous
       # index.html can load its assets until the new index.html is in place.
       - name: Upload hashed assets as immutable
-        run: aws s3 sync dist/assets s3://webgl-ray-tracer.orky.net/assets --cache-control 'public, max-age=31536000, immutable'
+        run: aws s3 sync dist/assets s3://${{ vars.SITE_BUCKET }}/assets --cache-control 'public, max-age=31536000, immutable'
 
       - name: Upload fixed-name files so browsers revalidate them
-        run: aws s3 sync dist/ s3://webgl-ray-tracer.orky.net --delete --exclude 'assets/*' --cache-control 'no-cache'
+        run: aws s3 sync dist/ s3://${{ vars.SITE_BUCKET }} --delete --exclude 'assets/*' --cache-control 'no-cache'
 
       - name: Remove hashed assets the new build no longer uses
-        run: aws s3 sync dist/assets s3://webgl-ray-tracer.orky.net/assets --delete --cache-control 'public, max-age=31536000, immutable'
+        run: aws s3 sync dist/assets s3://${{ vars.SITE_BUCKET }}/assets --delete --cache-control 'public, max-age=31536000, immutable'

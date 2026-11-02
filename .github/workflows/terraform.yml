@@ -61,9 +61,14 @@ jobs:
           role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
           aws-region: us-west-2
 
+      - name: Require the TFSTATE_BUCKET variable
+        env:
+          TFSTATE_BUCKET: ${{ vars.TFSTATE_BUCKET }}
+        run: test -n "$TFSTATE_BUCKET" || { echo "Set the TFSTATE_BUCKET repository variable by running infra/bootstrap/bootstrap.sh." >&2; exit 1; }
+
       - run: >-
           terraform init
-          -backend-config="bucket=webgl-ray-tracer-tfstate-570846794821"
+          -backend-config="bucket=${{ vars.TFSTATE_BUCKET }}"
           -backend-config="key=webgl-ray-tracer.tfstate"
           -backend-config="region=us-west-2"
       - run: terraform apply -auto-approve
