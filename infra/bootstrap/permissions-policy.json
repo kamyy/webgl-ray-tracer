@@ -1,0 +1,163 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "StateBucketList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::webgl-ray-tracer-tfstate-570846794821"
+    },
+    {
+      "Sid": "StateObjects",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::webgl-ray-tracer-tfstate-570846794821/*"
+    },
+    {
+      "Sid": "SiteOriginAccessControl",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateOriginAccessControl",
+        "cloudfront:GetOriginAccessControl",
+        "cloudfront:UpdateOriginAccessControl",
+        "cloudfront:DeleteOriginAccessControl",
+        "cloudfront:ListOriginAccessControls"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SiteBucketConfig",
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": "arn:aws:s3:::webgl-ray-tracer.orky.net"
+    },
+    {
+      "Sid": "SiteDistributionCreate",
+      "Effect": "Allow",
+      "Action": ["cloudfront:CreateDistributionWithTags", "cloudfront:TagResource"],
+      "Resource": "arn:aws:cloudfront::570846794821:distribution/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "webgl-ray-tracer"
+        }
+      }
+    },
+    {
+      "Sid": "SiteDistributionManage",
+      "Effect": "Allow",
+      "Action": "cloudfront:*",
+      "Resource": "arn:aws:cloudfront::570846794821:distribution/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "webgl-ray-tracer"
+        }
+      }
+    },
+    {
+      "Sid": "ZoneRecords",
+      "Effect": "Allow",
+      "Action": ["route53:GetHostedZone", "route53:ListResourceRecordSets", "route53:ListTagsForResource"],
+      "Resource": "arn:aws:route53:::hostedzone/Z0138073181F1OW1ADWJW"
+    },
+    {
+      "Sid": "ZoneRecordChanges",
+      "Effect": "Allow",
+      "Action": "route53:ChangeResourceRecordSets",
+      "Resource": "arn:aws:route53:::hostedzone/Z0138073181F1OW1ADWJW",
+      "Condition": {
+        "ForAllValues:StringLike": {
+          "route53:ChangeResourceRecordSetsNormalizedRecordNames": [
+            "webgl-ray-tracer.orky.net",
+            "*.webgl-ray-tracer.orky.net"
+          ]
+        },
+        "ForAllValues:StringEquals": {
+          "route53:ChangeResourceRecordSetsRecordTypes": ["CNAME"]
+        }
+      }
+    },
+    {
+      "Sid": "ZoneChangeStatus",
+      "Effect": "Allow",
+      "Action": "route53:GetChange",
+      "Resource": "arn:aws:route53:::change/*"
+    },
+    {
+      "Sid": "DeployRoleAndPolicy",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreatePolicy",
+        "iam:CreatePolicyVersion",
+        "iam:CreateRole",
+        "iam:DeletePolicy",
+        "iam:DeletePolicyVersion",
+        "iam:DeleteRole",
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion",
+        "iam:GetRole",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListInstanceProfilesForRole",
+        "iam:ListPolicyTags",
+        "iam:ListPolicyVersions",
+        "iam:ListRolePolicies",
+        "iam:ListRoleTags",
+        "iam:SetDefaultPolicyVersion",
+        "iam:TagPolicy",
+        "iam:TagRole",
+        "iam:UntagPolicy",
+        "iam:UntagRole",
+        "iam:UpdateAssumeRolePolicy"
+      ],
+      "Resource": [
+        "arn:aws:iam::570846794821:role/github-actions-webgl-ray-tracer-deploy",
+        "arn:aws:iam::570846794821:policy/webgl-ray-tracer-deploy-policy"
+      ]
+    },
+    {
+      "Sid": "DeployRoleAttachment",
+      "Effect": "Allow",
+      "Action": ["iam:AttachRolePolicy", "iam:DetachRolePolicy"],
+      "Resource": "arn:aws:iam::570846794821:role/github-actions-webgl-ray-tracer-deploy",
+      "Condition": {
+        "ArnEquals": {
+          "iam:PolicyARN": "arn:aws:iam::570846794821:policy/webgl-ray-tracer-deploy-policy"
+        }
+      }
+    },
+    {
+      "Sid": "GitHubOidcProviderRead",
+      "Effect": "Allow",
+      "Action": "iam:GetOpenIDConnectProvider",
+      "Resource": "arn:aws:iam::570846794821:oidc-provider/token.actions.githubusercontent.com"
+    },
+    {
+      "Sid": "SiteCertificateRequest",
+      "Effect": "Allow",
+      "Action": ["acm:RequestCertificate", "acm:AddTagsToCertificate"],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "webgl-ray-tracer",
+          "aws:RequestedRegion": "us-east-1"
+        }
+      }
+    },
+    {
+      "Sid": "SiteCertificateManage",
+      "Effect": "Allow",
+      "Action": [
+        "acm:DescribeCertificate",
+        "acm:ListTagsForCertificate",
+        "acm:DeleteCertificate",
+        "acm:AddTagsToCertificate",
+        "acm:RemoveTagsFromCertificate"
+      ],
+      "Resource": "arn:aws:acm:us-east-1:570846794821:certificate/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "webgl-ray-tracer"
+        }
+      }
+    }
+  ]
+}

@@ -30,3 +30,6 @@ pnpm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# terraform
+/infra/.terraform/
