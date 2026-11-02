@@ -1,0 +1,7 @@
+{
+  "folders": [{ "path": "." }],
+  "settings": {
+    "explorer.sortOrder": "type",
+    "explorer.excludeGitIgnore": true,
+  },
+}
