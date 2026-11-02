@@ -7,6 +7,7 @@
  */
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
+import { defaultScene, type SceneInfo } from '../scenes'
 
 export enum ShadingMethod {
   flat,
@@ -14,6 +15,9 @@ export enum ShadingMethod {
 }
 
 interface AppState {
+  // Which scene is loaded. `PathTracer` restarts accumulation when the new scene is packed, so it needs no restart of its own.
+  readonly scene: SceneInfo
+
   // Render settings. A change to any of them restarts accumulation.
   readonly shadingMethod: ShadingMethod
   readonly numSamples: number // passes to accumulate before the render stops
@@ -29,6 +33,7 @@ interface AppState {
 
 // The ways to change the state. Each setter replaces one value.
 interface AppActions {
+  setScene(scene: SceneInfo): void
   setShadingMethod(shadingMethod: ShadingMethod): void
   setNumSamples(numSamples: number): void
   setNumBounces(numBounces: number): void
@@ -39,9 +44,10 @@ interface AppActions {
 
 export const useAppStore = create<AppState & AppActions>()(
   subscribeWithSelector(set => ({
+    scene: defaultScene,
     shadingMethod: ShadingMethod.flat,
     renderingPass: 0,
-    numSamples: 10,
+    numSamples: 100,
     numBounces: 6,
     cameraFov: 45,
     // A dash stands for a time that is not known yet.
@@ -49,6 +55,7 @@ export const useAppStore = create<AppState & AppActions>()(
     etaTime: '--',
     avgTime: '--',
 
+    setScene: scene => set({ scene }),
     setShadingMethod: shadingMethod => set({ shadingMethod }),
     setNumSamples: numSamples => set({ numSamples }),
     setNumBounces: numBounces => set({ numBounces }),

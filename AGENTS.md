@@ -77,10 +77,11 @@ A GPU path tracer that runs entirely in the browser through WebGL 2. React and T
 
 A single Vite + React app, with no server runtime.
 
-- `public/` — the sample glTF scene (`suzanne.glb`) and the Draco decoder in `public/draco/`. Vite copies it into `dist/` as-is.
+- `public/` — the bundled glTF scenes (`suzanne.glb`, `tricycle.glb`), their card pictures in `public/thumbs/`, and the Draco decoder in `public/draco/`. Vite copies it into `dist/` as-is.
 - `src/shaders/` — the GLSL vertex and fragment shaders, imported into the app as strings.
-- `src/components/` — React components, styled with Tailwind CSS utility classes. `src/components/hud.tsx` is the progress readout and About button, `src/components/settingsPanel.tsx` is the collapsible settings card, `src/components/popover.tsx` is the card the About button opens, the theme switch is in `src/components/hud.tsx`, and `src/components/viewport.tsx` is the render view.
+- `src/components/` — React components, styled with Tailwind CSS utility classes. `src/components/hud.tsx` is the progress readout and About button, `src/components/settingsPanel.tsx` is the collapsible settings card, `src/components/renderSettings.tsx` holds its controls including the scene cards, `src/components/popover.tsx` is the card the About button opens, the theme switch is in `src/components/hud.tsx`, and `src/components/viewport.tsx` is the render view.
 - `src/styles/` — `globals.css`, which imports Tailwind and holds the range slider rules that Tailwind has no utilities for.
+- `src/lib/scenes.ts` — the bundled scenes with their starting camera views, and the helpers for a scene opened from the user's drive.
 - `src/lib/store/` — the Zustand store for UI and rendering-status state only.
 - `src/lib/hooks/` — custom React hooks, one per file.
 - `src/lib/webgl/` — the shader materials, texture helpers, and scene packing with its BVH worker.
@@ -94,7 +95,7 @@ A single Vite + React app, with no server runtime.
 
 - **`bvhMaxStackSize` in `src/lib/webgl/sceneLayout.ts` must equal `BVH_MAX_STACK_SIZE` in `src/shaders/pathTrace.frag.glsl`.**
   - The shader's BVH traversal stack is a fixed-size array with no bounds checking, so a deeper tree silently corrupts the render.
-  - `BvhNode.subDivide` only calls `console.warn` when the limit is exceeded. It does not enforce it.
+  - `packScene` in `src/lib/webgl/packScene.ts` throws when the built tree is deeper than the limit, and the view shows the message.
 - **The packed texture layout is defined twice and the two copies must change together.**
   - `numFloatsPerFace`, `numFloatsPerBvhNode` and `numFloatsPerMaterial` in `src/lib/webgl/sceneLayout.ts` set the layout the CPU writes. `src/lib/webgl/bvhWorker.ts` packs the faces and BVH nodes with them, and `src/lib/webgl/packScene.ts` packs the materials.
   - The `*_INDEX` constants in `src/shaders/pathTrace.frag.glsl` set the layout the shader reads.
@@ -105,6 +106,7 @@ A single Vite + React app, with no server runtime.
 - **Any camera or setting change restarts accumulation at pass 0.** `PathTracer` in `src/components/pathTracer.tsx` calls `renderReset` when the camera's world matrix changes, and when `cameraFov`, `numSamples`, `numBounces` or `shadingMethod` changes in the store. A new setting that affects the image must be added to that store subscription, or the canvas blends old and new samples.
 - **While the camera is being dragged, only pass 1 renders.** `CameraControls` sets `interactingRef` on `controlstart` and `controlend`, and accumulation resumes on release. This keeps dragging responsive ([Rendering](ARCHITECTURE.md#2-rendering-pipeline)).
 - **Material behavior comes from the glTF material fields.** `packMaterials` in `src/lib/webgl/packScene.ts` reads them: a non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective with `metalness` as the reflection ratio and `1 - roughness` as the gloss. A glTF exported without these fields renders every surface as diffuse. Textures are ignored.
+- **A scene opened from the user's drive is served from an object URL that `chooseScene` in `src/components/renderSettings.tsx` frees when another scene replaces it.** It has no starting `view`, so `TracedScene` in `src/components/viewport.tsx` frames the camera on it after it loads. Only a self-contained `.glb` works, because the browser gives the loader no neighbouring files.
 - **The Zustand store holds UI and render-status state only.** The camera, render targets, textures and pass counter live in React Three Fiber and `PathTracer`, because they change every frame and must not trigger React re-renders.
 - **The render view's size cap comes from `src/lib/webgl/renderLimits.ts`.** `src/index.tsx` turns it into CSS variables for the `main` element that holds `Viewport`, `Hud` and `SettingsPanel`. Keep the readout, the settings card and the popover absolutely positioned inside `main`, or opening one resizes the canvas and restarts accumulation ([Layout](ARCHITECTURE.md#9-layout)).
 - **The app needs WebGL 2 with `EXT_color_buffer_float`, `EXT_float_blend` and enough texture units, and the GPU's texture limits must fit the scene.** `src/lib/webgl/checkGpuLimits.ts` checks them, and `src/components/viewport.tsx` shows the failure as a sentence in the view. The scene limits compare the real texture sizes with the GPU's limits, so a phone with small limits can still run a small scene.
@@ -193,7 +195,7 @@ There is no test suite or runner. `pnpm lint`, `pnpm typecheck` and `pnpm build`
 
 ## 6. State / what's next
 
-The path tracer renders the bundled Suzanne scene, and any glTF scene whose materials use constant PBR factors. Known gaps:
+The path tracer renders the bundled scenes, and any glTF scene whose materials use constant PBR factors. Known gaps:
 
 1. **No textures.** Only constant material factors are read ([Rendering gotchas](#3-rendering-gotchas)).
 2. **No automated tests.** Shader and BVH regressions only show up in a manual render.

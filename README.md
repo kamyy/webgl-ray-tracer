@@ -19,7 +19,7 @@ Live at [https://webgl-ray-tracer.orky.net](https://webgl-ray-tracer.orky.net).
 | Zoom   | Wheel or middle-drag | Pinch       |
 
 - **Progress** is the ring at the top left, with the pass count, elapsed time, time remaining and the average time per pass beside it. The view restarts at pass 0 whenever the camera, a setting or the window size changes.
-- **Render settings** are in the card at the bottom left, and the chevron collapses it out of the way. They are field of view, samples per pixel, ray bounces, and Flat or Phong shading.
+- **Render settings** are in the card at the bottom left, and the chevron collapses it out of the way. They are the scene, field of view, samples per pixel, ray bounces, and Flat or Phong shading.
 - The buttons at the top right switch the theme and open the About card with these controls and the license.
 
 ## 3. Running it locally
@@ -35,7 +35,7 @@ Then open the address Vite prints. [`RUNBOOK.md`](RUNBOOK.md) covers the other c
 
 ## 4. Your own scene
 
-The app loads `public/suzanne.glb`, a glTF 2.0 file compressed with Draco. Replace it with any glTF scene whose materials use plain PBR factors. A non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective, with `metalness` as the reflection ratio and `1 - roughness` as the gloss. Textures are ignored.
+The scene cards in the settings card pick one of the bundled glTF 2.0 scenes, and the "Open .glb" card loads a `.glb` file from your own drive. The file is read in the browser and never uploaded. It must be a self-contained `.glb` whose materials use plain PBR factors. A non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective, with `metalness` as the reflection ratio and `1 - roughness` as the gloss. Textures are ignored.
 
 ## 5. How it works
 
