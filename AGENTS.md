@@ -178,7 +178,7 @@ A single Vite + React app, with no server runtime.
 ### 5.2 Formatting & linting
 
 - **Run `pnpm format` and `pnpm lint:fix` before committing.** CI's `format:check` and `lint` fail on anything they would change.
-- Prettier (`prettier.config.mjs`) uses no semicolons, single quotes, no parentheses around a single arrow parameter, and `printWidth: 120`. `prettier-plugin-organize-imports` sorts imports.
+- Prettier (`prettier.config.mjs`) uses no semicolons, single quotes, no parentheses around a single arrow parameter, and `printWidth: 120`. `prettier-plugin-organize-imports` sorts imports. `prettier-plugin-tailwindcss` sorts the Tailwind classes in each `className`, and reads the custom `short` variant from `src/styles/globals.css`.
 - Husky's `.husky/pre-commit` runs `format-staged`, `lint` and `typecheck` in order. A failure in any of them blocks the commit.
 - Prettier also formats Markdown. Markdown prose has no maximum width: one line per paragraph or list item, since GitHub reflows paragraphs and fixed wraps only add diff noise.
 

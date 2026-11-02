@@ -43,7 +43,7 @@ export function SettingsPanel() {
       <button
         type="button"
         aria-expanded={false}
-        className={`${position} flex min-h-12 items-center gap-2 rounded-full bg-white/70 backdrop-blur-md px-5 text-sm font-bold shadow-xl hover:bg-white dark:bg-gray-900/70 dark:hover:bg-gray-800`}
+        className={`${position} flex min-h-12 items-center gap-2 rounded-full bg-white/70 px-5 text-sm font-bold shadow-xl backdrop-blur-md hover:bg-white dark:bg-gray-900/70 dark:hover:bg-gray-800`}
         onClick={() => setOpen(true)}
       >
         <SlidersIcon />
@@ -56,7 +56,7 @@ export function SettingsPanel() {
   return (
     <section
       aria-label="Render settings"
-      className={`${position} max-h-[calc(100dvh-7.5rem)] w-72 overflow-y-auto rounded-2xl bg-white/70 backdrop-blur-md p-3 shadow-xl dark:bg-gray-900/70 md:w-80 max-md:portrait:right-0 max-md:portrait:bottom-0 max-md:portrait:left-0 max-md:portrait:w-auto max-md:portrait:rounded-b-none max-md:portrait:pb-[max(0.75rem,env(safe-area-inset-bottom))]`}
+      className={`${position} max-h-[calc(100dvh-7.5rem)] w-72 overflow-y-auto rounded-2xl bg-white/70 p-3 shadow-xl backdrop-blur-md md:w-80 max-md:portrait:right-0 max-md:portrait:bottom-0 max-md:portrait:left-0 max-md:portrait:w-auto max-md:portrait:rounded-b-none max-md:portrait:pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:bg-gray-900/70`}
     >
       <button
         type="button"

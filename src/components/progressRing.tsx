@@ -21,7 +21,7 @@ export function ProgressRing({ proportion, className }: ProgressRingProps) {
       aria-hidden="true"
     >
       {/* The white disc that hides the middle of the pie slice, and holds the label. */}
-      <div className="absolute inset-[6%] grid place-items-center rounded-full bg-white dark:bg-gray-900 text-base font-medium md:text-lg tabular-nums">
+      <div className="absolute inset-[6%] grid place-items-center rounded-full bg-white text-base font-medium tabular-nums md:text-lg dark:bg-gray-900">
         {percent}%
       </div>
     </div>
