@@ -8,6 +8,8 @@ Live at [https://webgl-ray-tracer.orky.net](https://webgl-ray-tracer.orky.net).
 
 Each render is 1280 by 720 with 4000 samples per pixel, and the settings card and the progress readout are collapsed.
 
+Suzanne scene, 45° field of view, 8 bounces.
+
 ![Suzanne scene, 45° field of view, 8 bounces](docs/screenshots/suzanne-fov45-b8.png)
 
 Tricycle scene, 50° field of view, 8 bounces.

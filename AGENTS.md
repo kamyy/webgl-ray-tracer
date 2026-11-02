@@ -79,7 +79,15 @@ A single Vite + React app, with no server runtime.
 
 - `public/` — the bundled glTF scenes (`suzanne.glb`, `tricycle.glb`), their card pictures in `public/thumbs/`, and the Draco decoder in `public/draco/`. Vite copies it into `dist/` as-is.
 - `src/shaders/` — the GLSL vertex and fragment shaders, imported into the app as strings.
-- `src/components/` — React components, styled with Tailwind CSS utility classes. `src/components/hud.tsx` is the progress readout and About button, `src/components/settingsPanel.tsx` is the collapsible settings card, `src/components/renderSettings.tsx` holds its controls including the scene cards, `src/components/popover.tsx` is the card the About button opens, the theme switch is in `src/components/hud.tsx`, and `src/components/viewport.tsx` is the render view.
+- `src/components/` — React components, styled with Tailwind CSS utility classes.
+  - `src/components/about.tsx` — the camera controls, license and links shown in the About card.
+  - `src/components/hud.tsx` — the progress readout, the theme switch and the About button.
+  - `src/components/pathTracer.tsx` — `PathTracer`, which draws the passes.
+  - `src/components/popover.tsx` — the card the About button opens.
+  - `src/components/progressRing.tsx` — the circular progress ring inside the readout.
+  - `src/components/renderSettings.tsx` — the settings controls, including the scene cards.
+  - `src/components/settingsPanel.tsx` — the collapsible settings card.
+  - `src/components/viewport.tsx` — the render view.
 - `src/styles/` — `globals.css`, which imports Tailwind and holds the range slider rules that Tailwind has no utilities for.
 - `src/lib/scenes.ts` — the bundled scenes with their starting camera views, and the helpers for a scene opened from the user's drive.
 - `src/lib/store/` — the Zustand store for UI and rendering-status state only.
@@ -170,7 +178,7 @@ A single Vite + React app, with no server runtime.
 ### 5.2 Formatting & linting
 
 - **Run `pnpm format` and `pnpm lint:fix` before committing.** CI's `format:check` and `lint` fail on anything they would change.
-- Prettier (`prettier.config.mjs`) uses no semicolons, single quotes, no parentheses around a single arrow parameter, and `printWidth: 120`. `prettier-plugin-organize-imports` sorts imports.
+- Prettier (`prettier.config.mjs`) uses no semicolons, single quotes, no parentheses around a single arrow parameter, and `printWidth: 120`. `prettier-plugin-organize-imports` sorts imports. `prettier-plugin-tailwindcss` sorts the Tailwind classes in each `className`, and reads the custom `short` variant from `src/styles/globals.css`.
 - Husky's `.husky/pre-commit` runs `format-staged`, `lint` and `typecheck` in order. A failure in any of them blocks the commit.
 - Prettier also formats Markdown. Markdown prose has no maximum width: one line per paragraph or list item, since GitHub reflows paragraphs and fixed wraps only add diff noise.
 

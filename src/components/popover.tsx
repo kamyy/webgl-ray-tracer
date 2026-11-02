@@ -45,7 +45,7 @@ export function Popover({ title, className, onClose, children }: PopoverProps) {
       ref={ref}
       role="dialog"
       aria-label={title}
-      className={`absolute z-20 w-[min(30rem,calc(100vw-1.5rem))] rounded-2xl border border-gray-300 bg-white p-3.5 dark:border-gray-600 dark:bg-gray-900 shadow-xl ${className}`}
+      className={`absolute z-20 w-[min(30rem,calc(100vw-1.5rem))] rounded-2xl border border-gray-300 bg-white p-3.5 shadow-xl dark:border-gray-600 dark:bg-gray-900 ${className}`}
     >
       {children}
     </div>

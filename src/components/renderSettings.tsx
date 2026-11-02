@@ -80,7 +80,7 @@ function RangeRow({ title, value, min, max, onChange }: RangeRowProps) {
         onChange={event => onChange(parseInt(event.target.value))}
       />
       <input
-        className="min-h-9 w-16 flex-none short:min-h-8 rounded-lg border border-gray-300 bg-gray-100 px-2 dark:border-gray-600 dark:bg-gray-800 text-right text-xs tabular-nums"
+        className="min-h-9 w-16 flex-none rounded-lg border border-gray-300 bg-gray-100 px-2 text-right text-xs tabular-nums dark:border-gray-600 dark:bg-gray-800 short:min-h-8"
         type="number"
         min={min}
         max={max}
@@ -220,7 +220,7 @@ export function RenderSettings() {
                 checked={shadingMethod === method.value}
                 onChange={() => setShadingMethod(method.value)}
               />
-              <span className="block min-h-11 content-center px-4 short:min-h-9 text-center text-xs font-semibold text-gray-600 peer-checked:bg-(--accent) peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-2 peer-focus-visible:outline-(--accent) dark:text-gray-400 dark:peer-checked:text-gray-900">
+              <span className="block min-h-11 content-center px-4 text-center text-xs font-semibold text-gray-600 peer-checked:bg-(--accent) peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-2 peer-focus-visible:outline-(--accent) dark:text-gray-400 dark:peer-checked:text-gray-900 short:min-h-9">
                 {method.label}
               </span>
             </label>

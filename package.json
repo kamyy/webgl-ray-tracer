@@ -25,6 +25,7 @@
     "husky": "^9.1.7",
     "prettier": "^3.8.1",
     "prettier-plugin-organize-imports": "^4.3.0",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "pretty-quick": "^4.2.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",

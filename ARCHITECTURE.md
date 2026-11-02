@@ -50,15 +50,13 @@ Each animation frame draws one strip of a render pass, using two shaders. React 
 ```
 
 - **`PathTraceMaterial`** (`src/lib/webgl/pathTraceMaterial.ts`, with `src/shaders/pathTrace.vert.glsl` and `src/shaders/pathTrace.frag.glsl`) path-traces samples into an off-screen `RGBA32F` target with additive blending. The rgb channels hold the running sum of sample colors, and alpha counts the samples each pixel has received.
-- **`DisplayMaterial`** (`src/lib/webgl/displayMaterial.ts`, with `src/shaders/display.vert.glsl` and `src/shaders/display.frag.glsl`) divides the sum by the per-pixel count and draws it to the visible canvas.
+- **`DisplayMaterial`** (`src/lib/webgl/displayMaterial.ts`, with `src/shaders/display.vert.glsl` and `src/shaders/display.frag.glsl`) divides the sum by the per-pixel count and draws it to the visible canvas. Keeping the two apart leaves the accumulator a plain running sum, and only the display shader normalizes it.
 - **A pass is drawn as horizontal strips, one strip per animation frame.** A full pass on a mid-range GPU or a phone can take hundreds of milliseconds. The page cannot repaint while the GPU is busy, so one long draw makes the whole page stutter, and mobile browsers may reset the WebGL context. Strips keep each GPU job short.
   - The strip count adapts to the frame time, between 1 and 32. It doubles after consecutive frames over 24 ms and halves after about half a second of frames under 18 ms. It changes only between passes, so each pass covers every row exactly once.
   - The cost is that the target must be additive, which needs the `EXT_float_blend` extension, and that rows can briefly hold different sample counts. The per-pixel count in alpha makes that invisible.
   - The first pass after a restart is a one-bounce preview drawn whole, so a moving camera always shows a complete image.
-- **Both are raw shader materials drawn on one screen-covering triangle** (`src/lib/webgl/screenQuad.ts`). A raw material skips the code three.js adds to its built-in materials, which would clash with the GLSL's own inputs and outputs. The GLSL files have no `#version` line because the material's `glslVersion` writes it.
+- **Both are raw shader materials drawn on one screen-covering triangle** (`src/lib/webgl/screenQuad.ts`). A raw material skips the code three.js adds to its built-in materials, which would clash with the GLSL's own inputs and outputs.
 - **Pass and timing counters reach the store about four times a second**, not every frame, so React does not re-render at the frame rate.
-
-Splitting them keeps the accumulator a plain running sum, and only the display shader normalizes it.
 
 Rendering runs until the pass count reaches the sample setting. A camera or setting change resets the pass count and restarts accumulation. `PathTracer` notices a camera change by comparing the camera's world matrix with the previous frame's, so it does not depend on which control moved the camera. While the camera is being dragged, only pass 1 renders, which trades image quality for a responsive drag.
 
@@ -89,11 +87,11 @@ The scene is a glTF 2.0 binary, bundled in `public/` or opened from the user's d
 ```
 
 - **The split uses the Surface Area Heuristic (SAH).** `BvhNode.findBestSplit` sweeps all three axes and every candidate position with prefix and suffix bounding-box sums. It picks the split minimizing `SA(left) * |left| + SA(right) * |right|`. This builds slower than a median split and gives faster traversal, which pays off because a tree is built once and traced millions of times.
-- **The tree is built in a Web Worker.** The SAH sweep sorts the faces three times per node, which takes seconds for a large mesh and freezes the page if it runs on the main thread. The main thread sends world-space triangles and receives the packed arrays as transferable buffers, so nothing is copied. The cost is that the BVH code can't use three.js types, because the worker has no use for them.
+- **The tree is built in a Web Worker.** The SAH sweep sorts the faces three times per node, which takes seconds for a large mesh and freezes the page if it runs on the main thread. The main thread sends world-space triangles and receives the packed arrays as transferable buffers, so nothing is copied. The cost is that the BVH code can't import three.js or touch `window`, because the worker has neither.
 - **Traversal uses a fixed-size stack, so tree depth is capped** at `bvhMaxStackSize`. GLSL has no recursion, and a dynamically sized stack isn't available.
 - **Faces, BVH nodes and materials are packed into `Float32Array`s** and uploaded as `TEXTURE_2D_ARRAY` and `TEXTURE_2D` textures, one array layer per mesh. `NEAREST` filtering with `texelFetch` reads the exact texel. Uniform buffers hold far less data than a texture.
 - **glTF was chosen because its material fields already describe what the shader needs.** `metalness` becomes the reflection ratio, `1 - roughness` the gloss, `transmission` and `ior` select and drive dielectric materials, and `emissive` times `emissiveIntensity` makes a light. The alternative, OBJ with MTL, has no standard fields for emission, glass or roughness, so a scene needed hardcoded material names. The cost is that a scene must be authored or exported with these PBR fields set.
-- **The geometry is Draco-compressed** at 16-bit positions and 12-bit normals. The default quantization is coarse enough to show as faceting on smooth surfaces and as gaps between triangles. The file is about 6% of the size of the OBJ it replaced, and `DRACOLoader` decodes it in a web worker. The decoder is served from `public/draco/` instead of a CDN, so the app works offline and makes no third-party request.
+- **The geometry is Draco-compressed** at 16-bit positions and 12-bit normals. The default quantization is coarse enough to show as faceting on smooth surfaces and as gaps between triangles. `DRACOLoader` decodes the file in a web worker. The decoder is served from `public/draco/` instead of a CDN, so the app works offline and makes no third-party request.
 
 ---
 
@@ -112,9 +110,9 @@ The scene is a glTF 2.0 binary, bundled in `public/` or opened from the user's d
 
 ## 5. Camera and controls
 
-drei's `PerspectiveCamera` and `CameraControls` (`src/components/viewport.tsx`) replace the hand-written transform hierarchy and mouse handlers. The app uses three.js's axes everywhere: the world is Y-up, which is also glTF's native orientation, and the camera looks down its own -z axis. The shader builds each ray in that camera space and multiplies it by the camera's world matrix, so no axis conversion is needed anywhere.
+drei's `PerspectiveCamera` and `CameraControls` (`src/components/viewport.tsx`) provide the camera and its mouse and touch handling. The app uses three.js's axes everywhere: the world is Y-up, which is also glTF's native orientation, and the camera looks down its own -z axis. The shader builds each ray in that camera space and multiplies it by the camera's world matrix, so no axis conversion is needed anywhere.
 
-`CameraControls` gives rotate, pan and dolly with the mouse and touch for free. The cost is that it has no Ctrl + left-drag pan, so panning is right-drag or two fingers. Its rotate speed is set to 0.5 to match the sensitivity of the old controls.
+`CameraControls` gives rotate, pan and dolly with the mouse and touch for free. It has no Ctrl + left-drag pan, so panning is right-drag or two fingers. Its rotate speed is set to 0.5.
 
 ---
 
@@ -144,8 +142,8 @@ Everything else lives in React Three Fiber and `PathTracer`: the camera, the ren
 The app is fully client-side rendered, with the default Vite React setup and no server-side rendering. `dist/` is static HTML, JavaScript, CSS and the GLSL shaders bundled into the JavaScript, so an S3 bucket behind a CloudFront distribution serves it with no server runtime.
 
 - **The `deploy` job sets a `Cache-Control` header on every upload, so there is no cache to invalidate.** CloudFront (AWS's content delivery network, or CDN) sits in front of the bucket. Files in `dist/assets/` have a content hash in their name, so they are marked immutable for a year and a new build uploads new names. Every other file keeps a fixed name, so it is marked `no-cache`, and CloudFront and browsers check the bucket for a newer copy before reusing it. A deploy is visible at once.
-- **CI deploys on every push to `main`.** The `build` job gates the `deploy` job, and the deploy assumes an AWS role through GitHub's OIDC token, so the repo stores no long-lived AWS keys.
-- **Terraform in `infra/` defines the AWS resources, and the `apply` job applies it on merge to `main`.** Every change is then reviewed in a pull request, and a resource deleted by hand is put back on the next apply. That matters most for the DNS record that AWS Certificate Manager (ACM) needs to renew the site's certificate, because a missing record makes the renewal fail and the certificate expire.
+- **CI deploys on every push to `main` that changes built files.** The `build` job gates the `deploy` job, and the deploy assumes an AWS role through GitHub's OIDC token, so the repo stores no long-lived AWS keys.
+- **Terraform in `infra/` defines the AWS resources, and the `apply` job in `.github/workflows/terraform.yml` applies it on merge to `main`.** Every change is then reviewed in a pull request, and a resource deleted by hand is put back on the next apply. That matters most for the DNS record that AWS Certificate Manager (ACM) needs to renew the site's certificate, because a missing record makes the renewal fail and the certificate expire.
 - **Terraform keeps its state in its own S3 bucket, `webgl-ray-tracer-tfstate-570846794821`.** A dedicated bucket keeps the Terraform role away from the state of other projects. The bucket is created by hand once, because Terraform can't store state in a bucket that doesn't exist yet.
 - **The site has its own ACM certificate for `webgl-ray-tracer.orky.net`, not the wildcard `*.orky.net` one.** A certificate shared with the `d3d-to-webgl` site would tie the two sites together, so a mistake in one repo could expire the other site's certificate. CloudFront reads certificates only from us-east-1, so Terraform creates this one there.
 - **Terraform does not own the hosted zone or the GitHub OIDC provider.** Other projects in the account use both, so a change here must not be able to delete them.
