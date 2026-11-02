@@ -29,6 +29,7 @@ interface AppState {
   readonly elapsedTime: string
   readonly etaTime: string
   readonly avgTime: string
+  readonly resolution: string // the canvas size in pixels, which is also the size of a saved screenshot
 }
 
 // The ways to change the state. Each setter replaces one value.
@@ -39,6 +40,7 @@ interface AppActions {
   setNumBounces(numBounces: number): void
   setCameraFov(cameraFov: number): void
   setStatus(status: Pick<AppState, 'renderingPass' | 'elapsedTime' | 'etaTime' | 'avgTime'>): void
+  setResolution(width: number, height: number): void
   resetStatus(): void
 }
 
@@ -54,6 +56,7 @@ export const useAppStore = create<AppState & AppActions>()(
     elapsedTime: '--',
     etaTime: '--',
     avgTime: '--',
+    resolution: '--',
 
     setScene: scene => set({ scene }),
     setShadingMethod: shadingMethod => set({ shadingMethod }),
@@ -61,6 +64,7 @@ export const useAppStore = create<AppState & AppActions>()(
     setNumBounces: numBounces => set({ numBounces }),
     setCameraFov: cameraFov => set({ cameraFov }),
     setStatus: status => set(status),
+    setResolution: (width, height) => set({ resolution: `${width} × ${height}` }),
     resetStatus: () => set({ renderingPass: 0, elapsedTime: '--', etaTime: '--', avgTime: '--' }),
   })),
 )

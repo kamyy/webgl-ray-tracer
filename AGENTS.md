@@ -118,6 +118,10 @@ A single Vite + React app, with no server runtime.
 - **The Zustand store holds UI and render-status state only.** The camera, render targets, textures and pass counter live in React Three Fiber and `PathTracer`, because they change every frame and must not trigger React re-renders.
 - **The render view's size cap comes from `src/lib/webgl/renderLimits.ts`.** `src/index.tsx` turns it into CSS variables for the `main` element that holds `Viewport`, `Hud` and `SettingsPanel`. Keep the readout, the settings card and the popover absolutely positioned inside `main`, or opening one resizes the canvas and restarts accumulation ([Layout](ARCHITECTURE.md#9-layout)).
 - **The app needs WebGL 2 with `EXT_color_buffer_float`, `EXT_float_blend` and enough texture units, and the GPU's texture limits must fit the scene.** `src/lib/webgl/checkGpuLimits.ts` checks them, and `src/components/viewport.tsx` shows the failure as a sentence in the view. The scene limits compare the real texture sizes with the GPU's limits, so a phone with small limits can still run a small scene.
+- **The save button reads the canvas right after drawing the display pass again.** `downloadScreenshot` does both in one task, because the canvas has no `preserveDrawingBuffer` and is blank once the browser has shown it. The save button is disabled until `renderingPass` reaches `numSamples`.
+  - `src/components/hud.tsx` defines the save button.
+  - `src/components/pathTracer.tsx` defines `downloadScreenshot`.
+  - `src/lib/webgl/screenshot.ts` carries the call from the save button to `PathTracer`, which sits inside the React Three Fiber canvas.
 - **Touch devices render at half the width and height of the view.** `getPixelRatio` in `src/components/viewport.tsx` sets the canvas `dpr` to 0.5 when the primary pointer is coarse. The drawing buffer and the render targets are the view's CSS size times that ratio, so any code that sizes a texture to the view must multiply by `viewport.dpr`.
 
 ---
