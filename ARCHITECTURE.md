@@ -168,7 +168,7 @@ The render view fills the whole screen, and everything else floats over it.
 ```text
  desktop                                       phone in portrait
  ┌────────────────────────────────────────┐    ┌──────────────────────┐
- │ ProgressPill              theme, About │    │ ProgressPill buttons │
+ │ ProgressPill        save, theme, About │    │ ProgressPill buttons │
  │                                        │    │                      │
  │            Viewport                    │    │      Viewport        │
  │         (the whole of main)            │    │                      │
@@ -180,9 +180,10 @@ The render view fills the whole screen, and everything else floats over it.
 ```
 
 - **The view has no bars.** A header and a footer would take 100 to 200 px of height, most of it on a phone, for controls that sit idle while the image converges. A floating readout and a floating settings card cost no height, at the price of covering part of the image.
-- **The readout shows progress and the card holds the controls.** `src/components/hud.tsx` is a pill at the top left with the circular progress ring, the pass counter and the timing counters, plus an About button at the top right. The ring is the primary indicator, because a render converges over minutes and how far along it is matters more than any single setting. On a phone the pill shrinks to the ring, the pass count and the time left.
+- **The readout shows progress and the card holds the controls.** `src/components/hud.tsx` is a pill at the top left with the circular progress ring, the pass counter, the timing counters and the canvas size in pixels, plus save, theme and About buttons at the top right. The ring is the primary indicator, because a render converges over minutes and how far along it is matters more than any single setting. On a phone the pill shrinks to the ring, the pass count and the time left.
 - **The settings card collapses.** `src/components/settingsPanel.tsx` is a card at the bottom left with a row of scene cards, a slider and a number field for each of field of view, samples and bounces, plus the Flat/Phong control. It scrolls when the window is too short to show all of it. Its title bar collapses it to a small Settings button, so the whole image can be seen. On a phone in portrait the open card is a bottom sheet across the full width.
 - **The theme is a `dark` class on the `<html>` element.** `src/lib/hooks/useTheme.ts` sets it from the saved choice, or from the operating system's setting on a first visit, and a button at the top right switches it. Tailwind's `dark:` variant and the color variables in `src/styles/globals.css` follow the class, so no reload is needed. The render itself does not change, because only the floating controls have a theme.
+- **The save button is enabled only at 100%.** It downloads the canvas as a PNG at the drawing-buffer size, so the file never contains the floating elements or a half-converged image. The canvas is not created with `preserveDrawingBuffer`, which costs speed on some GPUs, so the button draws the display pass again just before it reads the canvas.
 - **Every floating element is absolutely positioned.** The card, the readout and the About popover overlap the view, so opening or collapsing them never changes the canvas size, rebuilds the render targets or restarts accumulation.
 - **The render view is capped at 2560 by 1440 CSS pixels from the `md` breakpoint up** (`src/lib/webgl/renderLimits.ts`). Every pixel is traced many times, so a maximized window on a 5K monitor, about 14.7 million pixels, would never converge. The cap is the size of a 1440p monitor, and a larger window shows the view centered. Phones are below the breakpoint, have few pixels, and use the whole window.
 - **Resizing the window resizes the canvas and restarts the render.** The new size rebuilds the render targets and `PathTracer` restarts accumulation at pass 0. The resize is debounced by 200 ms, so dragging a window edge does not rebuild them on every frame.

@@ -29,6 +29,7 @@ import { PackedScene } from '../lib/webgl/packScene'
 import { createPathTraceMaterial } from '../lib/webgl/pathTraceMaterial'
 import { createRandomTexture } from '../lib/webgl/randomTexture'
 import { createScreenQuad, screenQuadCamera } from '../lib/webgl/screenQuad'
+import { registerScreenshot } from '../lib/webgl/screenshot'
 
 // The accumulation target holds a running sum of color samples, so it needs a float format. Nearest filtering and no
 // mipmaps keep each texel exact, because the display pass reads the sum back one texel per pixel.
@@ -49,6 +50,7 @@ const slowFramesBeforeMoreStrips = 2
 const fastFrameMs = 18 // at 60 Hz an idle frame is about 16.7 ms, so a faster-than-this frame has headroom
 const fastFramesBeforeFewerStrips = 30
 const statusIntervalMs = 500 // how often the status counters are written to the store
+const revokeDelayMs = 10_000 // how long a screenshot's object URL stays valid after the download starts
 const bouncesSettleMs = 500 // how long the bounce setting must stay unchanged before it restarts accumulation
 
 // Everything the render loop remembers between frames. It lives in a plain object rather than React state, because
@@ -198,6 +200,35 @@ function updateStatus(state: PassState, numSamples: number, force: boolean) {
 
 // --- Drawing -------------------------------------------------------------------------
 
+// Draws the average of the running sum to the canvas.
+function drawDisplay(gl: WebGLRenderer, display: ScreenPass, accumulation: WebGLRenderTarget) {
+  display.material.uniforms.u_color_sampler.value = accumulation.texture
+  gl.setRenderTarget(null)
+  gl.render(display.scene, screenQuadCamera)
+}
+
+// Saves the canvas as a PNG file. The canvas is not created with `preserveDrawingBuffer`, so its contents are gone
+// once the browser has shown them. The display pass is drawn again, and `toBlob` copies the canvas before this task
+// ends.
+function downloadScreenshot(gl: WebGLRenderer, display: ScreenPass, accumulation: WebGLRenderTarget) {
+  drawDisplay(gl, display, accumulation)
+  gl.domElement.toBlob(blob => {
+    if (!blob) {
+      console.error('The canvas could not be encoded as a PNG.')
+      return
+    }
+
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'path-tracer.png'
+    link.click()
+
+    // Some browsers start the download after `click` returns, so the URL must outlive this call.
+    setTimeout(() => URL.revokeObjectURL(url), revokeDelayMs)
+  }, 'image/png')
+}
+
 // Adds one strip of samples to the running sum, then draws the average of everything accumulated so far.
 function drawStrip(state: PassState, inputs: PassInputs, numStrips: number) {
   const { gl, camera, width, height, packed, accumulation, randomTexture, pathTrace, display } = inputs
@@ -239,9 +270,7 @@ function drawStrip(state: PassState, inputs: PassInputs, numStrips: number) {
 
   // Pass 2: divide the sum by the sample count and show it on the canvas. This covers every pixel, so strips not yet
   // traced in this pass still show their previous average.
-  display.material.uniforms.u_color_sampler.value = accumulation.texture
-  gl.setRenderTarget(null)
-  gl.render(display.scene, screenQuadCamera)
+  drawDisplay(gl, display, accumulation)
 
   // Move to the next strip. After the last one the pass is complete, so a new strip count may take effect and the
   // counters are written at once, so the final pass always shows.
@@ -304,6 +333,11 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
     renderReset(state)
   }, [state, width, height, packed])
 
+  // The readout shows the size of the drawing buffer, which is also the size of a saved screenshot.
+  useEffect(() => {
+    useAppStore.getState().setResolution(width, height)
+  }, [width, height])
+
   // Any setting that changes the image restarts accumulation. A new one belongs in this list, except one that is
   // dragged on a slider, which needs a delay like the bounce count below.
   useEffect(
@@ -355,6 +389,9 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
     canvas.addEventListener('webglcontextrestored', restart)
     return () => canvas.removeEventListener('webglcontextrestored', restart)
   }, [gl, state])
+
+  // The heads-up display saves the image through this registration.
+  useEffect(() => registerScreenshot(() => downloadScreenshot(gl, display, accumulation)), [gl, display, accumulation])
 
   // Free GPU memory when a texture or material is replaced or the component unmounts.
   useEffect(() => {

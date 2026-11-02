@@ -1,5 +1,5 @@
 /**
- * The floating heads-up display over the render: the progress pill and the theme and About buttons.
+ * The floating heads-up display over the render: the progress pill and the screenshot, theme and About buttons.
  *
  * The pill's ring and counters are read-only. Their values come from the app store, where `PathTracer` writes them a
  * few times a second. Everything is absolutely positioned over the render view, so the render keeps the whole screen
@@ -9,6 +9,7 @@
 import { useCallback, useState } from 'react'
 import { useTheme } from '../lib/hooks/useTheme'
 import { useAppStore } from '../lib/store/appStore'
+import { saveScreenshot } from '../lib/webgl/screenshot'
 import { About } from './about'
 import { Popover } from './popover'
 import { ProgressRing } from './progressRing'
@@ -46,13 +47,16 @@ function Icon({ children }: { children: React.ReactNode }) {
 
 // --- Progress pill -------------------------------------------------------------------
 
-// One timing counter: a small label over a large value.
-function Stat({ label, value }: { label: string; value: string }) {
+// One counter: a small label over a large value. A value that changes while the render runs has no width of its own, so
+// a changing number never moves the columns and the label sets the width. A steady value sets the width itself, so a
+// value wider than its label is not clipped by the edge of the pill.
+function Stat({ label, value, steady = false }: { label: string; value: string; steady?: boolean }) {
+  const valueWidth = steady ? '' : 'w-0'
+
   return (
     <div className="flex flex-col leading-tight">
       <span className={`text-sm ${mutedText}`}>{label}</span>
-      {/* The value has no width of its own, so a changing number never moves the columns. The label sets the width. */}
-      <span className="w-0 text-lg whitespace-nowrap tabular-nums">{value}</span>
+      <span className={`text-lg whitespace-nowrap tabular-nums ${valueWidth}`}>{value}</span>
     </div>
   )
 }
@@ -64,6 +68,7 @@ function ProgressPill() {
   const elapsedTime = useAppStore(state => state.elapsedTime)
   const etaTime = useAppStore(state => state.etaTime)
   const avgTime = useAppStore(state => state.avgTime)
+  const resolution = useAppStore(state => state.resolution)
   const proportion = Math.min(renderingPass / numSamples, 1)
 
   // Pressing the pill folds it down to just the ring, and pressing it again unfolds the counters.
@@ -91,6 +96,7 @@ function ProgressPill() {
           <Stat label="Elapsed" value={elapsedTime} />
           <Stat label="Remaining" value={etaTime} />
           <Stat label="Avg. per pass" value={avgTime} />
+          <Stat label="Resolution" value={resolution} steady />
         </div>
       </>
     )
@@ -148,6 +154,26 @@ function ThemeButton() {
   )
 }
 
+// Saves the render as a PNG. It is disabled until the render reaches 100%, so the file is always the finished image.
+function ScreenshotButton() {
+  const complete = useAppStore(state => state.renderingPass >= state.numSamples)
+
+  return (
+    <button
+      type="button"
+      aria-label="Save screenshot"
+      disabled={!complete}
+      title={complete ? 'Save screenshot' : 'Available when the render reaches 100%'}
+      className={`${roundButton} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/70 dark:disabled:hover:bg-gray-900/70`}
+      onClick={saveScreenshot}
+    >
+      <Icon>
+        <path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14" />
+      </Icon>
+    </button>
+  )
+}
+
 // Opens the About popover below the button. The wrapper is the popover's positioning parent.
 function AboutButton() {
   const [open, setOpen] = useState(false)
@@ -190,6 +216,7 @@ export function Hud() {
       <ProgressPill />
 
       <div className={`absolute z-10 flex gap-2 ${topEdge} ${rightEdge}`}>
+        <ScreenshotButton />
         <ThemeButton />
         <AboutButton />
       </div>
