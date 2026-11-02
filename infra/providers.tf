@@ -1,9 +1,14 @@
-# Terraform's own settings: the required versions, the AWS provider, and the state backend.
+# Terraform's own settings, and the AWS objects this repo reads but does not own.
 #
 # Pins the Terraform CLI and AWS provider versions. Configures one AWS provider for us-west-2, where the S3 bucket
 # lives, and one for us-east-1. Stores Terraform's state in a dedicated S3 bucket. Tags every AWS resource the providers
 # create with the project name. The state bucket is created by hand once, because Terraform can't store state in a
 # bucket it hasn't made yet (RUNBOOK.md).
+#
+# The hosted zone and the GitHub OIDC provider are shared by every project in the account, so they are looked up here
+# and never created or destroyed by infra/.
+
+# --- Terraform and providers ----------------------------------------------------------
 
 terraform {
   # Exact, not a floor. A range would let a newer local CLI plan. .github/workflows/terraform.yml reads this string to
@@ -39,7 +44,8 @@ provider "aws" {
   }
 }
 
-# CloudFront only reads ACM certificates from us-east-1, wherever the rest of the stack runs. See infra/cert.tf.
+# CloudFront only reads ACM certificates from us-east-1, wherever the rest of the stack runs.
+# This provider creates `aws_acm_certificate.site` in infra/site.tf.
 provider "aws" {
   alias  = "us_east_1"
   region = "us-east-1"
@@ -49,4 +55,17 @@ provider "aws" {
       Project = "webgl-ray-tracer"
     }
   }
+}
+
+# --- Existing AWS objects -------------------------------------------------------------
+
+data "aws_caller_identity" "current" {}
+
+data "aws_route53_zone" "main" {
+  zone_id = var.hosted_zone_id
+}
+
+# The account-wide identity provider that lets a GitHub Actions run exchange its OIDC token for AWS credentials.
+data "aws_iam_openid_connect_provider" "github" {
+  arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
 }
