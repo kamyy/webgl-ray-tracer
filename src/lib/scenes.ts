@@ -11,14 +11,14 @@ export const scenes: SceneInfo[] = [
     id: 'suzanne',
     label: 'Suzanne',
     url: '/suzanne.glb',
-    thumbnail: '/thumbs/suzanne.jpg',
+    thumbnail: '/thumbnails/suzanne.jpg',
     view: { eye: [0, 2, 10], target: [0, 2, 0] },
   },
   {
     id: 'tricycle',
     label: 'Tricycle',
     url: '/tricycle.glb',
-    thumbnail: '/thumbs/tricycle.jpg',
+    thumbnail: '/thumbnails/tricycle.jpg',
     view: { eye: [0, 2, 10], target: [0, 1.5, 0] },
   },
 ]

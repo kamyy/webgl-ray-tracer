@@ -65,7 +65,7 @@ A shader, BVH or scene change needs a look in the browser, because nothing else 
 
 A user opens their own scene at run time. The settings card shows each bundled scene as a picture card, plus an "Open .glb" card that opens the browser's file picker. A file opened this way is loaded in the browser and never uploaded.
 
-To add a bundled scene, export a glTF binary (`.glb`) from Blender with Draco compression on, positions at 16 bits and normals at 12 bits. Set each material's base color, metallic, roughness and (for lights) emission strength, and (for glass) transmission and IOR. Put the file in `public/` and a small picture of it in `public/thumbs/`, then add an entry to `scenes` in `src/lib/scenes.ts` with the picture's URL and the camera's starting `view`.
+To add a bundled scene, export a glTF binary (`.glb`) from Blender with Draco compression on, positions at 16 bits and normals at 12 bits. Set each material's base color, metallic, roughness and (for lights) emission strength, and (for glass) transmission and IOR. Put the file in `public/` and a small picture of it in `public/thumbnails/`, then add an entry to `scenes` in `src/lib/scenes.ts` with the picture's URL and the camera's starting `view`.
 
 The Draco decoder in `public/draco/` is copied from `node_modules/three/examples/jsm/libs/draco/gltf/`. Copy the three files again after upgrading `three`, because the decoder must match the loader.
 

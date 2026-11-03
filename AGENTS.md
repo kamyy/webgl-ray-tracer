@@ -77,7 +77,7 @@ A GPU path tracer that runs entirely in the browser through WebGL 2. React and T
 
 A single Vite + React app, with no server runtime.
 
-- `public/` — the bundled glTF scenes (`suzanne.glb`, `tricycle.glb`), their card pictures in `public/thumbs/`, and the Draco decoder in `public/draco/`. Vite copies it into `dist/` as-is.
+- `public/` — the bundled glTF scenes (`suzanne.glb`, `tricycle.glb`), their card pictures in `public/thumbnails/`, and the Draco decoder in `public/draco/`. Vite copies it into `dist/` as-is.
 - `src/shaders/` — the GLSL vertex and fragment shaders, imported into the app as strings.
 - `src/components/` — React components, styled with Tailwind CSS utility classes.
   - `src/components/about.tsx` — the camera controls, license and links shown in the About card.
