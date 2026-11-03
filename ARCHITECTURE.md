@@ -16,9 +16,9 @@ Why the system is shaped this way: decisions, alternatives rejected, costs accep
 
 ## 1. Rendering approach
 
-The app is a path tracer. Each pixel fires many randomly scattered rays, and averaging their results converges on soft shadows, ambient occlusion and blurred reflections that a rasterizer needs tricks to fake. The cost is compute: one sample per pixel is very noisy, so the image refines over many passes.
+The app is a path tracer. Each pixel fires many randomly scattered rays, and averaging their results converges on soft shadows, ambient occlusion and blurred reflections. The cost is compute: one sample per pixel is very noisy, so the image refines over many passes.
 
-A fragment shader does the tracing because every pixel is independent, which is what a GPU runs in parallel. The shader needs WebGL 2 for several features:
+A fragment shader does the tracing because every pixel is independent, which is what a GPU can determine in parallel. The shader needs WebGL 2 for several features:
 
 - Loops without a compile-time bound, which the bounce and BVH traversal loops need.
 - Float texture formats, which hold the random seeds, mesh, material and BVH data.
@@ -31,7 +31,7 @@ The cost accepted is a hardware floor: a recent GPU, WebGL 2 and the `EXT_color_
 
 ## 2. Rendering pipeline
 
-Each animation frame draws one strip of a render pass, using two shaders. React Three Fiber owns the canvas, the camera and the controls, and `PathTracer` (`src/components/pathTracer.tsx`) does all the drawing.
+A rendering tick is one run of the render loop, which the browser starts once per screen refresh through `requestAnimationFrame`. React Three Fiber exposes that loop as the `useFrame` hook, and `PathTracer` draws from it. The tick rate therefore equals the screen refresh rate: a 72 Hz monitor gives 72 ticks a second, one every 13.9 ms, as long as each tick finishes in time. Each rendering tick draws one strip of a render pass, using two shaders. React Three Fiber owns the canvas, the camera and the controls, and `PathTracer` (`src/components/pathTracer.tsx`) does all the drawing.
 
 ```text
  ┌────────────────────┐   one strip of samples    ┌──────────────────────────┐
@@ -51,12 +51,31 @@ Each animation frame draws one strip of a render pass, using two shaders. React 
 
 - **`PathTraceMaterial`** (`src/lib/webgl/pathTraceMaterial.ts`, with `src/shaders/pathTrace.vert.glsl` and `src/shaders/pathTrace.frag.glsl`) path-traces samples into an off-screen `RGBA32F` target with additive blending. The rgb channels hold the running sum of sample colors, and alpha counts the samples each pixel has received.
 - **`DisplayMaterial`** (`src/lib/webgl/displayMaterial.ts`, with `src/shaders/display.vert.glsl` and `src/shaders/display.frag.glsl`) divides the sum by the per-pixel count and draws it to the visible canvas. Keeping the two apart leaves the accumulator a plain running sum, and only the display shader normalizes it.
-- **A pass is drawn as horizontal strips, one strip per animation frame.** A full pass on a mid-range GPU or a phone can take hundreds of milliseconds. The page cannot repaint while the GPU is busy, so one long draw makes the whole page stutter, and mobile browsers may reset the WebGL context. Strips keep each GPU job short.
-  - The strip count adapts to the frame time, between 1 and 32. It doubles after consecutive frames over 24 ms and halves after about half a second of frames under 18 ms. It changes only between passes, so each pass covers every row exactly once.
+- **A pass is drawn as horizontal strips, one strip per rendering tick.** A full pass on a mid-range GPU or a phone can take hundreds of milliseconds. The page cannot repaint while the GPU is busy, so one long draw makes the whole page stutter, and mobile browsers may reset the WebGL context. Strips keep each GPU job short.
+  - A strip is a band of the image's pixel rows. `PathTracer` limits the draw to those rows with a scissor, a rectangle the GPU will not draw outside. With 1080 rows and 4 strips, a pass takes four ticks:
+
+    ```text
+    pass N, 4 strips
+    ┌──────────────────────────┐
+    │ strip 0   rows 0–269     │ ◄ tick 1
+    ├──────────────────────────┤
+    │ strip 1   rows 270–539   │ ◄ tick 2
+    ├──────────────────────────┤
+    │ strip 2   rows 540–809   │ ◄ tick 3
+    ├──────────────────────────┤
+    │ strip 3   rows 810–1079  │ ◄ tick 4
+    └──────────────────────────┘
+                 │ pass N is complete
+                 ▼
+    pass N + 1 starts again at strip 0
+    ```
+
+  - The strip count adapts to the time between rendering ticks, between 1 and 32. It doubles after consecutive ticks over 24 ms and halves after about half a second of ticks under 18 ms. It changes only between passes, so each pass covers every row exactly once.
   - The cost is that the target must be additive, which needs the `EXT_float_blend` extension, and that rows can briefly hold different sample counts. The per-pixel count in alpha makes that invisible.
   - The first pass after a restart is a one-bounce preview drawn whole, so a moving camera always shows a complete image.
+
 - **Both are raw shader materials drawn on one screen-covering triangle** (`src/lib/webgl/screenQuad.ts`). A raw material skips the code three.js adds to its built-in materials, which would clash with the GLSL's own inputs and outputs.
-- **Pass and timing counters reach the store about twice a second**, not every frame, so React does not re-render at the frame rate.
+- **Pass and timing counters reach the store about twice a second**, not every rendering tick, so React does not re-render at the display refresh rate.
 
 Rendering runs until the pass count reaches the sample setting, which can change mid-render without a reset. A camera or image setting change resets the pass count and restarts accumulation. `PathTracer` notices a camera change by comparing the camera's world matrix with the previous frame's, so it does not depend on which control moved the camera. While the camera is being dragged, only pass 1 renders, which trades image quality for a responsive drag.
 
@@ -133,7 +152,7 @@ A Zustand store (`src/lib/store/appStore.ts`) holds only state the UI displays: 
  └────────────────────────────┘                                    re-render when a value changes
 ```
 
-Everything else lives in React Three Fiber and `PathTracer`: the camera, the render targets, the textures and the pass counter. These change every animation frame, and storing them in the store would re-render React on each change for no benefit.
+Everything else lives in React Three Fiber and `PathTracer`: the camera, the render targets, the textures and the pass counter. These change every rendering tick, and storing them in the store would re-render React on each change for no benefit.
 
 ---
 
@@ -186,6 +205,6 @@ The render view fills the whole screen, and everything else floats over it.
 - **The save button is enabled only at 100%.** It downloads the canvas as a PNG at the drawing-buffer size, so the file never contains the floating elements or a half-converged image. The canvas is not created with `preserveDrawingBuffer`, which costs speed on some GPUs, so the button draws the display pass again just before it reads the canvas.
 - **Every floating element is absolutely positioned.** The card, the readout and the About popover overlap the view, so opening or collapsing them never changes the canvas size, rebuilds the render targets or restarts accumulation.
 - **The render view is capped at 2560 by 1440 CSS pixels from the `md` breakpoint up** (`src/lib/webgl/renderLimits.ts`). Every pixel is traced many times, so a maximized window on a 5K monitor, about 14.7 million pixels, would never converge. The cap is the size of a 1440p monitor, and a larger window shows the view centered. Phones are below the breakpoint, have few pixels, and use the whole window.
-- **Resizing the window resizes the canvas and restarts the render.** The new size rebuilds the render targets and `PathTracer` restarts accumulation at pass 0. The resize is debounced by 200 ms, so dragging a window edge does not rebuild them on every frame.
+- **Resizing the window resizes the canvas and restarts the render.** The new size rebuilds the render targets and `PathTracer` restarts accumulation at pass 0. The resize is debounced by 200 ms, so dragging a window edge does not rebuild them on every rendering tick.
 - **Touch screens render at half the width and height.** A phone GPU is far slower than a desktop one, so a coarse pointer gives a quarter of the pixels, which the browser scales up. The canvas keeps its full CSS size. Rotating the phone resizes the view, which rebuilds the render targets and restarts accumulation. The resize is debounced by 200 ms so the rotation animation does not rebuild them repeatedly.
 - **GPU limits are checked against the loaded scene.** Phone GPUs often allow only 4096 or 8192 pixel textures, so the check compares the scene's real texture sizes with the GPU's limits, instead of demanding a fixed desktop-class minimum that would reject most phones. A failure is shown as a sentence in the view, because a blank canvas gives no hint. A lost WebGL context, which mobile GPUs trigger when a shader runs too long, shows a notice and restarts accumulation when the context returns.

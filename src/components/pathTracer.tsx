@@ -4,7 +4,7 @@
  * One pass adds one sample per pixel to a running sum held in a float render target, with the sample count in the
  * alpha channel. The display shader divides the sum by that count and draws it to the canvas. A full pass on a slow
  * GPU can take hundreds of milliseconds, and the page cannot repaint while the GPU is busy, so a pass is split into
- * horizontal strips and one strip is drawn per animation frame. The number of strips adapts to the frame time. The
+ * horizontal strips and one strip is drawn per rendering tick. The number of strips adapts to the time between ticks. The
  * component renders nothing itself. It takes over drawing from React Three Fiber with a render priority.
  */
 import { useFBO } from '@react-three/drei'
@@ -42,19 +42,19 @@ const renderTargetSettings = {
   generateMipmaps: false,
 }
 
-// A pass is drawn as horizontal strips, one strip per animation frame, so the page can repaint between strips. The
-// thresholds below grow or shrink the strip count to hold the frame time near one display refresh.
+// A pass is drawn as horizontal strips, one strip per rendering tick, so the page can repaint between strips. The
+// thresholds below grow or shrink the strip count to hold the tick time near one display refresh.
 const maxNumStrips = 32
-const slowFrameMs = 24 // a frame this long means a strip is too much work for one frame
+const slowFrameMs = 24 // a tick this long means a strip is too much work for one tick
 const slowFramesBeforeMoreStrips = 2
-const fastFrameMs = 18 // at 60 Hz an idle frame is about 16.7 ms, so a faster-than-this frame has headroom
+const fastFrameMs = 18 // at 60 Hz an idle tick is about 16.7 ms, so a faster-than-this tick has headroom
 const fastFramesBeforeFewerStrips = 30
 const statusIntervalMs = 500 // how often the status counters are written to the store
 const revokeDelayMs = 10_000 // how long a screenshot's object URL stays valid after the download starts
 const bouncesSettleMs = 500 // how long the bounce setting must stay unchanged before it restarts accumulation
 
-// Everything the render loop remembers between frames. It lives in a plain object rather than React state, because
-// it changes every frame and must not re-render the page.
+// Everything the render loop remembers between ticks. It lives in a plain object rather than React state, because
+// it changes every rendering tick and must not re-render the page.
 interface PassState {
   renderingPass: number // number of completed passes
   restartTimestamp: number // when accumulation last restarted, for the elapsed and remaining times
@@ -64,8 +64,8 @@ interface PassState {
   numBounces: number // the bounce depth the accumulated passes were traced at, which trails the setting while it is dragged
   needsClear: boolean // true after a restart, so the next draw empties the accumulation target first
   drewLastFrame: boolean // false after a frame with no strip drawn, because the preview is no measure of a strip
-  slowFrames: number // consecutive frames over `slowFrameMs`
-  fastFrames: number // consecutive frames under `fastFrameMs`
+  slowFrames: number // consecutive ticks over `slowFrameMs`
+  fastFrames: number // consecutive ticks under `fastFrameMs`
   lastStatusTimestamp: number // when the counters were last written to the store
   lastCameraMatrix: Matrix4 // the camera's world matrix at the last frame, to notice that it moved
 }
@@ -136,7 +136,7 @@ function renderReset(state: PassState) {
 
 // --- Strip count ---------------------------------------------------------------------
 
-// Strips make a pass cheaper per frame, so add some when frames run long and remove some when they have headroom.
+// Strips make a pass cheaper per tick, so add some when ticks run long and remove some when they have headroom.
 function adaptNumStrips(state: PassState, frameMs: number) {
   if (!state.drewLastFrame) {
     return
@@ -179,7 +179,7 @@ function formatDuration(milliseconds: number): string {
   return `${seconds}s`
 }
 
-// Writes the pass and timing counters to the store at a few updates a second, so React does not re-render every frame.
+// Writes the pass and timing counters to the store at a few updates a second, so React does not re-render every rendering tick.
 function updateStatus(state: PassState, numSamples: number, force: boolean) {
   const now = Date.now()
   if (!force && now - state.lastStatusTimestamp < statusIntervalMs) {
@@ -284,7 +284,7 @@ function drawStrip(state: PassState, inputs: PassInputs, numStrips: number) {
   }
 }
 
-// Called every animation frame. Restarts accumulation when the camera moved, then draws the next strip if one is due.
+// Called every rendering tick. Restarts accumulation when the camera moved, then draws the next strip if one is due.
 function frame(state: PassState, inputs: PassInputs, interacting: boolean, frameMs: number) {
   inputs.camera.updateMatrixWorld()
   if (!state.lastCameraMatrix.equals(inputs.camera.matrixWorld)) {
