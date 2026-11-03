@@ -20,12 +20,12 @@ interface AppState {
 
   // Render settings. A change to any of them restarts accumulation.
   readonly shadingMethod: ShadingMethod
-  readonly numSamples: number // passes to accumulate before the render stops
+  readonly numSamples: number // samples to accumulate before the render stops
   readonly numBounces: number // most times a ray may bounce
   readonly cameraFov: number // vertical field of view in degrees
 
   // Render progress, written by `PathTracer` a few times a second. The times are text, ready to show.
-  readonly renderingPass: number // passes completed since the last restart
+  readonly samplesDone: number // samples completed since the last restart
   readonly elapsedTime: string
   readonly etaTime: string
   readonly avgTime: string
@@ -39,7 +39,7 @@ interface AppActions {
   setNumSamples(numSamples: number): void
   setNumBounces(numBounces: number): void
   setCameraFov(cameraFov: number): void
-  setStatus(status: Pick<AppState, 'renderingPass' | 'elapsedTime' | 'etaTime' | 'avgTime'>): void
+  setStatus(status: Pick<AppState, 'samplesDone' | 'elapsedTime' | 'etaTime' | 'avgTime'>): void
   setResolution(width: number, height: number): void
   resetStatus(): void
 }
@@ -48,7 +48,7 @@ export const useAppStore = create<AppState & AppActions>()(
   subscribeWithSelector(set => ({
     scene: defaultScene,
     shadingMethod: ShadingMethod.flat,
-    renderingPass: 0,
+    samplesDone: 0,
     numSamples: 100,
     numBounces: 6,
     cameraFov: 45,
@@ -65,6 +65,6 @@ export const useAppStore = create<AppState & AppActions>()(
     setCameraFov: cameraFov => set({ cameraFov }),
     setStatus: status => set(status),
     setResolution: (width, height) => set({ resolution: `${width} × ${height}` }),
-    resetStatus: () => set({ renderingPass: 0, elapsedTime: '--', etaTime: '--', avgTime: '--' }),
+    resetStatus: () => set({ samplesDone: 0, elapsedTime: '--', etaTime: '--', avgTime: '--' }),
   })),
 )

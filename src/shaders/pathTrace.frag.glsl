@@ -87,7 +87,7 @@ uniform highp sampler2DArray u_bvh_sampler;
 uniform highp sampler2D u_material_sampler;
 
 uniform int u_num_objects; // number of models/objects to render
-uniform int u_render_pass; // current render pass number
+uniform int u_sample_number; // number of the sample being traced, starting at 1
 uniform int u_num_bounces; // max number of ray bounces
 uniform int u_shading_method; // flat or Phong shading
 
@@ -369,9 +369,9 @@ vec3 pathTrace(Ray ray) {
 void main() {
     ivec2 fragCoord = ivec2(gl_FragCoord.xy);
 
-    // seed the random number generator before using rand(), use render pass number to change the seed for every pass
+    // seed the random number generator before using rand(), use the sample number to change the seed for every sample
     g_randGeneratorState = texelFetch(u_random_sampler, fragCoord, 0)
-                            + uvec4(u_render_pass, u_render_pass, u_render_pass, u_render_pass);
+                            + uvec4(u_sample_number, u_sample_number, u_sample_number, u_sample_number);
 
     vec4 rayTarget = u_eye_to_world * vec4( // transform ray target pos on image plane from camera space (x right, y up, looking down -z) to world space
         v_eye_to_x + rand(),

@@ -1,20 +1,24 @@
 /**
  * Runs the progressive path tracer inside the React Three Fiber canvas.
  *
- * One pass adds one sample per pixel to a running sum held in a float render target, with the sample count in the
- * alpha channel. The display shader divides the sum by that count and draws it to the canvas. A full pass on a slow
- * GPU can take hundreds of milliseconds, and the page cannot repaint while the GPU is busy, so a pass is split into
- * horizontal strips and one strip is drawn per rendering tick. The number of strips adapts to the time between ticks. The
- * component renders nothing itself. It takes over drawing from React Three Fiber with a render priority.
+ * One sample adds one path per pixel to a running sum held in a float render target, with the sample count in the
+ * alpha channel. The display shader divides the sum by that count and draws it to the canvas. A full sample on a slow
+ * GPU can take hundreds of milliseconds, and the page cannot repaint while the GPU is busy, so a sample is split into
+ * horizontal strips and one strip is drawn per rendering tick. The number of strips adapts to the time between ticks.
+ * The component renders nothing itself. It takes over drawing from React Three Fiber with a render priority.
  */
 import { useFBO } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { RefObject, useEffect, useMemo, useState } from 'react'
 import {
+  BufferGeometry,
   DataTexture,
+  Float32BufferAttribute,
   FloatType,
   Matrix4,
+  Mesh,
   NearestFilter,
+  OrthographicCamera,
   PerspectiveCamera,
   RawShaderMaterial,
   RGBAFormat,
@@ -28,7 +32,6 @@ import { createDisplayMaterial } from '../lib/webgl/displayMaterial'
 import { PackedScene } from '../lib/webgl/packScene'
 import { createPathTraceMaterial } from '../lib/webgl/pathTraceMaterial'
 import { createRandomTexture } from '../lib/webgl/randomTexture'
-import { createScreenQuad, screenQuadCamera } from '../lib/webgl/screenQuad'
 import { registerScreenshot } from '../lib/webgl/screenshot'
 
 // The accumulation target holds a running sum of color samples, so it needs a float format. Nearest filtering and no
@@ -42,7 +45,7 @@ const renderTargetSettings = {
   generateMipmaps: false,
 }
 
-// A pass is drawn as horizontal strips, one strip per rendering tick, so the page can repaint between strips. The
+// A sample is drawn as horizontal strips, one strip per rendering tick, so the page can repaint between strips. The
 // thresholds below grow or shrink the strip count to hold the tick time near one display refresh.
 const maxNumStrips = 32
 const slowFrameMs = 24 // a tick this long means a strip is too much work for one tick
@@ -53,15 +56,39 @@ const statusIntervalMs = 500 // how often the status counters are written to the
 const revokeDelayMs = 10_000 // how long a screenshot's object URL stays valid after the download starts
 const bouncesSettleMs = 500 // how long the bounce setting must stay unchanged before it restarts accumulation
 
+// --- Fullscreen triangle -------------------------------------------------------------
+
+// Each fullscreen pass is a fragment shader that runs once per pixel, so its "scene" is one triangle that covers the
+// target. Each row is one vertex (x, y, z) in clip space, where the target spans -1 to 1 on both axes. The triangle
+// reaches 3 on purpose, because the GPU clips the excess. The Rendering pipeline section of `ARCHITECTURE.md` has a
+// diagram.
+// prettier-ignore
+const clipSpaceTrianglePositions = [
+  -1, -1, 0, // bottom left
+   3, -1, 0, // bottom right, beyond the target
+  -1,  3, 0, // top left, beyond the target
+]
+
+const clipSpaceTriangle = new BufferGeometry().setAttribute(
+  'position',
+  new Float32BufferAttribute(clipSpaceTrianglePositions, 3),
+)
+
+// The camera used to render a fullscreen pass. Its view does not matter, because the vertex shaders pass clip-space
+// positions straight through.
+const fullScreenPassCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1)
+
+// --- Tracer state --------------------------------------------------------------------
+
 // Everything the render loop remembers between ticks. It lives in a plain object rather than React state, because
 // it changes every rendering tick and must not re-render the page.
-interface PassState {
-  renderingPass: number // number of completed passes
+interface TracerState {
+  samplesDone: number // number of completed samples
   restartTimestamp: number // when accumulation last restarted, for the elapsed and remaining times
-  numStrips: number // strips per pass, only changed between passes so every pass covers each row once
-  wantedNumStrips: number // the strip count that `adaptNumStrips` wants to switch to at the next pass boundary
-  strip: number // next strip of the current pass
-  numBounces: number // the bounce depth the accumulated passes were traced at, which trails the setting while it is dragged
+  numStrips: number // strips per sample, only changed between samples so every sample covers each row once
+  wantedNumStrips: number // the strip count that `adaptNumStrips` wants to switch to at the next sample boundary
+  strip: number // next strip of the current sample
+  numBounces: number // the bounce depth the accumulated samples were traced at, which trails a dragged setting
   needsClear: boolean // true after a restart, so the next draw empties the accumulation target first
   drewLastFrame: boolean // false after a frame with no strip drawn, because the preview is no measure of a strip
   slowFrames: number // consecutive ticks over `slowFrameMs`
@@ -71,13 +98,13 @@ interface PassState {
 }
 
 // A fragment shader that covers the whole target, with the scene that draws it.
-interface ScreenPass {
+interface FullScreenPass {
   material: RawShaderMaterial
   scene: Scene
 }
 
 // The objects that one frame of drawing needs, gathered so the drawing helpers take one argument.
-interface PassInputs {
+interface TracerInputs {
   gl: WebGLRenderer
   camera: PerspectiveCamera
   width: number
@@ -85,8 +112,8 @@ interface PassInputs {
   packed: PackedScene
   accumulation: WebGLRenderTarget
   randomTexture: DataTexture
-  pathTrace: ScreenPass
-  display: ScreenPass
+  pathTrace: FullScreenPass
+  display: FullScreenPass
 }
 
 interface PathTracerProps {
@@ -94,11 +121,11 @@ interface PathTracerProps {
   interactingRef: RefObject<boolean> // true while the user is dragging the camera
 }
 
-// --- Pass state ----------------------------------------------------------------------
+// --- Setup ---------------------------------------------------------------------------
 
-function createPassState(): PassState {
+function createTracerState(): TracerState {
   return {
-    renderingPass: 0,
+    samplesDone: 0,
     restartTimestamp: Date.now(),
     numStrips: 4,
     wantedNumStrips: 4,
@@ -113,8 +140,13 @@ function createPassState(): PassState {
   }
 }
 
-function createScreenPass(material: RawShaderMaterial): ScreenPass {
-  return { material, scene: createScreenQuad(material) }
+function createFullScreenPass(material: RawShaderMaterial): FullScreenPass {
+  const mesh = new Mesh(clipSpaceTriangle, material)
+  mesh.frustumCulled = false // the vertex shaders ignore the camera, so a test against its frustum would be wrong
+
+  const scene = new Scene()
+  scene.add(mesh)
+  return { material, scene }
 }
 
 // Every pixel of the canvas is overwritten by the display pass, and the accumulation target is cleared to zero
@@ -124,9 +156,9 @@ function configureRenderer(gl: WebGLRenderer) {
   gl.setClearColor(0x000000, 0)
 }
 
-// Restart accumulation at pass 0.
-function renderReset(state: PassState) {
-  state.renderingPass = 0
+// Restart accumulation from zero samples.
+function renderReset(state: TracerState) {
+  state.samplesDone = 0
   state.strip = 0
   state.needsClear = true
   state.numBounces = useAppStore.getState().numBounces
@@ -136,8 +168,8 @@ function renderReset(state: PassState) {
 
 // --- Strip count ---------------------------------------------------------------------
 
-// Strips make a pass cheaper per tick, so add some when ticks run long and remove some when they have headroom.
-function adaptNumStrips(state: PassState, frameMs: number) {
+// Strips make a sample cheaper per tick, so add some when ticks run long and remove some when they have headroom.
+function adaptNumStrips(state: TracerState, frameMs: number) {
   if (!state.drewLastFrame) {
     return
   }
@@ -179,8 +211,9 @@ function formatDuration(milliseconds: number): string {
   return `${seconds}s`
 }
 
-// Writes the pass and timing counters to the store at a few updates a second, so React does not re-render every rendering tick.
-function updateStatus(state: PassState, numSamples: number, force: boolean) {
+// Writes the sample and timing counters to the store at a few updates a second, so React does not re-render every
+// rendering tick.
+function updateStatus(state: TracerState, numSamples: number, force: boolean) {
   const now = Date.now()
   if (!force && now - state.lastStatusTimestamp < statusIntervalMs) {
     return
@@ -188,10 +221,10 @@ function updateStatus(state: PassState, numSamples: number, force: boolean) {
   state.lastStatusTimestamp = now
 
   const elapsed = now - state.restartTimestamp
-  const average = elapsed / Math.max(state.renderingPass, 1)
-  const eta = (numSamples - state.renderingPass) * average
+  const average = elapsed / Math.max(state.samplesDone, 1)
+  const eta = (numSamples - state.samplesDone) * average
   useAppStore.getState().setStatus({
-    renderingPass: state.renderingPass,
+    samplesDone: state.samplesDone,
     elapsedTime: formatDuration(elapsed),
     etaTime: formatDuration(eta),
     avgTime: `${average.toFixed(0)}ms`,
@@ -201,16 +234,16 @@ function updateStatus(state: PassState, numSamples: number, force: boolean) {
 // --- Drawing -------------------------------------------------------------------------
 
 // Draws the average of the running sum to the canvas.
-function drawDisplay(gl: WebGLRenderer, display: ScreenPass, accumulation: WebGLRenderTarget) {
+function drawDisplay(gl: WebGLRenderer, display: FullScreenPass, accumulation: WebGLRenderTarget) {
   display.material.uniforms.u_color_sampler.value = accumulation.texture
   gl.setRenderTarget(null)
-  gl.render(display.scene, screenQuadCamera)
+  gl.render(display.scene, fullScreenPassCamera)
 }
 
 // Saves the canvas as a PNG file. The canvas is not created with `preserveDrawingBuffer`, so its contents are gone
 // once the browser has shown them. The display pass is drawn again, and `toBlob` copies the canvas before this task
 // ends.
-function downloadScreenshot(gl: WebGLRenderer, display: ScreenPass, accumulation: WebGLRenderTarget) {
+function downloadScreenshot(gl: WebGLRenderer, display: FullScreenPass, accumulation: WebGLRenderTarget) {
   drawDisplay(gl, display, accumulation)
   gl.domElement.toBlob(blob => {
     if (!blob) {
@@ -230,7 +263,7 @@ function downloadScreenshot(gl: WebGLRenderer, display: ScreenPass, accumulation
 }
 
 // Adds one strip of samples to the running sum, then draws the average of everything accumulated so far.
-function drawStrip(state: PassState, inputs: PassInputs, numStrips: number) {
+function drawStrip(state: TracerState, inputs: TracerInputs, numStrips: number) {
   const { gl, camera, width, height, packed, accumulation, randomTexture, pathTrace, display } = inputs
   const { shadingMethod, numSamples } = useAppStore.getState()
 
@@ -253,8 +286,8 @@ function drawStrip(state: PassState, inputs: PassInputs, numStrips: number) {
   uniforms.u_half_wd.value = width * 0.5
   uniforms.u_half_ht.value = height * 0.5
   uniforms.u_num_objects.value = packed.numObjects
-  uniforms.u_render_pass.value = state.renderingPass + 1
-  uniforms.u_num_bounces.value = state.renderingPass === 0 ? 1 : state.numBounces
+  uniforms.u_sample_number.value = state.samplesDone + 1
+  uniforms.u_num_bounces.value = state.samplesDone === 0 ? 1 : state.numBounces
   uniforms.u_shading_method.value = shadingMethod
   uniforms.u_eye_to_image.value = (height * 0.5) / Math.tan(camera.fov * 0.5 * (Math.PI / 180.0))
   uniforms.u_eye_position.value.setFromMatrixPosition(camera.matrixWorld)
@@ -264,28 +297,28 @@ function drawStrip(state: PassState, inputs: PassInputs, numStrips: number) {
   uniforms.u_bvh_sampler.value = packed.bvhTexture
   uniforms.u_material_sampler.value = packed.materialsTexture
 
-  // Pass 1: trace the strip and add its samples to the running sum.
+  // Fullscreen pass 1: trace the strip and add its samples to the running sum.
   gl.setRenderTarget(accumulation)
-  gl.render(pathTrace.scene, screenQuadCamera)
+  gl.render(pathTrace.scene, fullScreenPassCamera)
 
-  // Pass 2: divide the sum by the sample count and show it on the canvas. This covers every pixel, so strips not yet
-  // traced in this pass still show their previous average.
+  // Fullscreen pass 2: divide the sum by the sample count and show it on the canvas. This covers every pixel, so
+  // strips not yet traced in this sample still show their previous average.
   drawDisplay(gl, display, accumulation)
 
-  // Move to the next strip. After the last one the pass is complete, so a new strip count may take effect and the
-  // counters are written at once, so the final pass always shows.
+  // Move to the next strip. After the last one the sample is complete, so a new strip count may take effect and the
+  // counters are written at once, so the final sample always shows.
   if (++state.strip >= numStrips) {
     state.strip = 0
-    ++state.renderingPass
+    ++state.samplesDone
     state.numStrips = state.wantedNumStrips
-    updateStatus(state, numSamples, state.renderingPass >= numSamples)
+    updateStatus(state, numSamples, state.samplesDone >= numSamples)
   } else {
     updateStatus(state, numSamples, false)
   }
 }
 
 // Called every rendering tick. Restarts accumulation when the camera moved, then draws the next strip if one is due.
-function frame(state: PassState, inputs: PassInputs, interacting: boolean, frameMs: number) {
+function frame(state: TracerState, inputs: TracerInputs, interacting: boolean, frameMs: number) {
   inputs.camera.updateMatrixWorld()
   if (!state.lastCameraMatrix.equals(inputs.camera.matrixWorld)) {
     state.lastCameraMatrix.copy(inputs.camera.matrixWorld)
@@ -295,12 +328,12 @@ function frame(state: PassState, inputs: PassInputs, interacting: boolean, frame
   adaptNumStrips(state, frameMs)
   state.drewLastFrame = false
 
-  // The first pass after a restart is a quick one-bounce preview, drawn whole so a moving camera always shows a
-  // complete image. While dragging, no later pass is drawn. A pass that has started is finished even when the sample
-  // ceiling drops below it, so no rows end up one sample behind the rest.
+  // The first sample after a restart is a quick one-bounce preview, drawn whole so a moving camera always shows a
+  // complete image. While dragging, no later sample is drawn. A sample that has started is finished even when the
+  // sample ceiling drops below it, so no rows end up one sample behind the rest.
   const { numSamples } = useAppStore.getState()
-  const isPreview = state.renderingPass === 0
-  if ((state.strip > 0 || state.renderingPass < numSamples) && (isPreview || !interacting)) {
+  const isPreview = state.samplesDone === 0
+  if ((state.strip > 0 || state.samplesDone < numSamples) && (isPreview || !interacting)) {
     drawStrip(state, inputs, isPreview ? 1 : state.numStrips)
     state.drewLastFrame = !isPreview
   }
@@ -319,9 +352,9 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
   // The render targets and textures are rebuilt whenever the view size changes.
   const accumulation = useFBO(width, height, renderTargetSettings)
   const randomTexture = useMemo(() => createRandomTexture(width, height), [width, height])
-  const pathTrace = useMemo(() => createScreenPass(createPathTraceMaterial()), [])
-  const display = useMemo(() => createScreenPass(createDisplayMaterial()), [])
-  const [state] = useState(createPassState)
+  const pathTrace = useMemo(() => createFullScreenPass(createPathTraceMaterial()), [])
+  const display = useMemo(() => createFullScreenPass(createDisplayMaterial()), [])
+  const [state] = useState(createTracerState)
 
   useEffect(() => {
     configureRenderer(gl)

@@ -1,8 +1,10 @@
-// Vertex shader for the path-tracing pass: places the screen-covering triangle and aims each pixel's ray.
+// Vertex shader for the path-tracing pass: places the fullscreen triangle and aims each pixel's ray.
 //
-// The triangle's corners are in clip space, from -1 to 1. Scaling them by half the render size gives each pixel's
-// position on the image plane, measured from the image center in pixels, which the fragment shader
-// (`src/shaders/pathTrace.frag.glsl`) turns into a ray direction. The GPU interpolates the values across the triangle.
+// The triangle's corners are in clip space at (-1, -1), (3, -1) and (-1, 3), and the render target is the part from
+// -1 to 1 on both axes. Scaling a position by half the render size gives its place on the image plane, measured from
+// the image center in pixels. At the target's edges that is plus or minus half the width and height. The GPU
+// interpolates the values across the triangle, so every pixel gets its own, and the fragment shader
+// (`src/shaders/pathTrace.frag.glsl`) turns it into a ray direction.
 
 precision highp int;
 precision highp float;

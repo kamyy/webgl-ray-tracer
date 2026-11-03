@@ -3,7 +3,7 @@
  *
  * The pill's ring and counters are read-only. Their values come from the app store, where `PathTracer` writes them a
  * few times a second. Everything is absolutely positioned over the render view, so the render keeps the whole screen
- * and opening the About popover never resizes the canvas. On a phone the pill shrinks to the ring, the pass count and
+ * and opening the About popover never resizes the canvas. On a phone the pill shrinks to the ring, the sample count and
  * the time left. Pressing the pill folds it down to the ring alone.
  */
 import { useCallback, useState } from 'react'
@@ -63,13 +63,13 @@ function Stat({ label, value, steady = false }: { label: string; value: string; 
 
 // The pill at the top left. It re-renders only when `PathTracer` writes new counters to the store.
 function ProgressPill() {
-  const renderingPass = useAppStore(state => state.renderingPass)
+  const samplesDone = useAppStore(state => state.samplesDone)
   const numSamples = useAppStore(state => state.numSamples)
   const elapsedTime = useAppStore(state => state.elapsedTime)
   const etaTime = useAppStore(state => state.etaTime)
   const avgTime = useAppStore(state => state.avgTime)
   const resolution = useAppStore(state => state.resolution)
-  const proportion = Math.min(renderingPass / numSamples, 1)
+  const proportion = Math.min(samplesDone / numSamples, 1)
 
   // Pressing the pill folds it down to just the ring, and pressing it again unfolds the counters.
   const [collapsed, setCollapsed] = useState(false)
@@ -78,11 +78,11 @@ function ProgressPill() {
   if (!collapsed) {
     counters = (
       <>
-        {/* The pass counter. The number has a minimum width so a 1 digit and a 2 digit count take the same room. */}
+        {/* The sample counter. The number has a minimum width so a 1 digit and a 2 digit count take the same room. */}
         <div className="leading-tight">
           <div className="font-medium tabular-nums">
-            <span className="inline-block min-w-[3ch] text-right text-xl md:text-3xl">{renderingPass}</span>
-            <span className={`text-base ${mutedText}`}> / {numSamples} passes</span>
+            <span className="inline-block min-w-[3ch] text-right text-xl md:text-3xl">{samplesDone}</span>
+            <span className={`text-base ${mutedText}`}> / {numSamples} samples</span>
           </div>
           <div className={`text-sm ${mutedText}`}>
             {/* A phone has no room for the three counters, so its second line shows the time left instead of the name. */}
@@ -95,7 +95,7 @@ function ProgressPill() {
         <div className="hidden gap-10 md:flex">
           <Stat label="Elapsed" value={elapsedTime} />
           <Stat label="Remaining" value={etaTime} />
-          <Stat label="Avg. per pass" value={avgTime} />
+          <Stat label="Avg. per sample" value={avgTime} />
           <Stat label="Resolution" value={resolution} steady />
         </div>
       </>
@@ -156,7 +156,7 @@ function ThemeButton() {
 
 // Saves the render as a PNG. It is disabled until the render reaches 100%, so the file is always the finished image.
 function ScreenshotButton() {
-  const complete = useAppStore(state => state.renderingPass >= state.numSamples)
+  const complete = useAppStore(state => state.samplesDone >= state.numSamples)
 
   return (
     <button

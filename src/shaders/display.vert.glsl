@@ -1,4 +1,4 @@
-// Vertex shader for the display pass: places the screen-covering triangle.
+// Vertex shader for the display pass: places the fullscreen triangle.
 //
 // The triangle's corners are already in clip space, so each position passes straight through. The display pass draws
 // one such triangle over the whole canvas, and `src/shaders/display.frag.glsl` shades every pixel of it.

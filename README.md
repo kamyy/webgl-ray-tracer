@@ -1,6 +1,6 @@
 # WebGL Ray Tracer
 
-A path tracer that runs entirely in your browser. The GPU does the tracing in a WebGL 2 fragment shader, and the image sharpens pass by pass as more samples arrive. You can orbit the camera while it renders, change the settings live, and switch the UI between light and dark mode.
+A path tracer that runs entirely in your browser. The GPU does the tracing in a WebGL 2 fragment shader, and the image sharpens as more samples arrive. You can orbit the camera while it renders, change the settings live, and switch the UI between light and dark mode.
 
 Live at [https://webgl-ray-tracer.orky.net](https://webgl-ray-tracer.orky.net).
 
@@ -30,7 +30,7 @@ Newer scene, 50° field of view, 8 bounces.
 | Pan    | Right-drag           | Two fingers |
 | Zoom   | Wheel or middle-drag | Pinch       |
 
-- **Progress** is tracked by the ring in the top left corner, with the pass count, elapsed time, time remaining and the average time per pass beside it. The render restarts at pass 0 whenever the camera, a setting or the window size changes.
+- **Progress** is tracked by the ring in the top left corner, with the sample count, elapsed time, time remaining and the average time per sample beside it. The render starts over from zero samples whenever the camera, a setting or the window size changes.
 - **Render settings** are in the card at the bottom left, and the chevron collapses it out of the way. They are the scene, field of view, samples per pixel, ray bounces, and Flat or Phong shading.
 - The buttons at the top right switch the theme and open the About card that lists these controls and the MIT license.
 
