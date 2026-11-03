@@ -3,7 +3,7 @@
  *
  * The path-tracing shader draws random numbers to pick each ray's jitter and bounce, so every pixel needs its own
  * generator state. Four random 32-bit integers per pixel seed that generator, and the shader then perturbs them by
- * the pass number so every pass draws different samples.
+ * the sample number so every sample uses different random numbers.
  */
 import { DataTexture, NearestFilter, RGBAIntegerFormat, UnsignedIntType } from 'three'
 

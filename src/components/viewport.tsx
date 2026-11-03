@@ -2,7 +2,7 @@
  * The ray-traced view: a React Three Fiber canvas with a camera, orbit controls and the path tracer.
  *
  * `Canvas` owns the WebGL context and the render loop. The camera and `CameraControls` handle mouse and touch input,
- * and `PathTracer` draws each progressive pass. The glTF scene loads under `<Suspense>`, so a spinner shows until the
+ * and `PathTracer` draws each progressive sample. The glTF scene loads under `<Suspense>`, so a spinner shows until the
  * file is decoded and its BVH is built. When the GPU cannot run the tracer, or loses its context, the view says so in
  * words instead of staying blank.
  */
@@ -194,7 +194,11 @@ export function Viewport() {
   let spinner: React.ReactNode = null
   if (loading) {
     spinner = (
-      <div className="absolute top-1/2 left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 animate-spin rounded-full border-[16px] border-t-[blue] border-r-[green] border-b-[red] border-l-[yellow]" />
+      <div
+        role="status"
+        aria-label="Loading the scene"
+        className="absolute top-1/2 left-1/2 size-12 -translate-x-1/2 -translate-y-1/2 animate-spin rounded-full border-4 border-(--accent-track) border-t-(--accent)"
+      />
     )
   }
 
