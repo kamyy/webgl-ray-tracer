@@ -194,7 +194,11 @@ export function Viewport() {
   let spinner: React.ReactNode = null
   if (loading) {
     spinner = (
-      <div className="absolute top-1/2 left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 animate-spin rounded-full border-[16px] border-t-[blue] border-r-[green] border-b-[red] border-l-[yellow]" />
+      <div
+        role="status"
+        aria-label="Loading the scene"
+        className="absolute top-1/2 left-1/2 size-12 -translate-x-1/2 -translate-y-1/2 animate-spin rounded-full border-4 border-(--accent-track) border-t-(--accent)"
+      />
     )
   }
 
