@@ -10,11 +10,11 @@ Each render is 1280 by 720 with 4000 samples per pixel, and the settings card an
 
 Suzanne scene, 45° field of view, 8 bounces.
 
-![Suzanne scene, 45° field of view, 8 bounces](docs/screenshots/suzanne-fov45-b8.png)
+![Suzanne scene, 45° field of view, 8 bounces](screenshots/suzanne-fov45-b8.png)
 
 Tricycle scene, 50° field of view, 8 bounces.
 
-![Tricycle scene, 50° field of view, 8 bounces](docs/screenshots/tricycle-fov50-b8.png)
+![Tricycle scene, 50° field of view, 8 bounces](screenshots/tricycle-fov50-b8.png)
 
 ## 2. What you need
 
