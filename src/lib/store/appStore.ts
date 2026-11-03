@@ -3,7 +3,7 @@
  *
  * React components read it with selectors (`useAppStore(s => s.cameraFov)`), and the render loop reads it outside
  * React with `useAppStore.getState()`. Camera transforms, textures and WebGL handles are not kept here, because they
- * change every frame and must not re-render React.
+ * change every rendering tick and must not re-render React.
  */
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
