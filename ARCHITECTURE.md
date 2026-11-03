@@ -16,9 +16,9 @@ Why the system is shaped this way: decisions, alternatives rejected, costs accep
 
 ## 1. Rendering approach
 
-The app is a path tracer. Each pixel fires many randomly scattered rays, and averaging their results converges on soft shadows, ambient occlusion and blurred reflections. The cost is compute: one sample per pixel is very noisy, so the image refines over many passes.
+The app is a path tracer. Each pixel fires many randomly scattered rays, and averaging their results converges on soft shadows, ambient occlusion and blurred reflections. A rasterizer, which projects triangles onto the screen without tracing rays, has to approximate these effects. The cost is compute: one sample per pixel is very noisy, so the image refines over many passes.
 
-A fragment shader does the tracing because every pixel is independent, which is what a GPU can determine in parallel. The shader needs WebGL 2 for several features:
+A fragment shader does the tracing because every pixel is independent, which is what a GPU can compute in parallel. The shader needs WebGL 2 for several features:
 
 - Loops without a compile-time bound, which the bounce and BVH traversal loops need.
 - Float texture formats, which hold the random seeds, mesh, material and BVH data.
