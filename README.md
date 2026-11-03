@@ -1,26 +1,26 @@
 # WebGL Ray Tracer
 
-A path tracer that runs entirely in your browser. The GPU does the tracing in a WebGL 2 fragment shader, and the image sharpens pass by pass as more samples arrive. You can orbit the camera while it renders, change the settings live, and switch between light and dark mode.
+A path tracer that runs entirely in your browser. The GPU does the tracing in a WebGL 2 fragment shader, and the image sharpens pass by pass as more samples arrive. You can orbit the camera while it renders, change the settings live, and switch the UI between light and dark mode.
 
 Live at [https://webgl-ray-tracer.orky.net](https://webgl-ray-tracer.orky.net).
 
-## 1. Gallery
+## 1. Pre-rendered examples
 
 Each render is 1280 by 720 with 4000 samples per pixel, and the settings card and the progress readout are collapsed.
 
-Suzanne scene, 45° field of view, 8 bounces.
+Original scene, 45° field of view, 8 bounces.
 
-![Suzanne scene, 45° field of view, 8 bounces](screenshots/suzanne-fov45-b8.png)
+![Original scene, 45° field of view, 8 bounces](screenshots/suzanne-fov45-b8.png)
 
-Tricycle scene, 50° field of view, 8 bounces.
+Newer scene, 50° field of view, 8 bounces.
 
-![Tricycle scene, 50° field of view, 8 bounces](screenshots/tricycle-fov50-b8.png)
+![Newer scene, 50° field of view, 8 bounces](screenshots/tricycle-fov50-b8.png)
 
 ## 2. What you need
 
-- A browser with WebGL 2 and the `EXT_color_buffer_float` and `EXT_float_blend` extensions. Recent Chrome, Firefox and Safari all qualify.
+- A browser that supports WebGL 2 and the `EXT_color_buffer_float` and `EXT_float_blend` extensions. Recent versions of Chrome, Firefox and Safari all qualify.
 - A reasonably powerful GPU. A desktop card such as an Nvidia GeForce GTX 1080 converges in seconds to minutes. Phones work too, in portrait and landscape, but render at half the width and height and take longer.
-- If something is missing, the page says what instead of showing a blank view.
+- If hardware or software support is missing, the page says what instead of showing a blank view.
 
 ## 3. Using it
 
@@ -30,9 +30,9 @@ Tricycle scene, 50° field of view, 8 bounces.
 | Pan    | Right-drag           | Two fingers |
 | Zoom   | Wheel or middle-drag | Pinch       |
 
-- **Progress** is the ring at the top left, with the pass count, elapsed time, time remaining and the average time per pass beside it. The view restarts at pass 0 whenever the camera, a setting or the window size changes.
+- **Progress** is tracked by the ring in the top left corner, with the pass count, elapsed time, time remaining and the average time per pass beside it. The render restarts at pass 0 whenever the camera, a setting or the window size changes.
 - **Render settings** are in the card at the bottom left, and the chevron collapses it out of the way. They are the scene, field of view, samples per pixel, ray bounces, and Flat or Phong shading.
-- The buttons at the top right switch the theme and open the About card with these controls and the license.
+- The buttons at the top right switch the theme and open the About card that lists these controls and the MIT license.
 
 ## 4. Running it locally
 
@@ -47,9 +47,9 @@ Then open the address Vite prints. [`RUNBOOK.md`](RUNBOOK.md) covers the other c
 
 ## 5. Your own scene
 
-The scene cards in the settings card pick one of the bundled glTF 2.0 scenes, and the "Open .glb" card loads a `.glb` file from your own drive. The file is read in the browser and never uploaded. It must be a self-contained `.glb` whose materials use plain PBR factors, because textures are ignored. [Rendering gotchas](AGENTS.md#3-rendering-gotchas) in [`AGENTS.md`](AGENTS.md) lists how each material field is read.
+The thumbnails in the settings card pick one of the bundled glTF 2.0 scenes, and the "Open .glb" card loads a `.glb` file from your own drive. The file is read in the browser and never uploaded. It must be a self-contained `.glb` whose materials use plain PBR factors, because textures are ignored. [Rendering gotchas](AGENTS.md#3-rendering-gotchas) in [`AGENTS.md`](AGENTS.md) lists how each material field is read.
 
-## 6. How it works
+## 6. How it started
 
 I went to Eric Haines's GDC 2019 talk, "A Fast Forward Through [Ray Tracing Gems](http://www.realtimerendering.com/raytracinggems)", where real-time ray tracing was the hot topic. Peter Shirley's [Ray Tracing in One Weekend](http://in1weekend.blogspot.com/2016/01/ray-tracing-in-one-weekend.html) came up in passing. Inspired by it, I wanted to see whether a ray tracer could run on the web, using the GPU through a fragment shader, which suits tracing rays in parallel almost perfectly.
 
