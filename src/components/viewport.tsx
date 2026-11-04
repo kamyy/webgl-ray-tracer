@@ -34,11 +34,6 @@ function LoadingNotice({ onLoadingChange }: { onLoadingChange: (loading: boolean
   return null
 }
 
-// A phone's touch screen has far fewer pixels to spare than a desktop, so it traces a quarter as many.
-function getPixelRatio() {
-  return window.matchMedia('(pointer: coarse)').matches ? 0.5 : 1
-}
-
 // Points the camera at the middle of the scene from the front and a little above, far enough back that the whole scene
 // fits in the view.
 function frameCamera(controls: CameraControls, root: Object3D, fovDegrees: number) {
@@ -181,7 +176,6 @@ function Notice({ children }: { children: React.ReactNode }) {
 // The render view. It fills its parent, so the canvas size follows the window and the render restarts on a resize.
 export function Viewport() {
   const [webgl2] = useState(supportsWebGL2)
-  const [pixelRatio] = useState(getPixelRatio)
   const [loading, setLoading] = useState(false)
   const [gpuProblem, setGpuProblem] = useState<string | null>(null)
   const [sceneProblem, setSceneProblem] = useState<string | null>(null)
@@ -212,7 +206,7 @@ export function Viewport() {
   return (
     <div className="absolute inset-0">
       <Canvas
-        dpr={pixelRatio}
+        dpr={1}
         frameloop="always"
         resize={{ debounce: { scroll: 50, resize: 200 } }}
         gl={{ antialias: false, alpha: false, depth: false, stencil: false }}

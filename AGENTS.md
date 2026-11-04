@@ -122,7 +122,7 @@ A single Vite + React app, with no server runtime.
   - `src/components/hud.tsx` defines the save button.
   - `src/components/pathTracer.tsx` defines `downloadScreenshot`.
   - `src/lib/webgl/screenshot.ts` carries the call from the save button to `PathTracer`, which sits inside the React Three Fiber canvas.
-- **Touch devices render at half the width and height of the view.** `getPixelRatio` in `src/components/viewport.tsx` sets the canvas `dpr` to 0.5 when the primary pointer is coarse. The drawing buffer and the render targets are the view's CSS size times that ratio, so any code that sizes a texture to the view must multiply by `viewport.dpr`.
+- **The canvas `dpr` is fixed at 1 in `src/components/viewport.tsx`.** React Three Fiber's default would follow the device pixel ratio. Code that sizes a texture to the view must still multiply by `viewport.dpr`, so the sizes stay right if the ratio changes.
 
 ---
 
