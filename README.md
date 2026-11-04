@@ -19,7 +19,7 @@ Newer scene, 50° field of view, 8 bounces.
 ## 2. What you need
 
 - A browser that supports WebGL 2 and the `EXT_color_buffer_float` and `EXT_float_blend` extensions. Recent versions of Chrome, Firefox and Safari all qualify.
-- A reasonably powerful GPU. A desktop card such as an Nvidia GeForce GTX 1080 converges in seconds to minutes. Phones work too, in portrait and landscape, but render at half the width and height and take longer.
+- A reasonably powerful GPU. A desktop card such as an Nvidia GeForce GTX 1080 converges in seconds to minutes. Phones work too, in portrait and landscape, but take longer.
 - If hardware or software support is missing, the page says what instead of showing a blank view.
 
 ## 3. Using it
