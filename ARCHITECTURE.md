@@ -31,7 +31,7 @@ The cost accepted is a hardware floor: a recent GPU, WebGL 2 and the `EXT_color_
 
 ## 2. Rendering pipeline
 
-A rendering tick is one run of the render loop, which the browser starts once per screen refresh through `requestAnimationFrame`. React Three Fiber exposes that loop as the `useFrame` hook. `PathTracer` draws the display shader (`DisplayMaterial`) from it, so the display updates at the screen refresh rate. The path-trace shader (`PathTraceMaterial`) runs on its own timer, as fast as the GPU finishes samples. React Three Fiber owns the canvas, the camera and the controls, and `PathTracer` (`src/components/pathTracer.tsx`) does all the drawing.
+A rendering tick is one run of the render loop, which the browser starts once per screen refresh through `requestAnimationFrame`. React Three Fiber exposes that loop as the `useFrame` hook. `PathTracer` draws the display shader (`DisplayMaterial`) from it, so the display updates at the screen refresh rate. The path-trace shader (`PathTraceMaterial`) runs on its own timer, as fast as the GPU finishes samples. React Three Fiber owns the canvas, the camera and the controls, and `PathTracer` (`src/components/pathTracer.tsx`) starts the drawing, which `src/lib/webgl/tracer.ts` does.
 
 ```text
  ┌────────────────────┐   bands of one sample      ┌──────────────────────────┐
@@ -80,7 +80,7 @@ A rendering tick is one run of the render loop, which the browser starts once pe
   - The cost is that the target must be additive, which needs the `EXT_float_blend` extension, and that a second float target of the same size is held in memory.
   - Samples are numbered from 1, and the counter shows how many are done. The first one after a restart is a one-bounce preview drawn as a single band, so a moving camera always shows a complete image.
 
-- **Both are raw shader materials drawn on one fullscreen triangle** (`src/components/pathTracer.tsx`). A raw material skips the code three.js adds to its built-in materials, which would clash with the GLSL's own inputs and outputs.
+- **Both are raw shader materials drawn on one triangle that covers the target** (`src/lib/webgl/shaderTriangle.ts`). A raw material skips the code three.js adds to its built-in materials, which would clash with the GLSL's own inputs and outputs.
   - The target is the square from -1 to 1 on both axes in clip space, the coordinates the GPU clips to. The triangle's corners are `(-1, -1)`, `(3, -1)` and `(-1, 3)`, so its two legs are 4 units long and the square fits inside it. The GPU discards the part outside the square:
 
     ```text
@@ -165,13 +165,13 @@ A Zustand store (`src/lib/store/appStore.ts`) holds only state the UI displays: 
 ```text
  ┌────────────────────────────┐                                  ┌──────────────────────────────┐
  │ PathTracer                 │   counters, about 4 a second     │ useAppStore                  │
- │ src/components/            ├─────────────────────────────────►│   cameraFov, numSamples      │
- │ pathTracer.tsx             │                                  │   numBounces, shadingMethod  │
+ │ and the tracing engine     ├─────────────────────────────────►│   cameraFov, numSamples      │
+ │                            │                                  │   numBounces, shadingMethod  │
  │                            │◄─────────────────────────────────┤   samplesDone, the times     │
  │ Owns, outside the store:   │   settings, read with getState() └──────────────┬───────────────┘
  │   camera and controls      │                                                 │ selectors
  │   render targets, textures │                                                 ▼
- │   sample counter            │                                    ProgressPill and SettingsPanel
+ │   sample counter           │                                    ProgressPill and SettingsPanel
  └────────────────────────────┘                                    re-render when a value changes
 ```
 
