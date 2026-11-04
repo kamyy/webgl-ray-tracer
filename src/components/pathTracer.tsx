@@ -2,14 +2,22 @@
  * Runs the progressive path tracer inside the React Three Fiber canvas.
  *
  * One sample adds one path per pixel to a running sum held in a float render target, with the sample count in the
- * alpha channel. The display shader divides the sum by that count and draws it to the canvas. A full sample on a slow
- * GPU can take hundreds of milliseconds, and the page cannot repaint while the GPU is busy, so a sample is split into
- * horizontal strips and one strip is drawn per rendering tick. The number of strips adapts to the time between ticks.
- * The component renders nothing itself. It takes over drawing from React Three Fiber with a render priority.
+ * alpha channel. The display shader divides the sum by that count and draws it to the canvas.
+ *
+ * Tracing runs on a timer instead of the screen refresh, so a fast GPU is not held to one sample per refresh. The GPU
+ * is shared with the rest of the desktop, so one job must stay short, or every window stutters while it runs. A sample
+ * is therefore drawn as bands of rows, and each band is sized to take a few milliseconds. The timer keeps at most two
+ * bands waiting on the GPU, found by polling a fence, which is a marker the GPU signals when it has finished everything
+ * submitted before it. That keeps the GPU busy without letting the command queue grow.
+ *
+ * While a sample is partly drawn, its finished rows have one more sample than the rest, which shows as a faint edge in
+ * the noise. So the picture comes from a second target, a copy of the running sum made each time a sample completes.
+ * The display pass runs once per rendering tick after a copy. The component renders nothing itself. It takes over
+ * drawing from React Three Fiber with a render priority.
  */
 import { useFBO } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { RefObject, useEffect, useMemo, useState } from 'react'
+import { RefObject, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BufferGeometry,
   DataTexture,
@@ -45,13 +53,14 @@ const renderTargetSettings = {
   generateMipmaps: false,
 }
 
-// A sample is drawn as horizontal strips, one strip per rendering tick, so the page can repaint between strips. The
-// thresholds below grow or shrink the strip count to hold the tick time near one display refresh.
-const maxNumStrips = 32
-const slowFrameMs = 24 // a tick this long means a strip is too much work for one tick
-const slowFramesBeforeMoreStrips = 2
-const fastFrameMs = 18 // at 60 Hz an idle tick is about 16.7 ms, so a faster-than-this tick has headroom
-const fastFramesBeforeFewerStrips = 30
+// The tracing loop keeps this many bands submitted to the GPU. It learns that one finished by polling on a timer, so
+// the second band keeps the GPU busy until the next poll. The desktop can wait for both before it draws a window.
+const maxBandsInFlight = 2
+const bandBudgetMs = 16 // how long one band should take on the GPU
+const firstBandRows = 16 // the band size before any band has been timed
+const msPerRowSmoothing = 0.3 // how much each timed band moves the estimate, from 0 (never) to 1 (replace it)
+const fencePollMs = 4 // browsers stretch a shorter nested timer to this, and a longer wait would delay each band's timing
+const idlePollMs = 16 // how often the loop looks for new work when it has nothing to draw
 const statusIntervalMs = 500 // how often the status counters are written to the store
 const revokeDelayMs = 10_000 // how long a screenshot's object URL stays valid after the download starts
 const bouncesSettleMs = 500 // how long the bounce setting must stay unchanged before it restarts accumulation
@@ -80,19 +89,26 @@ const fullScreenPassCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1)
 
 // --- Tracer state --------------------------------------------------------------------
 
+// A band of rows that was submitted to the GPU and has not finished yet.
+interface Band {
+  fence: WebGLSync
+  submittedAt: number // performance.now() when it was submitted
+  rows: number
+  timed: boolean // false for the one-bounce preview, which costs less per row than a full sample
+}
+
 // Everything the render loop remembers between ticks. It lives in a plain object rather than React state, because
 // it changes every rendering tick and must not re-render the page.
 interface TracerState {
-  samplesDone: number // number of completed samples
+  samplesDone: number // number of samples submitted to the GPU
+  row: number // first row of the current sample that has not been submitted yet
+  msPerRow: number | null // GPU time per row, smoothed over the bands timed so far, or null before the first
+  lastBandDoneAt: number // performance.now() when the GPU last finished a band
   restartTimestamp: number // when accumulation last restarted, for the elapsed and remaining times
-  numStrips: number // strips per sample, only changed between samples so every sample covers each row once
-  wantedNumStrips: number // the strip count that `adaptNumStrips` wants to switch to at the next sample boundary
-  strip: number // next strip of the current sample
   numBounces: number // the bounce depth the accumulated samples were traced at, which trails a dragged setting
   needsClear: boolean // true after a restart, so the next draw empties the accumulation target first
-  drewLastFrame: boolean // false after a frame with no strip drawn, because the preview is no measure of a strip
-  slowFrames: number // consecutive ticks over `slowFrameMs`
-  fastFrames: number // consecutive ticks under `fastFrameMs`
+  needsDisplay: boolean // true after a sample completes, so the next rendering tick draws the display pass
+  bands: Band[] // the bands still on the GPU, oldest first
   lastStatusTimestamp: number // when the counters were last written to the store
   lastCameraMatrix: Matrix4 // the camera's world matrix at the last frame, to notice that it moved
 }
@@ -111,6 +127,7 @@ interface TracerInputs {
   height: number
   packed: PackedScene
   accumulation: WebGLRenderTarget
+  completed: WebGLRenderTarget
   randomTexture: DataTexture
   pathTrace: FullScreenPass
   display: FullScreenPass
@@ -126,15 +143,14 @@ interface PathTracerProps {
 function createTracerState(): TracerState {
   return {
     samplesDone: 0,
+    row: 0,
+    msPerRow: null,
+    lastBandDoneAt: 0,
     restartTimestamp: Date.now(),
-    numStrips: 4,
-    wantedNumStrips: 4,
-    strip: 0,
     numBounces: useAppStore.getState().numBounces,
     needsClear: true,
-    drewLastFrame: false,
-    slowFrames: 0,
-    fastFrames: 0,
+    needsDisplay: false,
+    bands: [],
     lastStatusTimestamp: 0,
     lastCameraMatrix: new Matrix4(),
   }
@@ -159,37 +175,11 @@ function configureRenderer(gl: WebGLRenderer) {
 // Restart accumulation from zero samples.
 function renderReset(state: TracerState) {
   state.samplesDone = 0
-  state.strip = 0
+  state.row = 0
   state.needsClear = true
   state.numBounces = useAppStore.getState().numBounces
   state.restartTimestamp = Date.now()
   useAppStore.getState().resetStatus()
-}
-
-// --- Strip count ---------------------------------------------------------------------
-
-// Strips make a sample cheaper per tick, so add some when ticks run long and remove some when they have headroom.
-function adaptNumStrips(state: TracerState, frameMs: number) {
-  if (!state.drewLastFrame) {
-    return
-  }
-
-  if (frameMs > slowFrameMs) {
-    state.fastFrames = 0
-    if (++state.slowFrames >= slowFramesBeforeMoreStrips) {
-      state.wantedNumStrips = Math.min(state.numStrips * 2, maxNumStrips)
-      state.slowFrames = 0
-    }
-  } else if (frameMs <= fastFrameMs) {
-    state.slowFrames = 0
-    if (++state.fastFrames >= fastFramesBeforeFewerStrips) {
-      state.wantedNumStrips = Math.max(Math.floor(state.numStrips / 2), 1)
-      state.fastFrames = 0
-    }
-  } else {
-    state.slowFrames = 0
-    state.fastFrames = 0
-  }
 }
 
 // --- Status counters -----------------------------------------------------------------
@@ -212,8 +202,13 @@ function formatDuration(milliseconds: number): string {
 }
 
 // Writes the sample and timing counters to the store at a few updates a second, so React does not re-render every
-// rendering tick.
+// rendering tick. The one-bounce preview is not counted. A camera or setting that is being dragged restarts the render
+// before the next sample finishes, so showing the preview would flash numbers between the dashes of each restart.
 function updateStatus(state: TracerState, numSamples: number, force: boolean) {
+  if (state.samplesDone < 2 && state.samplesDone < numSamples) {
+    return
+  }
+
   const now = Date.now()
   if (!force && now - state.lastStatusTimestamp < statusIntervalMs) {
     return
@@ -233,9 +228,9 @@ function updateStatus(state: TracerState, numSamples: number, force: boolean) {
 
 // --- Drawing -------------------------------------------------------------------------
 
-// Draws the average of the running sum to the canvas.
-function drawDisplay(gl: WebGLRenderer, display: FullScreenPass, accumulation: WebGLRenderTarget) {
-  display.material.uniforms.u_color_sampler.value = accumulation.texture
+// Draws the average of the last completed sum to the canvas.
+function drawDisplay(gl: WebGLRenderer, display: FullScreenPass, completed: WebGLRenderTarget) {
+  display.material.uniforms.u_color_sampler.value = completed.texture
   gl.setRenderTarget(null)
   gl.render(display.scene, fullScreenPassCamera)
 }
@@ -243,8 +238,8 @@ function drawDisplay(gl: WebGLRenderer, display: FullScreenPass, accumulation: W
 // Saves the canvas as a PNG file. The canvas is not created with `preserveDrawingBuffer`, so its contents are gone
 // once the browser has shown them. The display pass is drawn again, and `toBlob` copies the canvas before this task
 // ends.
-function downloadScreenshot(gl: WebGLRenderer, display: FullScreenPass, accumulation: WebGLRenderTarget) {
-  drawDisplay(gl, display, accumulation)
+function downloadScreenshot(gl: WebGLRenderer, display: FullScreenPass, completed: WebGLRenderTarget) {
+  drawDisplay(gl, display, completed)
   gl.domElement.toBlob(blob => {
     if (!blob) {
       console.error('The canvas could not be encoded as a PNG.')
@@ -262,12 +257,38 @@ function downloadScreenshot(gl: WebGLRenderer, display: FullScreenPass, accumula
   }, 'image/png')
 }
 
-// Adds one strip of samples to the running sum, then draws the average of everything accumulated so far.
-function drawStrip(state: TracerState, inputs: TracerInputs, numStrips: number) {
-  const { gl, camera, width, height, packed, accumulation, randomTexture, pathTrace, display } = inputs
+// Draws the display pass when a sample completed since the last time it was drawn.
+function drawDisplayIfNeeded(
+  state: TracerState,
+  gl: WebGLRenderer,
+  display: FullScreenPass,
+  completed: WebGLRenderTarget,
+) {
+  if (state.needsDisplay) {
+    state.needsDisplay = false
+    drawDisplay(gl, display, completed)
+  }
+}
+
+// Picks how many rows the next band covers. The first sample after a restart is drawn whole, because a quick preview
+// that arrives in pieces would show a half-new, half-old image to a moving camera.
+function nextBandRows(state: TracerState, height: number): number {
+  const remaining = height - state.row
+  if (state.samplesDone === 0) {
+    return remaining
+  }
+
+  const rows = state.msPerRow === null ? firstBandRows : Math.floor(bandBudgetMs / state.msPerRow)
+  return Math.min(Math.max(rows, 1), remaining)
+}
+
+// Adds a band of rows of the current sample to the running sum. Returns the number of rows drawn. The display pass runs
+// when a sample completes, at the next rendering tick.
+function drawBand(state: TracerState, inputs: TracerInputs): number {
+  const { gl, camera, width, height, packed, accumulation, completed, randomTexture, pathTrace } = inputs
   const { shadingMethod, numSamples } = useAppStore.getState()
 
-  // Empty the running sum after a restart. This must happen with the scissor off, or only one strip would be cleared.
+  // Empty the running sum after a restart. This must happen with the scissor off, or only one band would be cleared.
   accumulation.scissorTest = false
   if (state.needsClear) {
     state.needsClear = false
@@ -275,13 +296,12 @@ function drawStrip(state: TracerState, inputs: TracerInputs, numStrips: number) 
     gl.clear()
   }
 
-  // Limit the draw to this strip's rows. A single strip is the whole image, so it needs no scissor.
-  const firstRow = Math.floor((height * state.strip) / numStrips)
-  const lastRow = Math.floor((height * (state.strip + 1)) / numStrips)
-  accumulation.scissor.set(0, firstRow, width, lastRow - firstRow)
-  accumulation.scissorTest = numStrips > 1
+  // Limit the draw to this band's rows with a scissor, a rectangle the GPU will not draw outside.
+  const rows = nextBandRows(state, height)
+  accumulation.scissor.set(0, state.row, width, rows)
+  accumulation.scissorTest = rows < height
 
-  // Hand the shader this frame's camera, settings and scene textures.
+  // Hand the shader this sample's camera, settings and scene textures.
   const uniforms = pathTrace.material.uniforms
   uniforms.u_half_wd.value = width * 0.5
   uniforms.u_half_ht.value = height * 0.5
@@ -297,46 +317,83 @@ function drawStrip(state: TracerState, inputs: TracerInputs, numStrips: number) 
   uniforms.u_bvh_sampler.value = packed.bvhTexture
   uniforms.u_material_sampler.value = packed.materialsTexture
 
-  // Fullscreen pass 1: trace the strip and add its samples to the running sum.
+  // Fullscreen pass: trace the band and add it to the running sum.
   gl.setRenderTarget(accumulation)
   gl.render(pathTrace.scene, fullScreenPassCamera)
 
-  // Fullscreen pass 2: divide the sum by the sample count and show it on the canvas. This covers every pixel, so
-  // strips not yet traced in this sample still show their previous average.
-  drawDisplay(gl, display, accumulation)
-
-  // Move to the next strip. After the last one the sample is complete, so a new strip count may take effect and the
-  // counters are written at once, so the final sample always shows.
-  if (++state.strip >= numStrips) {
-    state.strip = 0
+  state.row += rows
+  if (state.row >= height) {
+    state.row = 0
     ++state.samplesDone
-    state.numStrips = state.wantedNumStrips
-    updateStatus(state, numSamples, state.samplesDone >= numSamples)
+
+    // The GPU runs commands in order, so the copy holds exactly the finished sample, even with the next band queued.
+    gl.copyTextureToTexture(accumulation.texture, completed.texture)
+    state.needsDisplay = true
+    updateStatus(state, numSamples, true)
   } else {
     updateStatus(state, numSamples, false)
   }
+
+  return rows
 }
 
-// Called every rendering tick. Restarts accumulation when the camera moved, then draws the next strip if one is due.
-function frame(state: TracerState, inputs: TracerInputs, interacting: boolean, frameMs: number) {
+// --- Tracing loop --------------------------------------------------------------------
+
+// Forgets the bands the GPU has finished, and learns from their timing how long a row takes. A band started when the
+// GPU was free or when the band before it finished, whichever is later. A fence the GPU cannot signal, such as after a
+// lost context, counts as finished.
+function retireFinishedBands(context: WebGL2RenderingContext, state: TracerState) {
+  while (state.bands.length > 0 && context.clientWaitSync(state.bands[0].fence, 0, 0) !== context.TIMEOUT_EXPIRED) {
+    const band = state.bands.shift()!
+    context.deleteSync(band.fence)
+
+    const now = performance.now()
+    if (band.timed) {
+      const msPerRow = (now - Math.max(band.submittedAt, state.lastBandDoneAt)) / band.rows
+      state.msPerRow =
+        state.msPerRow === null ? msPerRow : state.msPerRow + (msPerRow - state.msPerRow) * msPerRowSmoothing
+    }
+    state.lastBandDoneAt = now
+  }
+}
+
+// Submits one band when the GPU has room and the settings call for one. Returns how many milliseconds to wait before
+// the next try.
+function traceStep(state: TracerState, inputs: TracerInputs, interacting: boolean): number {
+  const context = inputs.gl.getContext() as WebGL2RenderingContext
+  if (context.isContextLost()) {
+    return idlePollMs
+  }
+
+  retireFinishedBands(context, state)
+
   inputs.camera.updateMatrixWorld()
   if (!state.lastCameraMatrix.equals(inputs.camera.matrixWorld)) {
     state.lastCameraMatrix.copy(inputs.camera.matrixWorld)
     renderReset(state)
   }
 
-  adaptNumStrips(state, frameMs)
-  state.drewLastFrame = false
-
-  // The first sample after a restart is a quick one-bounce preview, drawn whole so a moving camera always shows a
-  // complete image. While dragging, no later sample is drawn. A sample that has started is finished even when the
-  // sample ceiling drops below it, so no rows end up one sample behind the rest.
+  // While dragging, only the preview is drawn. A sample that has started is finished even when the sample ceiling drops
+  // below it, so no rows end up one sample behind the rest.
   const { numSamples } = useAppStore.getState()
   const isPreview = state.samplesDone === 0
-  if ((state.strip > 0 || state.samplesDone < numSamples) && (isPreview || !interacting)) {
-    drawStrip(state, inputs, isPreview ? 1 : state.numStrips)
-    state.drewLastFrame = !isPreview
+  if ((state.row === 0 && state.samplesDone >= numSamples) || (!isPreview && interacting)) {
+    return idlePollMs
   }
+  if (state.bands.length >= maxBandsInFlight) {
+    return fencePollMs
+  }
+
+  const submittedAt = performance.now()
+  const rows = drawBand(state, inputs)
+
+  const fence = context.fenceSync(context.SYNC_GPU_COMMANDS_COMPLETE, 0)
+  if (fence) {
+    state.bands.push({ fence, submittedAt, rows, timed: !isPreview })
+  }
+  context.flush() // a fence is only signaled once the GPU has been sent the commands before it
+
+  return 0
 }
 
 // --- Path tracer ---------------------------------------------------------------------
@@ -351,14 +408,21 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
 
   // The render targets and textures are rebuilt whenever the view size changes.
   const accumulation = useFBO(width, height, renderTargetSettings)
+  const completed = useFBO(width, height, renderTargetSettings)
   const randomTexture = useMemo(() => createRandomTexture(width, height), [width, height])
   const pathTrace = useMemo(() => createFullScreenPass(createPathTraceMaterial()), [])
   const display = useMemo(() => createFullScreenPass(createDisplayMaterial()), [])
   const [state] = useState(createTracerState)
+  const inputsRef = useRef<TracerInputs | null>(null)
 
   useEffect(() => {
     configureRenderer(gl)
   }, [gl])
+
+  // The completed target is only ever copied into, so it needs its GPU memory made before the first copy.
+  useEffect(() => {
+    gl.initRenderTarget(completed)
+  }, [gl, completed])
 
   // A new view size means new render targets, which start empty, and a new scene means new geometry, so accumulation
   // starts over.
@@ -424,7 +488,7 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
   }, [gl, state])
 
   // The heads-up display saves the image through this registration.
-  useEffect(() => registerScreenshot(() => downloadScreenshot(gl, display, accumulation)), [gl, display, accumulation])
+  useEffect(() => registerScreenshot(() => downloadScreenshot(gl, display, completed)), [gl, display, completed])
 
   // Free GPU memory when a texture or material is replaced or the component unmounts.
   useEffect(() => {
@@ -450,15 +514,33 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
     }
   }, [pathTrace, display])
 
-  // Priority above 0 turns off React Three Fiber's own rendering, so this callback does all the drawing.
-  useFrame((_, deltaSeconds) => {
-    if (!packed) {
-      return
-    }
+  // The tracing loop reads the latest drawing objects from here, because the timer outlives any one render.
+  useEffect(() => {
+    inputsRef.current = packed
+      ? { gl, camera, width, height, packed, accumulation, completed, randomTexture, pathTrace, display }
+      : null
+  }, [gl, camera, width, height, packed, accumulation, completed, randomTexture, pathTrace, display])
 
-    const inputs = { gl, camera, width, height, packed, accumulation, randomTexture, pathTrace, display }
-    frame(state, inputs, interactingRef.current, deltaSeconds * 1000)
-  }, 1)
+  // The tracing loop. It runs on a timer, so a fast GPU is not held to one sample per screen refresh.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>
+    const tick = () => {
+      // The next tick is scheduled even when a step throws, so one failed draw does not stop the render for good.
+      let delay = idlePollMs
+      try {
+        const inputs = inputsRef.current
+        delay = inputs ? traceStep(state, inputs, interactingRef.current) : idlePollMs
+      } finally {
+        timer = setTimeout(tick, delay)
+      }
+    }
+    tick()
+    return () => clearTimeout(timer)
+  }, [state, interactingRef])
+
+  // Priority above 0 turns off React Three Fiber's own rendering, so this callback does all the drawing. The display
+  // pass runs once per screen refresh, however many samples were traced since the last one.
+  useFrame(() => drawDisplayIfNeeded(state, gl, display, completed), 1)
 
   return null
 }
