@@ -92,7 +92,7 @@ A single Vite + React app, with no server runtime.
 - `src/lib/scenes.ts` — the bundled scenes with their starting camera views, and the helpers for a scene opened from the user's drive.
 - `src/lib/store/` — the Zustand store for UI and rendering-status state only.
 - `src/lib/hooks/` — custom React hooks, one per file.
-- `src/lib/webgl/` — the shader materials, texture helpers, and scene packing with its BVH worker.
+- `src/lib/webgl/` — the shader materials, texture helpers, scene packing with its BVH worker, and the path-tracing engine.
 - `infra/` — the Terraform for the S3 bucket, CloudFront distribution, DNS records and deploy role, with one state ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)). `infra/bootstrap/` holds the policies for the Terraform role, which is created by hand.
 
 `@/*` maps to `src/*` in both `vite.config.ts` and `tsconfig.json`.
@@ -111,7 +111,7 @@ A single Vite + React app, with no server runtime.
   - A mismatch renders wrong geometry or colors and reports no error.
 - **The BVH is built in a Web Worker.** `src/lib/webgl/packScene.ts` sends world-space triangles to `src/lib/webgl/bvhWorker.ts` and receives the packed arrays back, so the worker cannot import anything that touches `window` or three.js.
 - **GLSL files are imported with Vite's `?raw` suffix.** `src/lib/webgl/pathTraceMaterial.ts` and `src/lib/webgl/displayMaterial.ts` import each file from `src/shaders/` as a string, so a renamed shader file fails the build. A GLSL syntax error still only shows up in the browser console when the shader compiles. The GLSL files have no `#version` line, because the material's `glslVersion` writes it.
-- **Any camera or setting change restarts accumulation from zero samples.** `PathTracer` in `src/components/pathTracer.tsx` calls `renderReset` when the camera's world matrix changes, and when `cameraFov` or `shadingMethod` changes in the store, and 500 ms after `numBounces` stops changing so dragging its slider restarts once. `numSamples` only moves the stop ceiling, so changing it never restarts. A new setting that affects the image must be added to that store subscription, or the canvas blends old and new samples.
+- **Any camera or setting change restarts accumulation from zero samples.** `src/lib/webgl/tracer.ts` calls `renderReset` when the camera's world matrix changes, and when `cameraFov` or `shadingMethod` changes in the store, and 500 ms after `numBounces` stops changing so dragging its slider restarts once. `numSamples` only moves the stop ceiling, so changing it never restarts. A new setting that affects the image must be added to that store subscription, or the canvas blends old and new samples.
 - **While the camera is being dragged, only sample 1 renders.** `CameraControls` sets `interactingRef` on `controlstart` and `controlend`, and accumulation resumes on release. This keeps dragging responsive ([Rendering](ARCHITECTURE.md#2-rendering-pipeline)).
 - **Material behavior comes from the glTF material fields.** `packMaterials` in `src/lib/webgl/packScene.ts` reads them: a non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective with `metalness` as the reflection ratio and `1 - roughness` as the gloss. A glTF exported without these fields renders every surface as diffuse. Textures are ignored.
 - **A scene opened from the user's drive is served from an object URL that `chooseScene` in `src/components/renderSettings.tsx` frees when another scene replaces it.** It has no starting `view`, so `TracedScene` in `src/components/viewport.tsx` frames the camera on it after it loads. Only a self-contained `.glb` works, because the browser gives the loader no neighbouring files.
@@ -120,7 +120,7 @@ A single Vite + React app, with no server runtime.
 - **The app needs WebGL 2 with `EXT_color_buffer_float`, `EXT_float_blend` and enough texture units, and the GPU's texture limits must fit the scene.** `src/lib/webgl/checkGpuLimits.ts` checks them, and `src/components/viewport.tsx` shows the failure as a sentence in the view. The scene limits compare the real texture sizes with the GPU's limits, so a phone with small limits can still run a small scene.
 - **The save button reads the canvas right after drawing the display pass again.** `downloadScreenshot` does both in one task, because the canvas has no `preserveDrawingBuffer` and is blank once the browser has shown it. The save button is disabled until `samplesDone` reaches `numSamples`.
   - `src/components/hud.tsx` defines the save button.
-  - `src/components/pathTracer.tsx` defines `downloadScreenshot`.
+  - `src/lib/webgl/tracer.ts` defines `downloadScreenshot`.
   - `src/lib/webgl/screenshot.ts` carries the call from the save button to `PathTracer`, which sits inside the React Three Fiber canvas.
 - **The canvas `dpr` is fixed at 1 in `src/components/viewport.tsx`.** React Three Fiber's default would follow the device pixel ratio. Code that sizes a texture to the view must still multiply by `viewport.dpr`, so the sizes stay right if the ratio changes.
 
