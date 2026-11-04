@@ -31,14 +31,20 @@ The cost accepted is a hardware floor: a recent GPU, WebGL 2 and the `EXT_color_
 
 ## 2. Rendering pipeline
 
-A rendering tick is one run of the render loop, which the browser starts once per screen refresh through `requestAnimationFrame`. React Three Fiber exposes that loop as the `useFrame` hook, and `PathTracer` draws from it. The tick rate therefore equals the screen refresh rate: a 72 Hz monitor gives 72 ticks a second, one every 13.9 ms, as long as each tick finishes in time. Each rendering tick draws one strip of a sample, using two shaders: the path-trace shader (`PathTraceMaterial`), then the display shader (`DisplayMaterial`). React Three Fiber owns the canvas, the camera and the controls, and `PathTracer` (`src/components/pathTracer.tsx`) does all the drawing.
+A rendering tick is one run of the render loop, which the browser starts once per screen refresh through `requestAnimationFrame`. React Three Fiber exposes that loop as the `useFrame` hook. `PathTracer` draws the display shader (`DisplayMaterial`) from it, so the display updates at the screen refresh rate. The path-trace shader (`PathTraceMaterial`) runs on its own timer, as fast as the GPU finishes samples. React Three Fiber owns the canvas, the camera and the controls, and `PathTracer` (`src/components/pathTracer.tsx`) does all the drawing.
 
 ```text
- ┌────────────────────┐   one strip of samples    ┌──────────────────────────┐
+ ┌────────────────────┐   bands of one sample      ┌──────────────────────────┐
  │ PathTraceMaterial  ├──────────────────────────►│ one float render target  │
  │ pathTrace.frag.glsl│   added by blending       │ RGBA32F, sum + count     │
  └────────────────────┘                           └────────────┬─────────────┘
-                                                               │ accumulated color
+                                                               │ copied when a sample
+                                                               │ completes
+                                                               ▼
+                                                  ┌────────────────────────┐
+                                                  │ completed target       │
+                                                  │ RGBA32F copy of the sum│
+                                                  └────────────┬───────────┘
                                                                ▼
                                                   ┌────────────────────────┐
                                                   │ DisplayMaterial        │
@@ -51,28 +57,28 @@ A rendering tick is one run of the render loop, which the browser starts once pe
 
 - **`PathTraceMaterial`** (`src/lib/webgl/pathTraceMaterial.ts`, with `src/shaders/pathTrace.vert.glsl` and `src/shaders/pathTrace.frag.glsl`) path-traces samples into an off-screen `RGBA32F` target with additive blending. The rgb channels hold the running sum of sample colors, and alpha counts the samples each pixel has received.
 - **`DisplayMaterial`** (`src/lib/webgl/displayMaterial.ts`, with `src/shaders/display.vert.glsl` and `src/shaders/display.frag.glsl`) divides the sum by the per-pixel count and draws it to the visible canvas. Keeping the two apart leaves the accumulator a plain running sum, and only the display shader normalizes it.
-- **A sample is drawn as horizontal strips, one strip per rendering tick.** A full sample on a mid-range GPU or a phone can take hundreds of milliseconds. The page cannot repaint while the GPU is busy, so one long draw makes the whole page stutter, and mobile browsers may reset the WebGL context. Strips keep each GPU job short.
-  - A strip is a band of the image's pixel rows. `PathTracer` limits the draw to those rows with a scissor, a rectangle the GPU will not draw outside. With 1080 rows and 4 strips, a sample takes four ticks:
+- **Tracing runs on a timer, in bands of rows sized to take about 16 ms, with at most two bands waiting on the GPU.** Tying it to the screen refresh would cap a fast GPU at one band per refresh and leave it idle between them.
 
-    ```text
-    sample N, 4 strips
-    ┌──────────────────────────┐
-    │ strip 0   rows 0–269     │ ◄ tick 1
-    ├──────────────────────────┤
-    │ strip 1   rows 270–539   │ ◄ tick 2
-    ├──────────────────────────┤
-    │ strip 2   rows 540–809   │ ◄ tick 3
-    ├──────────────────────────┤
-    │ strip 3   rows 810–1079  │ ◄ tick 4
-    └──────────────────────────┘
-                 │ sample N is complete
-                 ▼
-    sample N + 1 starts again at strip 0
-    ```
+  ```text
+   timer loop                                 GPU, in submission order
+   ┌───────────────────────────────────┐      ┌──────────────────────────┐
+   │ fewer than 2 bands waiting?       │      │ band 1 ► fence 1         │
+   │   yes ► draw a band, add a fence  ├─────►│ band 2 ► fence 2         │
+   │   no  ► look again in 4 ms        │      │ last band of a sample:   │
+   │                                   │      │   copy sum ► `completed` │
+   │ a signaled fence gives the band's │◄─────┤                          │
+   │ time, which sizes the next band   │      │                          │
+   └───────────────────────────────────┘      └─────────────┬────────────┘
+                                                            ▼
+                                      next screen refresh: `drawDisplay` reads `completed`
+  ```
 
-  - The strip count adapts to the time between rendering ticks, between 1 and 32. It doubles after consecutive ticks over 24 ms and halves after about half a second of ticks under 18 ms. It changes only between samples, so each sample covers every row exactly once.
-  - The cost is that the target must be additive, which needs the `EXT_float_blend` extension, and that rows can briefly hold different sample counts. The per-pixel count in alpha makes that invisible.
-  - Samples are numbered from 1, and the counter shows how many are done. The first one after a restart is a one-bounce preview drawn whole, so a moving camera always shows a complete image.
+  - The GPU also draws every window on the desktop, so a long job makes the whole desktop stutter, and on a phone it can make the browser reset the WebGL context ([Layout](#9-layout)). A full sample can take hundreds of milliseconds, so `PathTracer` draws it as bands. A band is a range of the image's pixel rows. `PathTracer` limits the draw to those rows with a scissor, a rectangle the GPU will not draw outside. A band never crosses a sample boundary, so a fast GPU that finishes a sample in under 16 ms draws it as one band and traces many samples per refresh.
+  - A fence is a marker the GPU signals when it has finished all the commands submitted before it. The loop checks the oldest fence about every 4 ms. The limit of two bands keeps the command queue from growing without bound, because the loop would otherwise submit faster than the GPU works.
+  - The time from a band's start to its fence signaling gives the GPU time per row, smoothed over the last bands, so the size follows the GPU, the scene and the bounce count.
+  - The display shader reads the `completed` target, a copy of the running sum that `PathTracer` makes each time a sample finishes, not the running sum itself. Mid-sample, the rows already drawn hold one more sample than the rest, which would show as a faint edge in the noise. The copy runs on the GPU in order with the bands, so it holds exactly the finished sample even while the next band is queued. The display pass runs only after a copy, so the image updates once per sample.
+  - The cost is that the target must be additive, which needs the `EXT_float_blend` extension, and that a second float target of the same size is held in memory.
+  - Samples are numbered from 1, and the counter shows how many are done. The first one after a restart is a one-bounce preview drawn as a single band, so a moving camera always shows a complete image.
 
 - **Both are raw shader materials drawn on one fullscreen triangle** (`src/components/pathTracer.tsx`). A raw material skips the code three.js adds to its built-in materials, which would clash with the GLSL's own inputs and outputs.
   - The target is the square from -1 to 1 on both axes in clip space, the coordinates the GPU clips to. The triangle's corners are `(-1, -1)`, `(3, -1)` and `(-1, 3)`, so its two legs are 4 units long and the square fits inside it. The GPU discards the part outside the square:
@@ -165,7 +171,7 @@ A Zustand store (`src/lib/store/appStore.ts`) holds only state the UI displays: 
  │ Owns, outside the store:   │   settings, read with getState() └──────────────┬───────────────┘
  │   camera and controls      │                                                 │ selectors
  │   render targets, textures │                                                 ▼
- │   sample counter, strips   │                                    ProgressPill and SettingsPanel
+ │   sample counter            │                                    ProgressPill and SettingsPanel
  └────────────────────────────┘                                    re-render when a value changes
 ```
 
