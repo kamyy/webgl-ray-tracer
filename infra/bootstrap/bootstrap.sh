@@ -38,6 +38,7 @@ domain_zone_name=$(tfvar domain_zone_name)
 hosted_zone_id=$(tfvar hosted_zone_id)
 state_bucket=webgl-ray-tracer-tfstate-${account_id}
 site_bucket=webgl-ray-tracer.${domain_zone_name}
+scenes_bucket=${site_bucket}-scenes
 deploy_role_arn=arn:aws:iam::${account_id}:role/github-actions-webgl-ray-tracer-deploy
 
 # The secrets and variables are written to the repo that `gh` resolves, which must be the repo the trust policy names.
@@ -58,6 +59,7 @@ for file in trust-policy.json permissions-policy.json; do
     -e "s|__REPO__|$repo|g" \
     -e "s|__HOSTED_ZONE_ID__|$hosted_zone_id|g" \
     -e "s|__HOSTNAME__|$site_bucket|g" \
+    -e "s|__SCENES_BUCKET__|$scenes_bucket|g" \
     "$here/$file" >"$rendered/$file"
 
   # A placeholder the sed call above doesn't know about would reach IAM as literal text.

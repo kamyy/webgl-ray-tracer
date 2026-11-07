@@ -12,6 +12,11 @@ output "site_bucket" {
   value       = aws_s3_bucket.site.id
 }
 
+output "scenes_bucket" {
+  description = "Name of the private S3 bucket that holds the example scenes."
+  value       = aws_s3_bucket.scenes.id
+}
+
 output "deploy_role_arn" {
   description = "ARN to store in the AWS_DEPLOY_ROLE_ARN GitHub secret."
   value       = aws_iam_role.deploy.arn
