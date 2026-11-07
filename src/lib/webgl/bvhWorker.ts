@@ -2,7 +2,7 @@
  * Web Worker that builds the bounding volume hierarchy (BVH) and packs faces and BVH nodes into float arrays.
  *
  * Building the tree with the surface area heuristic takes seconds for a large mesh, which would freeze the page if it
- * ran on the main thread. `packScene` sends world-space triangles here, and the worker sends back the packed arrays as
+ * ran on the main thread. `packScene` sends world-space faces here, and the worker sends back the packed arrays as
  * transferable buffers, so nothing is copied. These are the arrays that become the faces and BVH textures.
  */
 import { bvhNodesPerRow, facesPerRow, numFloatsPerBvhNode, numFloatsPerFace } from './sceneLayout'
@@ -43,7 +43,7 @@ interface Face {
   centroid: Vec3 // average of the three vertex positions, which the split sorts by
 }
 
-/** One mesh as world-space triangles, 9 floats per face (three corners of x, y, z). */
+/** One mesh as world-space faces, 9 floats per face (three verts of x, y, z). */
 export interface BvhRequestMesh {
   positions: Float32Array
   normals: Float32Array
