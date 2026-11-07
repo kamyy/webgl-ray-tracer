@@ -77,7 +77,7 @@ A GPU path tracer that runs entirely in the browser through WebGL 2. React and T
 
 A single Vite + React app, with no server runtime.
 
-- `public/` — the bundled glTF scenes (`suzanne.glb`, `tricycle.glb`), their card pictures in `public/thumbnails/`, and the Draco decoder in `public/draco/`. Vite copies it into `dist/` as-is.
+- `public/` — the scene card pictures in `public/thumbnails/` and the Draco decoder in `public/draco/`. Vite copies it into `dist/` as-is. The glTF scenes are not in git, and `.gitignore` excludes `public/*.glb` ([Changing the scene](RUNBOOK.md#15-changing-the-scene)).
 - `src/shaders/` — the GLSL vertex and fragment shaders, imported into the app as strings.
 - `src/components/` — React components, styled with Tailwind CSS utility classes.
   - `src/components/about.tsx` — the camera controls, license and links shown in the About card.
@@ -93,7 +93,7 @@ A single Vite + React app, with no server runtime.
 - `src/lib/store/` — the Zustand store for UI and rendering-status state only.
 - `src/lib/hooks/` — custom React hooks, one per file.
 - `src/lib/webgl/` — the shader materials, texture helpers, scene packing with its BVH worker, and the path-tracing engine.
-- `infra/` — the Terraform for the S3 bucket, CloudFront distribution, DNS records and deploy role, with one state ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)). `infra/bootstrap/` holds the policies for the Terraform role, which is created by hand.
+- `infra/` — the Terraform for the site and scenes S3 buckets, CloudFront distribution, DNS records and deploy role, with one state ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)). `infra/bootstrap/` holds the policies for the Terraform role, which is created by hand.
 
 `@/*` maps to `src/*` in both `vite.config.ts` and `tsconfig.json`.
 
@@ -176,6 +176,7 @@ A single Vite + React app, with no server runtime.
 - **A push that changes only Markdown, `LICENSE` or files under `infra/` starts no `CI` run.** The `push` trigger in `.github/workflows/ci.yml` lists them under `paths-ignore`. The `pull_request` trigger has no filter, so a docs or infrastructure PR still gets a CI result. A push under `infra/` still starts the `Terraform` workflow.
 - **A file with a fixed name must stay out of `dist/assets/`.** The `deploy` job marks everything in that folder immutable for a year ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)).
 - **Change AWS resources only through `infra/`.** An edit in the console or with the AWS CLI is reverted by the next `apply` job in `.github/workflows/terraform.yml`. The Terraform role in `infra/bootstrap/permissions-policy.json` lists the only IAM objects it may change, so a new resource of another kind needs that policy extended by hand first ([Managing AWS with Terraform](RUNBOOK.md#3-managing-aws-with-terraform)).
+- **The bundled scenes load from `/scenes/` and are uploaded by hand to the bucket in `infra/scenes_bucket.tf`.** A fresh clone has none locally, so `pnpm dev` proxies `/scenes` to the deployed site in `vite.config.ts`. A new bucket needs `infra/bootstrap/permissions-policy.json` applied by hand before the `apply` job can create it ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)).
 - **Never remove the `aws_route53_record.cert_validation` record in `infra/certificate.tf`.** AWS Certificate Manager (ACM) needs it to renew the site's certificate, and the renewal fails without it.
 - **The `deploy` job's `id-token: write` permission is what lets it assume the AWS role.** Removing it fails the deploy at the credentials step.
 

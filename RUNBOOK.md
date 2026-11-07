@@ -65,7 +65,14 @@ A shader, BVH or scene change needs a look in the browser, because nothing else 
 
 A user opens their own scene at run time. The settings card shows each bundled scene as a picture card, plus an "Open .glb" card that opens the browser's file picker. A file opened this way is loaded in the browser and never uploaded.
 
-To add a bundled scene, export a glTF binary (`.glb`) from Blender with Draco compression on, positions at 16 bits and normals at 12 bits. Set each material's base color, metallic, roughness and (for lights) emission strength, and (for glass) transmission and IOR. Put the file in `public/` and a small picture of it in `public/thumbnails/`, then add an entry to `scenes` in `src/lib/scenes.ts` with the picture's URL and the camera's starting `view`.
+To add a bundled scene, export a glTF binary (`.glb`) from Blender with Draco compression on, positions at 16 bits and normals at 12 bits. Set each material's base color, metallic, roughness and (for lights) emission strength, and (for glass) transmission and IOR. Upload the file to the scenes bucket with your own AWS credentials, under the `scenes/` key prefix. The `deploy` job never uploads scenes, so this is a manual step. The upload sets a one-year `Cache-Control` header, so give a changed scene a new file name and update its `url` in `src/lib/scenes.ts`. Overwriting a file would leave browsers and CloudFront serving the old copy.
+
+```bash
+aws s3 cp suzanne.glb s3://webgl-ray-tracer.orky.net-scenes/scenes/suzanne.glb --content-type model/gltf-binary \
+  --cache-control 'public, max-age=31536000, immutable'
+```
+
+Put a small picture of the scene in `public/thumbnails/`, then add an entry to `scenes` in `src/lib/scenes.ts` with the scene's URL under `/scenes/`, the picture's URL and the camera's starting `view`. `pnpm dev` fetches `/scenes/*` from the deployed site through the proxy in `vite.config.ts`, so a scene must be uploaded before it shows locally.
 
 The Draco decoder in `public/draco/` is copied from `node_modules/three/examples/jsm/libs/draco/gltf/`. Copy the three files again after upgrading `three`, because the decoder must match the loader.
 
@@ -98,7 +105,7 @@ A merge that changes only Markdown, `LICENSE` or files under `infra/` starts no 
 
 ## 3. Managing AWS with Terraform
 
-`infra/` holds the AWS resources behind the site: the S3 bucket, the CloudFront distribution, the DNS records and the deploy role ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)). The first two steps are one-time setup, for recreating this stack in a fresh AWS account, which is also how a fork sets up its own. A fork first needs a Route 53 hosted zone for its domain in that account, with the domain delegated to it, and its own values for `domain_zone_name`, `hosted_zone_id` and `github_repo` in `infra/terraform.tfvars`. The site bucket is named after the hostname and S3 bucket names are global, so moving the same hostname to a new account needs the old bucket and DNS record deleted first. Do the steps in order before the `apply` job in `.github/workflows/terraform.yml` first runs, or it tries to create resources that already exist.
+`infra/` holds the AWS resources behind the site: the site and scenes S3 buckets, the CloudFront distribution, the DNS records and the deploy role ([Hosting & CI/CD](ARCHITECTURE.md#7-hosting--cicd)). The first two steps are one-time setup, for recreating this stack in a fresh AWS account, which is also how a fork sets up its own. A fork first needs a Route 53 hosted zone for its domain in that account, with the domain delegated to it, and its own values for `domain_zone_name`, `hosted_zone_id` and `github_repo` in `infra/terraform.tfvars`. The site bucket is named after the hostname and S3 bucket names are global, so moving the same hostname to a new account needs the old bucket and DNS record deleted first. Do the steps in order before the `apply` job in `.github/workflows/terraform.yml` first runs, or it tries to create resources that already exist.
 
 1. [Create the state bucket and the Terraform role](#31-create-the-state-bucket-and-the-terraform-role).
 2. [Apply for the first time](#32-apply-for-the-first-time).
