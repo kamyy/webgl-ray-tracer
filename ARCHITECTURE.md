@@ -106,7 +106,7 @@ Rendering runs until the sample count reaches the sample setting, which can chan
 
 ## 3. Scene loading & BVH
 
-The scene is a glTF 2.0 binary, bundled in `public/` or opened from the user's drive, loaded with three.js's `GLTFLoader`. Each mesh becomes one object, and a bounding volume hierarchy (BVH) is built for each object so the shader tests a ray against a few boxes before it tests any triangle.
+The scene is a glTF 2.0 binary, fetched from `/scenes/` or opened from the user's drive, loaded with three.js's `GLTFLoader`. Each mesh becomes one object, and a bounding volume hierarchy (BVH) is built for each object so the shader tests a ray against a few boxes before it tests any triangle.
 
 ```text
  main thread                                             Web Worker
@@ -184,6 +184,7 @@ Everything else lives in React Three Fiber and `PathTracer`: the camera, the ren
 The app is fully client-side rendered, with the default Vite React setup and no server-side rendering. `dist/` is static HTML, JavaScript, CSS and the GLSL shaders bundled into the JavaScript, so an S3 bucket behind a CloudFront distribution serves it with no server runtime.
 
 - **The `deploy` job sets a `Cache-Control` header on every upload, so there is no cache to invalidate.** CloudFront (AWS's content delivery network, or CDN) sits in front of the bucket. Files in `dist/assets/` have a content hash in their name, so they are marked immutable for a year and a new build uploads new names. Every other file keeps a fixed name, so it is marked `no-cache`, and CloudFront and browsers check the bucket for a newer copy before reusing it. A deploy is visible at once.
+- **The example `.glb` scenes live in a second, private S3 bucket, not in git.** CloudFront serves it at `/scenes/*` through the same Origin Access Control as the site bucket, and the bucket policy allows only this distribution to read it. A separate bucket keeps the scenes out of the `deploy` job's `--delete` sync, and the deploy role has no access to it, so a deploy cannot remove a scene. Only the owner's own AWS credentials can write to it. The cost is that anyone who loads the site can fetch `/scenes/*.glb`, because a browser app holds no credentials to prove otherwise.
 - **CI deploys on every push to `main` that changes built files.** The `build` job gates the `deploy` job, and the deploy assumes an AWS role through GitHub's OIDC token, so the repo stores no long-lived AWS keys.
 - **Terraform in `infra/` defines the AWS resources, and the `apply` job in `.github/workflows/terraform.yml` applies it on merge to `main`.** Every change is then reviewed in a pull request, and a resource deleted by hand is put back on the next apply. That matters most for the DNS record that AWS Certificate Manager (ACM) needs to renew the site's certificate, because a missing record makes the renewal fail and the certificate expire.
 - **Terraform keeps its state in its own S3 bucket, `webgl-ray-tracer-tfstate-<account id>`.** A dedicated bucket keeps the Terraform role away from the state of other projects. The bucket is created by hand once, because Terraform can't store state in a bucket that doesn't exist yet.

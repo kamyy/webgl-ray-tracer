@@ -33,3 +33,6 @@ pnpm-debug.log*
 
 # terraform
 /infra/.terraform/
+
+# example scenes live in S3 (RUNBOOK.md)
+/public/*.glb

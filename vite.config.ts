@@ -18,5 +18,9 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    // The bundled scenes are not in the repo. The dev server fetches them from the deployed site.
+    proxy: {
+      '/scenes': { target: 'https://webgl-ray-tracer.orky.net', changeOrigin: true },
+    },
   },
 })

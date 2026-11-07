@@ -1,23 +1,24 @@
 /**
  * The scenes the app can render, and where the camera starts in each.
  *
- * The two bundled scenes are glTF binaries in `public/`, each with a starting `view` that places the camera in the
- * scene's own units, where y is up. A scene the user opens from their own drive has no `view`, so `TracedScene` in
- * `src/components/viewport.tsx` frames it once it has loaded and its size is known.
+ * The two bundled scenes are glTF binaries in a private S3 bucket that CloudFront serves at `/scenes/`. Each has a
+ * starting `view` that places the camera in the scene's own units, where y is up. A scene the user opens from their own
+ * drive has no `view`, so `TracedScene` in `src/components/viewport.tsx` frames it once it has loaded and its size is
+ * known.
  */
 
 export const scenes: SceneInfo[] = [
   {
     id: 'suzanne',
     label: 'Suzanne',
-    url: '/suzanne.glb',
+    url: '/scenes/suzanne.glb',
     thumbnail: '/thumbnails/suzanne.jpg',
     view: { eye: [0, 2, 10], target: [0, 2, 0] },
   },
   {
     id: 'tricycle',
     label: 'Tricycle',
-    url: '/tricycle.glb',
+    url: '/scenes/tricycle.glb',
     thumbnail: '/thumbnails/tricycle.jpg',
     view: { eye: [0, 2, 10], target: [0, 1.5, 0] },
   },
