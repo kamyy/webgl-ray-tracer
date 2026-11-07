@@ -1,7 +1,8 @@
 # The CloudFront distribution in front of the site bucket, and the DNS record that points the hostname at it.
 #
 # Visitors reach the app through CloudFront, which serves the bucket's files over HTTPS and caches them for up to 24
-# hours. The distribution reads the bucket in infra/bucket.tf and uses the certificate in infra/certificate.tf.
+# hours. The distribution reads the site bucket in infra/bucket.tf, reads the scenes bucket in infra/scenes_bucket.tf
+# for /scenes/*, and uses the certificate in infra/certificate.tf.
 #
 # `local.hostname` is the site's address. The bucket, the distribution, the DNS record and the certificate all use it.
 
@@ -32,6 +33,35 @@ resource "aws_cloudfront_distribution" "site" {
     # Origin Access Control cannot follow.
     domain_name              = aws_s3_bucket.site.bucket_regional_domain_name
     origin_access_control_id = aws_cloudfront_origin_access_control.site.id
+  }
+
+  origin {
+    origin_id                = "S3-${local.hostname}-scenes"
+    domain_name              = aws_s3_bucket.scenes.bucket_regional_domain_name
+    origin_access_control_id = aws_cloudfront_origin_access_control.site.id
+  }
+
+  # The example scenes. The scenes bucket keeps them under a scenes/ key prefix, so the request path maps straight to
+  # the object key. The upload command in RUNBOOK.md sets a one-year Cache-Control header, so a changed scene must be
+  # uploaded under a new name.
+  ordered_cache_behavior {
+    path_pattern           = "/scenes/*"
+    target_origin_id       = "S3-${local.hostname}-scenes"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+    min_ttl                = 0
+    default_ttl            = 86400
+    max_ttl                = 31536000
+
+    forwarded_values {
+      query_string = false
+
+      cookies {
+        forward = "none"
+      }
+    }
   }
 
   default_cache_behavior {

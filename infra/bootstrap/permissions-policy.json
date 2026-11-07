@@ -32,6 +32,12 @@
       "Resource": "arn:aws:s3:::__HOSTNAME__"
     },
     {
+      "Sid": "ScenesBucketConfig",
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": "arn:aws:s3:::__SCENES_BUCKET__"
+    },
+    {
       "Sid": "SiteDistributionCreate",
       "Effect": "Allow",
       "Action": ["cloudfront:CreateDistributionWithTags", "cloudfront:TagResource"],
