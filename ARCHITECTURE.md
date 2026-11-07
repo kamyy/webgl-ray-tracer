@@ -11,6 +11,7 @@ Why the system is shaped this way: decisions, alternatives rejected, costs accep
 - [7. Hosting & CI/CD](#7-hosting--cicd)
 - [8. Styling](#8-styling)
 - [9. Layout](#9-layout)
+- [10. Ray tracing milestones](#10-ray-tracing-milestones)
 
 ---
 
@@ -21,7 +22,7 @@ The app is a path tracer. Each pixel fires many randomly scattered rays, and ave
 A fragment shader does the tracing because every pixel is independent, which is what a GPU can compute in parallel. The shader needs WebGL 2 for several features:
 
 - Loops without a compile-time bound, which the bounce and BVH traversal loops need.
-- Float texture formats, which hold the random seeds, mesh, material and BVH data.
+- Float texture formats, which hold the mesh, material and BVH data, and integer texture formats, which hold the random seeds.
 - Texture arrays, which hold one BVH per mesh.
 - `texelFetch`, which reads exact texels with no filtering.
 
@@ -100,7 +101,7 @@ A rendering tick is one run of the render loop, which the browser starts once pe
 
 - **Sample and timing counters reach the store about twice a second**, not every rendering tick, so React does not re-render at the display refresh rate.
 
-Rendering runs until the sample count reaches the sample setting, which can change mid-render without a reset. A camera or image setting change resets the sample count and restarts accumulation. `PathTracer` notices a camera change by comparing the camera's world matrix with the previous frame's, so it does not depend on which control moved the camera. While the camera is being dragged, only sample 1 renders, which trades image quality for a responsive drag.
+Rendering runs until the sample count reaches the sample setting, which can change mid-render without a reset. A camera or image setting change resets the sample count and restarts accumulation. `traceStep` in `src/lib/webgl/tracer.ts` notices a camera change by comparing the camera's world matrix with the one from the previous tracing step, so it does not depend on which control moved the camera. While the camera is being dragged, only sample 1 renders, which trades image quality for a responsive drag.
 
 ---
 
@@ -110,11 +111,11 @@ The scene is a glTF 2.0 binary, fetched from `/scenes/` or opened from the user'
 
 ```text
  main thread                                             Web Worker
- ┌──────────────────────────────┐   world-space triangles   ┌─────────────────────────────┐
+ ┌──────────────────────────────┐   world-space faces       ┌─────────────────────────────┐
  │ GLTFLoader                   │   (transferred, not       │ src/lib/webgl/bvhWorker.ts  │
  │   the chosen .glb file       ├──────────────────────────►│   SAH split, one tree       │
  │ usePackedScene ► packScene   │    copied)                │   per mesh                  │
- │   extractTriangles           │◄──────────────────────────┤   packFaces, packBvhNodes   │
+ │   extractFaces               │◄──────────────────────────┤   packFaces, packBvhNodes   │
  │   packMaterials              │   packed Float32Arrays    └─────────────────────────────┘
  └──────────────┬───────────────┘
                 │ uploaded as textures
@@ -129,7 +130,7 @@ The scene is a glTF 2.0 binary, fetched from `/scenes/` or opened from the user'
 ```
 
 - **The split uses the Surface Area Heuristic (SAH).** `BvhNode.findBestSplit` sweeps all three axes and every candidate position with prefix and suffix bounding-box sums. It picks the split minimizing `SA(left) * |left| + SA(right) * |right|`. This builds slower than a median split and gives faster traversal, which pays off because a tree is built once and traced millions of times.
-- **The tree is built in a Web Worker.** The SAH sweep sorts the faces three times per node, which takes seconds for a large mesh and freezes the page if it runs on the main thread. The main thread sends world-space triangles and receives the packed arrays as transferable buffers, so nothing is copied. The cost is that the BVH code can't import three.js or touch `window`, because the worker has neither.
+- **The tree is built in a Web Worker.** The SAH sweep sorts the faces three times per node, which takes seconds for a large mesh and freezes the page if it runs on the main thread. The main thread sends world-space faces and receives the packed arrays as transferable buffers, so nothing is copied. The cost is that the BVH code can't import three.js or touch `window`, because the worker has neither.
 - **Traversal uses a fixed-size stack, so tree depth is capped** at `bvhMaxStackSize`. GLSL has no recursion, and a dynamically sized stack isn't available.
 - **Faces, BVH nodes and materials are packed into `Float32Array`s** and uploaded as `TEXTURE_2D_ARRAY` and `TEXTURE_2D` textures, one array layer per mesh. `NEAREST` filtering with `texelFetch` reads the exact texel. Uniform buffers hold far less data than a texture.
 - **glTF was chosen because its material fields already describe what the shader needs.** `metalness` becomes the reflection ratio, `1 - roughness` the gloss, `transmission` and `ior` select and drive dielectric materials, and `emissive` times `emissiveIntensity` makes a light. The alternative, OBJ with MTL, has no standard fields for emission, glass or roughness, so a scene needed hardcoded material names. The cost is that a scene must be authored or exported with these PBR fields set.
@@ -164,7 +165,7 @@ A Zustand store (`src/lib/store/appStore.ts`) holds only state the UI displays: 
 
 ```text
  ┌────────────────────────────┐                                  ┌──────────────────────────────┐
- │ PathTracer                 │   counters, about 4 a second     │ useAppStore                  │
+ │ PathTracer                 │   counters, twice a second       │ useAppStore                  │
  │ and the tracing engine     ├─────────────────────────────────►│   cameraFov, numSamples      │
  │                            │                                  │   numBounces, shadingMethod  │
  │                            │◄─────────────────────────────────┤   samplesDone, the times     │
@@ -183,8 +184,8 @@ Everything else lives in React Three Fiber and `PathTracer`: the camera, the ren
 
 The app is fully client-side rendered, with the default Vite React setup and no server-side rendering. `dist/` is static HTML, JavaScript, CSS and the GLSL shaders bundled into the JavaScript, so an S3 bucket behind a CloudFront distribution serves it with no server runtime.
 
-- **The `deploy` job sets a `Cache-Control` header on every upload, so there is no cache to invalidate.** CloudFront (AWS's content delivery network, or CDN) sits in front of the bucket. Files in `dist/assets/` have a content hash in their name, so they are marked immutable for a year and a new build uploads new names. Every other file keeps a fixed name, so it is marked `no-cache`, and CloudFront and browsers check the bucket for a newer copy before reusing it. A deploy is visible at once.
 - **The example `.glb` scenes live in a second, private S3 bucket, not in git.** CloudFront serves it at `/scenes/*` through the same Origin Access Control as the site bucket, and the bucket policy allows only this distribution to read it. A separate bucket keeps the scenes out of the `deploy` job's `--delete` sync, and the deploy role has no access to it, so a deploy cannot remove a scene. Only the owner's own AWS credentials can write to it. The cost is that anyone who loads the site can fetch `/scenes/*.glb`, because a browser app holds no credentials to prove otherwise.
+- **The `deploy` job sets a `Cache-Control` header on every upload, so there is no cache to invalidate.** CloudFront (AWS's content delivery network, or CDN) sits in front of the bucket. Files in `dist/assets/` have a content hash in their name, so they are marked immutable for a year and a new build uploads new names. Every other file keeps a fixed name, so it is marked `no-cache`, and CloudFront and browsers check the bucket for a newer copy before reusing it. A deploy is visible at once.
 - **CI deploys on every push to `main` that changes built files.** The `build` job gates the `deploy` job, and the deploy assumes an AWS role through GitHub's OIDC token, so the repo stores no long-lived AWS keys.
 - **Terraform in `infra/` defines the AWS resources, and the `apply` job in `.github/workflows/terraform.yml` applies it on merge to `main`.** Every change is then reviewed in a pull request, and a resource deleted by hand is put back on the next apply. That matters most for the DNS record that AWS Certificate Manager (ACM) needs to renew the site's certificate, because a missing record makes the renewal fail and the certificate expire.
 - **Terraform keeps its state in its own S3 bucket, `webgl-ray-tracer-tfstate-<account id>`.** A dedicated bucket keeps the Terraform role away from the state of other projects. The bucket is created by hand once, because Terraform can't store state in a bucket that doesn't exist yet.
@@ -232,3 +233,50 @@ The render view fills the whole screen, and everything else floats over it.
 - **Resizing the window resizes the canvas and restarts the render.** The new size rebuilds the render targets and `PathTracer` restarts accumulation from zero samples. The resize is debounced by 200 ms, so dragging a window edge does not rebuild them on every rendering tick.
 - **The canvas renders at one pixel per CSS pixel on every device.** A phone's screen has a device pixel ratio near 3, so its picture is softer than a desktop one, but a higher ratio would multiply the work per sample. Rotating the phone resizes the view, which rebuilds the render targets and restarts accumulation. The resize is debounced by 200 ms so the rotation animation does not rebuild them repeatedly.
 - **GPU limits are checked against the loaded scene.** Phone GPUs often allow only 4096 or 8192 pixel textures, so the check compares the scene's real texture sizes with the GPU's limits, instead of demanding a fixed desktop-class minimum that would reject most phones. A failure is shown as a sentence in the view, because a blank canvas gives no hint. A lost WebGL context, which mobile GPUs trigger when a shader runs too long, shows a notice and restarts accumulation when the context returns.
+
+---
+
+## 10. Ray tracing milestones
+
+The milestones follow Peter Shirley's three-book series [_Ray Tracing in One Weekend_](https://raytracing.github.io/), which adds one rendering feature at a time. A struck-through milestone is implemented. The others are still to do.
+
+### 10.1 Book 1: Ray Tracing in One Weekend
+
+The minimal path tracer.
+
+| Milestone                                                                     | Notes                                                                                    |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| ~~Camera ray per pixel with random jitter, averaged over many samples~~       | Samples accumulate progressively in a float texture.                                     |
+| ~~Diffuse scattering with a bounce limit~~                                    | `randPosInUnitSphere` in `src/shaders/pathTrace.frag.glsl` picks the scatter direction.  |
+| ~~Metal with fuzz~~                                                           | `reflectionRatio` and `reflectionGloss` blend glossy reflection with diffuse scattering. |
+| ~~Dielectrics: refraction, total internal reflection, Schlick approximation~~ | `rayBounceOffDielectricSurface` in `src/shaders/pathTrace.frag.glsl`.                    |
+| ~~Adjustable field of view~~                                                  | The `cameraFov` setting.                                                                 |
+| ~~Camera position and orientation~~                                           | The orbit controls move the camera.                                                      |
+| ~~Intersectable objects~~                                                     | Triangles from glTF meshes replace the book's spheres.                                   |
+| ~~Gamma correction~~                                                          | `src/shaders/display.frag.glsl` gamma-encodes the average with a square root.            |
+| Defocus blur (depth of field)                                                 | The camera is a pinhole.                                                                 |
+
+### 10.2 Book 2: Ray Tracing: The Next Week
+
+Speed and a wider range of effects.
+
+| Milestone                                 | Notes                                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| ~~Bounding volume hierarchy (BVH)~~       | Built in a Web Worker and walked with an explicit stack ([Scene loading & BVH](#3-scene-loading--bvh)). |
+| ~~Emissive materials~~                    | A ray that hits an emissive surface ends.                                                               |
+| Motion blur                               | Needs a random time per ray and moving objects.                                                         |
+| Textures: checker, image and Perlin noise | Needs the glTF texture coordinates.                                                                     |
+| Instancing                                | Each mesh has its own BVH, and the scene is flattened to world-space faces.                             |
+| Volumes: smoke and fog                    | Needs a constant-density medium with random scatter distance.                                           |
+
+### 10.3 Book 3: Ray Tracing: The Rest of Your Life
+
+Noise reduction through principled sampling.
+
+| Milestone                                                         | Notes                                                               |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Light sampling                                                    | Rays reach a light only by chance, so small lights converge slowly. |
+| Importance sampling with probability density functions (PDFs)     | Samples are not weighted by a density.                              |
+| Mixture PDFs                                                      | Blends scatter sampling with light sampling.                        |
+| Orthonormal basis (ONB) for sampling around a surface normal      | Needed by cosine-weighted diffuse sampling.                         |
+| Material refactor around PDFs and a `scatter` and `emitted` split | `pathTrace` multiplies albedos along the path instead.              |

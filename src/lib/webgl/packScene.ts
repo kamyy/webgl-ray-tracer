@@ -38,7 +38,7 @@ import {
 } from './sceneLayout'
 
 // The most memory the packed face and BVH arrays may take. Both are padded to the largest mesh in the scene, so a scene
-// with many meshes and one huge mesh costs far more than its triangle count suggests.
+// with many meshes and one huge mesh costs far more than its face count suggests.
 const maxPackedBytes = 1024 * 1024 * 1024
 
 export interface PackedScene {
@@ -48,54 +48,54 @@ export interface PackedScene {
   materialsTexture: DataTexture
 }
 
-// A glTF mesh without normals is flat shaded, so each corner takes the normal of its triangle.
-function writeFlatNormals(positions: Float32Array, normals: Float32Array) {
+// A glTF mesh without normals is flat shaded, so each vertex takes the normal of its face.
+function writeFlatNormals(pos: Float32Array, nrm: Float32Array) {
   const p0 = new Vector3()
   const p1 = new Vector3()
   const p2 = new Vector3()
-  for (let corner = 0; corner < positions.length; corner += 9) {
-    p0.fromArray(positions, corner)
-    p1.fromArray(positions, corner + 3)
-    p2.fromArray(positions, corner + 6)
+  for (let faceStartIndex = 0; faceStartIndex < pos.length; faceStartIndex += 9) {
+    p0.fromArray(pos, faceStartIndex)
+    p1.fromArray(pos, faceStartIndex + 3)
+    p2.fromArray(pos, faceStartIndex + 6)
     p1.sub(p0).cross(p2.sub(p0)).normalize()
     for (let vertex = 0; vertex < 3; ++vertex) {
-      p1.toArray(normals, corner + vertex * 3)
+      p1.toArray(nrm, faceStartIndex + vertex * 3)
     }
   }
 }
 
-// Turns a mesh into world-space triangles for the BVH worker, three corners of x, y, z per face.
-function extractTriangles(mesh: Mesh, materialIndex: number): BvhRequestMesh {
-  const matrix = mesh.matrixWorld
-  const normalMatrix = new Matrix3().getNormalMatrix(matrix)
-  const positionAttribute = mesh.geometry.getAttribute('position')
-  const normalAttribute = mesh.geometry.getAttribute('normal')
+// Turns a mesh into world-space faces for the BVH worker, three verts of x, y, z per face.
+function extractFaces(mesh: Mesh, materialIndex: number): BvhRequestMesh {
+  const mtx = mesh.matrixWorld
+  const nrmMtx = new Matrix3().getNormalMatrix(mtx)
+  const posAttrib = mesh.geometry.getAttribute('position')
+  const nrmAttrib = mesh.geometry.getAttribute('normal')
   const indices = mesh.geometry.getIndex()
-  const numCorners = indices ? indices.count : positionAttribute.count
+  const numFaceVerts = indices ? indices.count : posAttrib.count
 
-  const positions = new Float32Array(numCorners * 3)
-  const normals = new Float32Array(numCorners * 3)
-  const vector = new Vector3()
-  for (let corner = 0; corner < numCorners; ++corner) {
-    const vertex = indices ? indices.getX(corner) : corner
-    vector
-      .fromBufferAttribute(positionAttribute, vertex)
-      .applyMatrix4(matrix)
-      .toArray(positions, corner * 3)
-    if (normalAttribute) {
-      vector
-        .fromBufferAttribute(normalAttribute, vertex)
-        .applyMatrix3(normalMatrix)
+  const pos = new Float32Array(numFaceVerts * 3)
+  const nrm = new Float32Array(numFaceVerts * 3)
+  const vec = new Vector3()
+  for (let faceVert = 0; faceVert < numFaceVerts; ++faceVert) {
+    const meshVert = indices ? indices.getX(faceVert) : faceVert
+    vec
+      .fromBufferAttribute(posAttrib, meshVert)
+      .applyMatrix4(mtx)
+      .toArray(pos, faceVert * 3)
+    if (nrmAttrib) {
+      vec
+        .fromBufferAttribute(nrmAttrib, meshVert)
+        .applyMatrix3(nrmMtx)
         .normalize()
-        .toArray(normals, corner * 3)
+        .toArray(nrm, faceVert * 3)
     }
   }
 
-  if (!normalAttribute) {
-    writeFlatNormals(positions, normals)
+  if (!nrmAttrib) {
+    writeFlatNormals(pos, nrm)
   }
 
-  return { positions, normals, materialIndex }
+  return { positions: pos, normals: nrm, materialIndex }
 }
 
 // Builds the BVH on a worker thread, so a large scene does not freeze the page.
@@ -164,15 +164,15 @@ function checkMaterial(material: Mesh['material']) {
 }
 
 // Stops a scene whose padded arrays would be too big to allocate. The BVH has at most two nodes per face.
-function checkPackedSize(triangles: BvhRequestMesh[]) {
-  const largestMesh = triangles.reduce((most, mesh) => Math.max(most, mesh.positions.length / 9), 0)
+function checkPackedSize(meshFaces: BvhRequestMesh[]) {
+  const largestMesh = meshFaces.reduce((most, mesh) => Math.max(most, mesh.positions.length / 9), 0)
   const paddedFaces = Math.ceil(largestMesh / facesPerRow) * facesPerRow
   const paddedNodes = Math.ceil((largestMesh * 2) / bvhNodesPerRow) * bvhNodesPerRow
-  const bytes = 4 * triangles.length * (paddedFaces * numFloatsPerFace + paddedNodes * numFloatsPerBvhNode)
+  const bytes = 4 * meshFaces.length * (paddedFaces * numFloatsPerFace + paddedNodes * numFloatsPerBvhNode)
   if (bytes > maxPackedBytes) {
     const megabytes = Math.round(bytes / (1024 * 1024))
     throw new Error(
-      `the scene is too large to render. Its ${triangles.length} meshes are each padded to the largest one, ` +
+      `the scene is too large to render. Its ${meshFaces.length} meshes are each padded to the largest one, ` +
         `${Math.round(largestMesh)} triangles, which needs about ${megabytes} MB. Merge small meshes or reduce the biggest one.`,
     )
   }
@@ -193,16 +193,16 @@ export async function packScene(root: Object3D): Promise<PackedScene> {
   }
 
   const materials: MeshPhysicalMaterial[] = []
-  const triangles = meshes.map(mesh => {
+  const meshFaces = meshes.map(mesh => {
     checkMaterial(mesh.material)
     const material = mesh.material as MeshPhysicalMaterial
     if (!materials.includes(material)) {
       materials.push(material)
     }
-    return extractTriangles(mesh, materials.indexOf(material))
+    return extractFaces(mesh, materials.indexOf(material))
   })
-  checkPackedSize(triangles)
-  const bvh = await buildBvh({ meshes: triangles })
+  checkPackedSize(meshFaces)
+  const bvh = await buildBvh({ meshes: meshFaces })
 
   // Traversal pops a node and pushes both children, so a node split at depth d leaves d + 2 entries on the shader's
   // stack. A deeper tree would overflow it and corrupt the render without any error.

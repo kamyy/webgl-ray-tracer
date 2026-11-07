@@ -10,8 +10,9 @@
 // fixed-size array with no bounds checking, so a tree deeper than this silently corrupts the render.
 export const bvhMaxStackSize = 24
 
-// A face is eight texels: the face normal, three vertex positions, three vertex normals and the material index. Each
-// texel is three floats, so a face is 24 floats.
+// A face is eight texels: the face normal, three vertex positions and three vertex normals, then a texel that holds
+// the material index in its first float and leaves the other two unused. Each texel is three floats, so a face is
+// 24 floats.
 export const numTexelsPerFace = 8 // RGB texels. Must equal TEXELS_PER_FACE in src/shaders/pathTrace.frag.glsl.
 export const numFloatsPerFace = 24
 
