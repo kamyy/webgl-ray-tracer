@@ -8,7 +8,7 @@
  */
 import { PackedScene } from './packScene'
 
-const numSamplerTextureUnits = 5 // random seeds, faces, BVH nodes, materials and the accumulated color
+const numSamplerTextureUnits = 6 // random seeds, faces, BVH nodes, materials, lights and the accumulated color
 
 export function supportsWebGL2(): boolean {
   return document.createElement('canvas').getContext('webgl2') !== null
@@ -43,11 +43,13 @@ export function checkSceneLimits(
     packed.facesTexture.image.width,
     packed.bvhTexture.image.width,
     packed.materialsTexture.image.width,
+    packed.lightsTexture.image.width,
   )
   const tallest = Math.max(
     packed.facesTexture.image.height,
     packed.bvhTexture.image.height,
     packed.materialsTexture.image.height,
+    packed.lightsTexture.image.height,
     height,
   )
 

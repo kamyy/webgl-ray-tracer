@@ -28,6 +28,7 @@ export function createPathTraceMaterial(): RawShaderMaterial {
       u_half_wd: { value: 0 },
       u_half_ht: { value: 0 },
       u_num_objects: { value: 0 },
+      u_num_lights: { value: 0 },
       u_sample_number: { value: 0 },
       u_num_bounces: { value: 0 },
       u_shading_method: { value: 0 },
@@ -38,6 +39,7 @@ export function createPathTraceMaterial(): RawShaderMaterial {
       u_face_sampler: { value: null as Texture | null },
       u_bvh_sampler: { value: null as Texture | null },
       u_material_sampler: { value: null as Texture | null },
+      u_light_sampler: { value: null as Texture | null },
     },
   })
 }

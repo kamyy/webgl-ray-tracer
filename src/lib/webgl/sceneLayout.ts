@@ -34,6 +34,15 @@ export const bvhNodesPerRow = 64
 export const numTexelsPerMaterial = 2 // RGBA texels
 export const numFloatsPerMaterial = 8
 
+// A light is one emissive face, three RGBA texels: the first vertex with the total area of every light up to and
+// including this one in `w`, the second vertex, and the third vertex with the face's material index in `w`. The shader
+// reads the emission color from that material. Each texel is four floats, so a light is 12 floats.
+export const numTexelsPerLight = 3 // RGBA texels. Must equal TEXELS_PER_LIGHT in src/shaders/pathTrace.frag.glsl.
+export const numFloatsPerLight = 12
+
+// Lights wrap onto rows the same way faces do. Must equal LIGHTS_PER_ROW in src/shaders/pathTrace.frag.glsl.
+export const lightsPerRow = 64
+
 // The material classes the shader branches on. The values must equal the `*_MATERIAL` constants in the shader.
 export const EMISSIVE_MATERIAL = 0
 export const REFLECTIVE_MATERIAL = 1
