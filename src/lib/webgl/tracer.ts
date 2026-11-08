@@ -227,6 +227,7 @@ function drawBand(state: TracerState, inputs: TracerInputs): number {
   uniforms.u_half_wd.value = width * 0.5
   uniforms.u_half_ht.value = height * 0.5
   uniforms.u_num_objects.value = packed.numObjects
+  uniforms.u_num_lights.value = packed.numLights
   uniforms.u_sample_number.value = state.samplesDone + 1
   uniforms.u_num_bounces.value = state.samplesDone === 0 ? 1 : state.numBounces
   uniforms.u_shading_method.value = shadingMethod
@@ -237,6 +238,7 @@ function drawBand(state: TracerState, inputs: TracerInputs): number {
   uniforms.u_face_sampler.value = packed.facesTexture
   uniforms.u_bvh_sampler.value = packed.bvhTexture
   uniforms.u_material_sampler.value = packed.materialsTexture
+  uniforms.u_light_sampler.value = packed.lightsTexture
 
   // Shader triangle: trace the band and add it to the running sum.
   gl.setRenderTarget(accumulation)

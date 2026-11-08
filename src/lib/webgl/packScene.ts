@@ -28,11 +28,14 @@ import {
   DIELECTRIC_MATERIAL,
   EMISSIVE_MATERIAL,
   facesPerRow,
+  lightsPerRow,
   numFloatsPerBvhNode,
   numFloatsPerFace,
+  numFloatsPerLight,
   numFloatsPerMaterial,
   numTexelsPerBvhNode,
   numTexelsPerFace,
+  numTexelsPerLight,
   numTexelsPerMaterial,
   REFLECTIVE_MATERIAL,
 } from './sceneLayout'
@@ -46,6 +49,8 @@ export interface PackedScene {
   facesTexture: DataArrayTexture
   bvhTexture: DataArrayTexture
   materialsTexture: DataTexture
+  lightsTexture: DataTexture
+  numLights: number
 }
 
 // A glTF mesh without normals is flat shaded, so each vertex takes the normal of its face.
@@ -117,6 +122,11 @@ function buildBvh(request: BvhRequest): Promise<BvhResult> {
   })
 }
 
+// A material with a non-zero emissive color is a light.
+function isEmissive(material: MeshPhysicalMaterial): boolean {
+  return material.emissive.r > 0 || material.emissive.g > 0 || material.emissive.b > 0
+}
+
 // Writes the texels the shader reads for each material, straight from the three.js material.
 function packMaterials(materials: MeshPhysicalMaterial[]): Float32Array {
   const data = new Float32Array(numFloatsPerMaterial * materials.length)
@@ -125,7 +135,7 @@ function packMaterials(materials: MeshPhysicalMaterial[]): Float32Array {
     let materialClass = REFLECTIVE_MATERIAL
     let albedo = material.color.clone()
 
-    if (material.emissive.r > 0 || material.emissive.g > 0 || material.emissive.b > 0) {
+    if (isEmissive(material)) {
       materialClass = EMISSIVE_MATERIAL
       albedo = material.emissive.clone().multiplyScalar(material.emissiveIntensity)
     } else if (material.transmission > 0.5) {
@@ -151,6 +161,53 @@ function setExactTexels(texture: Texture) {
   texture.magFilter = NearestFilter
   texture.generateMipmaps = false
   texture.needsUpdate = true
+}
+
+// Writes one light per face of every emissive mesh. The first texel's `w` holds the running total of the areas, which
+// the shader searches to pick a light with a chance in proportion to its area.
+function packLights(meshFaces: BvhRequestMesh[], materials: MeshPhysicalMaterial[]): Float32Array {
+  const lights: number[] = []
+  const p0 = new Vector3()
+  const p1 = new Vector3()
+  const p2 = new Vector3()
+  const edge1 = new Vector3()
+  const edge2 = new Vector3()
+  let totalArea = 0
+
+  for (const mesh of meshFaces) {
+    if (!isEmissive(materials[mesh.materialIndex])) {
+      continue
+    }
+
+    for (let start = 0; start < mesh.positions.length; start += 9) {
+      p0.fromArray(mesh.positions, start)
+      p1.fromArray(mesh.positions, start + 3)
+      p2.fromArray(mesh.positions, start + 6)
+      const area = 0.5 * edge1.subVectors(p1, p0).cross(edge2.subVectors(p2, p0)).length()
+      if (area <= 0) {
+        continue
+      }
+
+      totalArea += area
+      lights.push(p0.x, p0.y, p0.z, totalArea)
+      lights.push(p1.x, p1.y, p1.z, 0)
+      lights.push(p2.x, p2.y, p2.z, mesh.materialIndex)
+    }
+  }
+
+  return new Float32Array(lights)
+}
+
+// The lights texture, with a placeholder row when the scene has no light, because the shader's sampler needs a texture.
+function createLightsTexture(lights: Float32Array): DataTexture {
+  const rows = Math.max(1, Math.ceil(lights.length / numFloatsPerLight / lightsPerRow))
+  const data = new Float32Array(rows * lightsPerRow * numFloatsPerLight)
+  data.set(lights)
+
+  const texture = new DataTexture(data, numTexelsPerLight * lightsPerRow, rows, RGBAFormat, FloatType)
+  texture.internalFormat = 'RGBA32F'
+  setExactTexels(texture)
+  return texture
 }
 
 // Rejects materials the shader cannot light, with a message that says how to fix the file. `GLTFLoader` makes a basic
@@ -202,6 +259,9 @@ export async function packScene(root: Object3D): Promise<PackedScene> {
     return extractFaces(mesh, materials.indexOf(material))
   })
   checkPackedSize(meshFaces)
+
+  // The lights are read before `buildBvh`, because sending the faces to the worker empties these arrays.
+  const lights = packLights(meshFaces, materials)
   const bvh = await buildBvh({ meshes: meshFaces })
 
   // Traversal pops a node and pushes both children, so a node split at depth d leaves d + 2 entries on the shader's
@@ -246,5 +306,12 @@ export async function packScene(root: Object3D): Promise<PackedScene> {
   materialsTexture.internalFormat = 'RGBA32F'
   setExactTexels(materialsTexture)
 
-  return { numObjects: bvh.numObjects, facesTexture, bvhTexture, materialsTexture }
+  return {
+    numObjects: bvh.numObjects,
+    facesTexture,
+    bvhTexture,
+    materialsTexture,
+    lightsTexture: createLightsTexture(lights),
+    numLights: lights.length / numFloatsPerLight,
+  }
 }

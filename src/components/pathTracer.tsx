@@ -78,6 +78,7 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
       packed?.facesTexture.dispose()
       packed?.bvhTexture.dispose()
       packed?.materialsTexture.dispose()
+      packed?.lightsTexture.dispose()
     }
   }, [packed])
 
