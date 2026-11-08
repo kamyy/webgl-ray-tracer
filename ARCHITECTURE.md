@@ -244,17 +244,17 @@ The milestones follow Peter Shirley's three-book series [_Ray Tracing in One Wee
 
 The minimal path tracer.
 
-| Milestone                                                                     | Notes                                                                                    |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| ~~Camera ray per pixel with random jitter, averaged over many samples~~       | Samples accumulate progressively in a float texture.                                     |
-| ~~Diffuse scattering with a bounce limit~~                                    | `randPosInUnitSphere` in `src/shaders/pathTrace.frag.glsl` picks the scatter direction.  |
-| ~~Metal with fuzz~~                                                           | `reflectionRatio` and `reflectionGloss` blend glossy reflection with diffuse scattering. |
-| ~~Dielectrics: refraction, total internal reflection, Schlick approximation~~ | `rayBounceOffDielectricSurface` in `src/shaders/pathTrace.frag.glsl`.                    |
-| ~~Adjustable field of view~~                                                  | The `cameraFov` setting.                                                                 |
-| ~~Camera position and orientation~~                                           | The orbit controls move the camera.                                                      |
-| ~~Intersectable objects~~                                                     | Triangles from glTF meshes replace the book's spheres.                                   |
-| ~~Gamma correction~~                                                          | `src/shaders/display.frag.glsl` gamma-encodes the average with a square root.            |
-| Defocus blur (depth of field)                                                 | The camera is a pinhole.                                                                 |
+| Milestone                                                                     | Notes                                                                                                                             |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| ~~Camera ray per pixel with random jitter, averaged over many samples~~       | Samples accumulate progressively in a float texture.                                                                              |
+| ~~Diffuse scattering with a bounce limit~~                                    | `randPosInUnitSphere` in `src/shaders/pathTrace.frag.glsl` picks the scatter direction.                                           |
+| ~~Metal with fuzz~~                                                           | `reflectionRatio` and `reflectionGloss` blend glossy reflection with diffuse scattering.                                          |
+| ~~Dielectrics: refraction, total internal reflection, Schlick approximation~~ | `rayBounceOffDielectricSurface` in `src/shaders/pathTrace.frag.glsl`.                                                             |
+| ~~Adjustable field of view~~                                                  | The `cameraFov` setting.                                                                                                          |
+| ~~Camera position and orientation~~                                           | The orbit controls move the camera.                                                                                               |
+| ~~Intersectable objects~~                                                     | Triangles from glTF meshes replace the book's spheres.                                                                            |
+| Gamma correction                                                              | `src/shaders/display.frag.glsl` outputs the linear average. The bundled scenes' materials and lights are tuned for linear output. |
+| Defocus blur (depth of field)                                                 | The camera is a pinhole.                                                                                                          |
 
 ### 10.2 Book 2: Ray Tracing: The Next Week
 
