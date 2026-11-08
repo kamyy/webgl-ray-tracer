@@ -116,13 +116,14 @@ The scene is a glTF 2.0 binary, fetched from `/scenes/` or opened from the user'
  │   the chosen .glb file       ├──────────────────────────►│   SAH split, one tree       │
  │ usePackedScene ► packScene   │    copied)                │   per mesh                  │
  │   extractFaces               │◄──────────────────────────┤   packFaces, packBvhNodes   │
- │   packMaterials              │   packed Float32Arrays    └─────────────────────────────┘
+ │   packMaterials, packLights  │   packed Float32Arrays    └─────────────────────────────┘
  └──────────────┬───────────────┘
                 │ uploaded as textures
                 ▼
  ┌─────────────────────────────────────────────────────────────┐
  │ facesTexture and bvhTexture: one array layer per mesh       │
  │ materialsTexture: one row per material                      │
+ │ lightsTexture: one entry per emissive face                  │
  └──────────────────────────────┬──────────────────────────────┘
                                 │ texelFetch
                                 ▼
@@ -132,7 +133,7 @@ The scene is a glTF 2.0 binary, fetched from `/scenes/` or opened from the user'
 - **The split uses the Surface Area Heuristic (SAH).** `BvhNode.findBestSplit` sweeps all three axes and every candidate position with prefix and suffix bounding-box sums. It picks the split minimizing `SA(left) * |left| + SA(right) * |right|`. This builds slower than a median split and gives faster traversal, which pays off because a tree is built once and traced millions of times.
 - **The tree is built in a Web Worker.** The SAH sweep sorts the faces three times per node, which takes seconds for a large mesh and freezes the page if it runs on the main thread. The main thread sends world-space faces and receives the packed arrays as transferable buffers, so nothing is copied. The cost is that the BVH code can't import three.js or touch `window`, because the worker has neither.
 - **Traversal uses a fixed-size stack, so tree depth is capped** at `bvhMaxStackSize`. GLSL has no recursion, and a dynamically sized stack isn't available.
-- **Faces, BVH nodes and materials are packed into `Float32Array`s** and uploaded as `TEXTURE_2D_ARRAY` and `TEXTURE_2D` textures, one array layer per mesh. `NEAREST` filtering with `texelFetch` reads the exact texel. Uniform buffers hold far less data than a texture.
+- **Faces, BVH nodes, materials and lights are packed into `Float32Array`s** and uploaded as `TEXTURE_2D_ARRAY` and `TEXTURE_2D` textures, one array layer per mesh. A light is one face of an emissive mesh. `packLights` writes the list before the faces go to the worker, because sending them empties the position arrays. `NEAREST` filtering with `texelFetch` reads the exact texel. Uniform buffers hold far less data than a texture.
 - **glTF was chosen because its material fields already describe what the shader needs.** `metalness` becomes the reflection ratio, `1 - roughness` the gloss, `transmission` and `ior` select and drive dielectric materials, and `emissive` times `emissiveIntensity` makes a light. The alternative, OBJ with MTL, has no standard fields for emission, glass or roughness, so a scene needed hardcoded material names. The cost is that a scene must be authored or exported with these PBR fields set.
 - **The geometry is Draco-compressed** at 16-bit positions and 12-bit normals. The default quantization is coarse enough to show as faceting on smooth surfaces and as gaps between triangles. `DRACOLoader` decodes the file in a web worker. The decoder is served from `public/draco/` instead of a CDN, so the app works offline and makes no third-party request.
 
@@ -144,9 +145,12 @@ The scene is a glTF 2.0 binary, fetched from `/scenes/` or opened from the user'
 
 - **The random number generator combines three Tausworthe steps with a linear congruential generator.** Each pixel is seeded from the texture that `createRandomTexture` in `src/lib/webgl/randomTexture.ts` builds, and perturbed by the sample number, so every sample uses different random numbers and the average converges.
 - **`rayIntersectBVH` walks every object's tree with an explicit stack.** It skips any subtree whose entry distance is farther than the nearest hit found so far.
-- **`pathTrace` unrolls the recursive algorithm into a loop** with a fixed-size stack, `RAY_BOUNCE_MAX_STACK_SIZE`, because GLSL can't recurse. It stops at an emissive material.
-  - Reflective surfaces (`rayBounceOffReflectiveSurface`) blend glossy reflection with diffuse scattering through `reflectionRatio` and `reflectionGloss`.
+- **`pathTrace` unrolls the recursive algorithm into a loop**, because GLSL can't recurse. It keeps a running `throughput` and adds light to `radiance`, and it stops at an emissive material. A path that runs out of bounces adds the albedo of the surface it ended on, an ambient glow that lights areas no ray reaches a light from.
+  - Reflective surfaces pick the mirror lobe (`rayBounceOffMirror`) or the diffuse lobe (`rayBounceOffDiffuse`) with the chance `reflectionRatio`, and `reflectionGloss` sets how sharp the mirror lobe is.
   - Dielectric surfaces (`rayBounceOffDielectricSurface`) use the Schlick approximation to choose between reflecting and refracting.
+- **`sampleDirectLight` samples the lights at every diffuse hit that can still bounce.** It picks an emissive face with a chance in proportion to its area, picks a uniform point on it and casts a shadow ray. Most diffuse hits then see the light directly instead of finding it by chance, so small lights converge much faster.
+  - A ray that reaches a light right after a diffuse bounce adds no emission, because `sampleDirectLight` already counted that light. Emission still counts for the camera ray and after a mirror or glass bounce, which a shadow ray cannot follow. This avoids multiple importance sampling (MIS) at the cost of noisier paths that reach a light through a mirror.
+  - `sampleDirectLight` weights the light by the density of `rayBounceOffDiffuse`, `2 * cos(theta)^3 / PI`, so the lit areas keep the brightness the bounce rays give. A correct cosine-weighted bounce has density `cos(theta) / PI`, and that term changes with it.
 - **Flat shading uses the face normal. Phong shading interpolates the vertex normals** with barycentric coordinates. `u_shading_method` selects between them.
 
 ---
@@ -273,10 +277,10 @@ Speed and a wider range of effects.
 
 Noise reduction through principled sampling.
 
-| Milestone                                                         | Notes                                                               |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Light sampling                                                    | Rays reach a light only by chance, so small lights converge slowly. |
-| Importance sampling with probability density functions (PDFs)     | Samples are not weighted by a density.                              |
-| Mixture PDFs                                                      | Blends scatter sampling with light sampling.                        |
-| Orthonormal basis (ONB) for sampling around a surface normal      | Needed by cosine-weighted diffuse sampling.                         |
-| Material refactor around PDFs and a `scatter` and `emitted` split | `pathTrace` multiplies albedos along the path instead.              |
+| Milestone                                                         | Notes                                                     |
+| ----------------------------------------------------------------- | --------------------------------------------------------- |
+| ~~Light sampling~~                                                | `sampleDirectLight` in `src/shaders/pathTrace.frag.glsl`. |
+| Importance sampling with probability density functions (PDFs)     | Samples are not weighted by a density.                    |
+| Mixture PDFs                                                      | Blends scatter sampling with light sampling.              |
+| Orthonormal basis (ONB) for sampling around a surface normal      | Needed by cosine-weighted diffuse sampling.               |
+| Material refactor around PDFs and a `scatter` and `emitted` split | `pathTrace` multiplies albedos along the path instead.    |

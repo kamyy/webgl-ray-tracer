@@ -1,6 +1,6 @@
 ---
 name: shader-layout-sync
-description: Keep the TypeScript scene packer and the GLSL path tracer in agreement. Use whenever src/lib/webgl/packScene.ts, src/lib/webgl/sceneLayout.ts, src/lib/webgl/bvhWorker.ts or src/shaders/pathTrace.frag.glsl is edited, especially bvhMaxStackSize, BVH_MAX_STACK_SIZE, numFloatsPerFace, numFloatsPerBvhNode, numFloatsPerMaterial or any *_INDEX constant.
+description: Keep the TypeScript scene packer and the GLSL path tracer in agreement. Use whenever src/lib/webgl/packScene.ts, src/lib/webgl/sceneLayout.ts, src/lib/webgl/bvhWorker.ts or src/shaders/pathTrace.frag.glsl is edited, especially bvhMaxStackSize, BVH_MAX_STACK_SIZE, numFloatsPerFace, numFloatsPerBvhNode, numFloatsPerMaterial, numFloatsPerLight or any *_INDEX constant.
 ---
 
 # Shader layout sync
@@ -13,4 +13,5 @@ The two files define the same data layout and the same stack depth from both sid
 2. **Face layout.** `numFloatsPerFace` and the order in which `packFaces` in `src/lib/webgl/bvhWorker.ts` writes its texels match `FACE_NRM_INDEX`, `VERTEX_*_POS_INDEX`, `VERTEX_*_NRM_INDEX` and `FACE_MATERIAL_INDEX`.
 3. **BVH layout.** `numFloatsPerBvhNode` and the order in which `packBvhNodes` in `src/lib/webgl/bvhWorker.ts` writes its texels match `BVH_NODE_MIN_BOUNDS_INDEX`, `BVH_NODE_MAX_BOUNDS_INDEX` and `BVH_NODE_PAYLOAD_INDEX`.
 4. **Material layout.** `numFloatsPerMaterial` and the order in which `packMaterials` in `src/lib/webgl/packScene.ts` writes its texels match `MATERIAL_ALBEDO_INDEX` and `MATERIAL_ATTRIB_INDEX`.
-5. **Render check.** Follow [Checking a render](../../../RUNBOOK.md#14-checking-a-render) and watch for a console warning.
+5. **Light layout.** `numFloatsPerLight` and the order in which `packLights` in `src/lib/webgl/packScene.ts` writes its texels match the texel numbers that `sampleDirectLight` in `src/shaders/pathTrace.frag.glsl` reads, and `lightsPerRow` and `numTexelsPerLight` equal `LIGHTS_PER_ROW` and `TEXELS_PER_LIGHT`.
+6. **Render check.** Follow [Checking a render](../../../RUNBOOK.md#14-checking-a-render) and watch for a console warning.
