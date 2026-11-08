@@ -41,6 +41,7 @@ struct Material {
 // --- constants -----------------------------------------------------------------------
 const float MAX_FLT = intBitsToFloat(2139095039);
 const float EPSILON = 0.001;
+const float PI = 3.14159265359;
 
 const int FLAT_SHADING = 0;
 
@@ -73,9 +74,10 @@ const int TEXELS_PER_BVH_NODE = 3;
 const int MATERIAL_ALBEDO_INDEX = 0;
 const int MATERIAL_ATTRIB_INDEX = 1;
 
-// The bounce loop stores a hit at index `i` for every `i` up to `u_num_bounces`, so the stacks hold one more entry than
-// the largest Bounces setting (`maxBounces` in `src/components/renderSettings.tsx`).
-const int RAY_BOUNCE_MAX_STACK_SIZE = 17;
+// Lights wrap onto rows of this many entries, like faces. Both constants must equal their counterparts in
+// `src/lib/webgl/sceneLayout.ts`: `lightsPerRow` and `numTexelsPerLight`.
+const int LIGHTS_PER_ROW = 64;
+const int TEXELS_PER_LIGHT = 3;
 
 // --- globals -------------------------------------------------------------------------
 uvec4 g_randGeneratorState; // random number generator current state
@@ -85,8 +87,10 @@ uniform highp usampler2D u_random_sampler;
 uniform highp sampler2DArray u_face_sampler;
 uniform highp sampler2DArray u_bvh_sampler;
 uniform highp sampler2D u_material_sampler;
+uniform highp sampler2D u_light_sampler; // one emissive face per entry, see `src/lib/webgl/sceneLayout.ts`
 
 uniform int u_num_objects; // number of models/objects to render
+uniform int u_num_lights; // number of emissive faces in the lights texture, 0 when the scene has no light
 uniform int u_sample_number; // number of the sample being traced, starting at 1
 uniform int u_num_bounces; // max number of ray bounces
 uniform int u_shading_method; // flat or Phong shading
@@ -131,6 +135,11 @@ vec3 randPosInUnitSphere() {
 }
 
 // --- texel addresses -----------------------------------------------------------------
+// Texel `texel` of light `light` in the lights texture.
+ivec2 lightTexel(int texel, int light) {
+    return ivec2((light % LIGHTS_PER_ROW) * TEXELS_PER_LIGHT + texel, light / LIGHTS_PER_ROW);
+}
+
 // Texel `texel` of face `face` in object `obj`'s slice of the faces texture.
 ivec3 faceTexel(int texel, int face, int obj) {
     return ivec3((face % FACES_PER_ROW) * TEXELS_PER_FACE + texel, face / FACES_PER_ROW, obj);
@@ -267,13 +276,14 @@ float schlick(float cosine, float rindex) {
     return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
 }
 
-void rayBounceOffReflectiveSurface(inout Ray ray, RayHitResult res, Material material) {
+void rayBounceOffMirror(inout Ray ray, RayHitResult res, Material material) {
     ray.origin = res.p + res.fn * EPSILON;
-    if (rand() < material.reflectionRatio) {
-        ray.dir = normalize(reflect(ray.dir, res.n) + (1.0 - material.reflectionGloss) * randPosInUnitSphere());
-    } else {
-        ray.dir = normalize(res.p + res.n + randPosInUnitSphere() - res.p);
-    }
+    ray.dir = normalize(reflect(ray.dir, res.n) + (1.0 - material.reflectionGloss) * randPosInUnitSphere());
+}
+
+void rayBounceOffDiffuse(inout Ray ray, RayHitResult res) {
+    ray.origin = res.p + res.fn * EPSILON;
+    ray.dir = normalize(res.p + res.n + randPosInUnitSphere() - res.p);
 }
 
 void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Material material) {
@@ -309,60 +319,120 @@ void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Material mat
     }
 }
 
-vec3 pathTrace(Ray ray) {
-    RayHitResult hitStack[RAY_BOUNCE_MAX_STACK_SIZE];
-    Material          materialStack[RAY_BOUNCE_MAX_STACK_SIZE];
-    vec3 color = vec3(0.0, 0.0, 0.0);
-    vec4 texel;
-    bool bLoop = true;
-    int  i = 0;
+// --- light sampling and path tracing -------------------------------------------------
+// Picks a point on a light, with a chance in proportion to each light's area, and returns the light that point sends to
+// the hit through the diffuse lobe. The result is zero when the point is behind the surface or something blocks it.
+//
+// `rayBounceOffDiffuse` sends the ray along n + a random point in the unit ball. That direction has the density
+// 2 * cos(theta)^3 / PI per unit of solid angle, with theta measured from the normal. A light sample must use the same
+// density, or the lit areas would come out a different brightness than the bounce rays give.
+vec3 sampleDirectLight(RayHitResult hit, vec3 albedo) {
+    if (u_num_lights == 0) {
+        return vec3(0.0);
+    }
 
-    while (bLoop && rayIntersectBVH(ray, hitStack[i])) {
-        materialStack[i].albedo = texelFetch(u_material_sampler, ivec2(MATERIAL_ALBEDO_INDEX, hitStack[i].mi), 0).xyz;
-        texel              = texelFetch(u_material_sampler, ivec2(MATERIAL_ATTRIB_INDEX, hitStack[i].mi), 0);
-        materialStack[i].materialClass = int(texel.x);
-        materialStack[i].reflectionRatio = texel.y;
-        materialStack[i].reflectionGloss = texel.z;
-        materialStack[i].refractionIndex = texel.w;
-
-        switch (materialStack[i].materialClass) {
-        case EMISSIVE_MATERIAL:
-            color = materialStack[i].albedo;
-            bLoop = false;
-            break;
-
-        case REFLECTIVE_MATERIAL:
-            if (i < u_num_bounces) {
-                rayBounceOffReflectiveSurface(ray, hitStack[i], materialStack[i]);
-                if (dot(ray.dir, hitStack[i].n) < 0.0) { // absorb ray
-                    color = vec3(0.0, 0.0, 0.0);
-                    bLoop = false;
-                    i=0;
-                } else {
-                    i++;
-                }
-            } else {
-                color = materialStack[i].albedo;
-                bLoop = false;
-            }
-            break;
-
-        case DIELECTRIC_MATERIAL:
-            if (i < u_num_bounces) {
-                rayBounceOffDielectricSurface(ray, hitStack[i], materialStack[i]); ++i;
-            } else {
-                color = materialStack[i].albedo;
-                bLoop = false;
-            }
-            break;
+    // The first texel's w holds the running total of the light areas, so a binary search finds the light that the
+    // random target falls in.
+    float totalArea = texelFetch(u_light_sampler, lightTexel(0, u_num_lights - 1), 0).w;
+    float target = rand() * totalArea;
+    int low = 0;
+    int high = u_num_lights - 1;
+    while (low < high) {
+        int mid = (low + high) / 2;
+        if (texelFetch(u_light_sampler, lightTexel(0, mid), 0).w < target) {
+            low = mid + 1;
+        } else {
+            high = mid;
         }
     }
 
-    while (i > 0) {
-        color *= materialStack[--i].albedo;
+    vec3 p0 = texelFetch(u_light_sampler, lightTexel(0, low), 0).xyz;
+    vec3 p1 = texelFetch(u_light_sampler, lightTexel(1, low), 0).xyz;
+    vec4 texel2 = texelFetch(u_light_sampler, lightTexel(2, low), 0);
+    vec3 p2 = texel2.xyz;
+    vec3 emission = texelFetch(u_material_sampler, ivec2(MATERIAL_ALBEDO_INDEX, int(texel2.w)), 0).xyz;
+
+    // A uniformly distributed point on the light's face.
+    float r1 = sqrt(rand());
+    float r2 = rand();
+    vec3 lightPoint = p0 * (1.0 - r1) + p1 * (r1 * (1.0 - r2)) + p2 * (r1 * r2);
+    vec3 lightNormal = normalize(cross(p1 - p0, p2 - p0));
+
+    vec3 origin = hit.p + hit.fn * EPSILON; // the same origin the diffuse bounce uses
+    vec3 toLight = lightPoint - origin;
+    float dist = length(toLight);
+    vec3 dir = toLight / dist;
+
+    float cosSurface = dot(hit.n, dir);
+    float cosLight = abs(dot(lightNormal, dir)); // a light emits from both sides, like a ray that hits it
+    if (cosSurface <= 0.0 || cosLight <= 0.0) {
+        return vec3(0.0);
     }
 
-    return color;
+    RayHitResult blocker;
+    if (rayIntersectBVH(Ray(origin, dir), blocker) && blocker.t < dist - 2.0 * EPSILON) {
+        return vec3(0.0);
+    }
+
+    // The bounce direction's density, times the albedo and the light's emission, times the area-to-solid-angle
+    // conversion, divided by the chance of picking this point (one over the total light area).
+    float density = 2.0 * cosSurface * cosSurface * cosSurface / PI;
+    return albedo * emission * (density * cosLight * totalArea / (dist * dist));
+}
+
+vec3 pathTrace(Ray ray) {
+    vec3 radiance = vec3(0.0);
+    vec3 throughput = vec3(1.0);
+    bool countEmission = true; // false right after a diffuse bounce, because sampleDirectLight already counted the light
+    RayHitResult hit;
+    Material material;
+    vec4 texel;
+
+    for (int i = 0; i <= u_num_bounces; ++i) {
+        if (!rayIntersectBVH(ray, hit)) {
+            break;
+        }
+
+        material.albedo = texelFetch(u_material_sampler, ivec2(MATERIAL_ALBEDO_INDEX, hit.mi), 0).xyz;
+        texel = texelFetch(u_material_sampler, ivec2(MATERIAL_ATTRIB_INDEX, hit.mi), 0);
+        material.materialClass = int(texel.x);
+        material.reflectionRatio = texel.y;
+        material.reflectionGloss = texel.z;
+        material.refractionIndex = texel.w;
+
+        if (material.materialClass == EMISSIVE_MATERIAL) {
+            if (countEmission) {
+                radiance += throughput * material.albedo;
+            }
+            break;
+        }
+
+        if (i == u_num_bounces) { // out of bounces, so the surface glows with its own color as ambient light
+            radiance += throughput * material.albedo;
+            break;
+        }
+
+        if (material.materialClass == REFLECTIVE_MATERIAL) {
+            if (rand() < material.reflectionRatio) {
+                rayBounceOffMirror(ray, hit, material);
+                if (dot(ray.dir, hit.n) < 0.0) { // absorb ray
+                    break;
+                }
+                countEmission = true;
+            } else {
+                radiance += throughput * sampleDirectLight(hit, material.albedo);
+                rayBounceOffDiffuse(ray, hit);
+                countEmission = false;
+            }
+        } else { // dielectric
+            rayBounceOffDielectricSurface(ray, hit, material);
+            countEmission = true;
+        }
+
+        throughput *= material.albedo;
+    }
+
+    return radiance;
 }
 
 // --- main ----------------------------------------------------------------------------

@@ -10,8 +10,7 @@ import { useId, useRef, useState } from 'react'
 import { isFileScene, sceneFromFile, scenes, type SceneInfo } from '../lib/scenes'
 import { ShadingMethod, useAppStore } from '../lib/store/appStore'
 
-// The limits of each setting. They bound both the sliders and the number fields. `RAY_BOUNCE_MAX_STACK_SIZE` in
-// `src/shaders/pathTrace.frag.glsl` must stay above `maxBounces`.
+// The limits of each setting. They bound both the sliders and the number fields.
 const minSamples = 1
 const maxSamples = 10000
 const minBounces = 1
