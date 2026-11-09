@@ -26,6 +26,17 @@ export const scenes: SceneInfo[] = [
 
 export const defaultScene = scenes[0]
 
+// The focus distance and lens radius slider ranges, in world units, before a scene has loaded.
+export const defaultFocusRange: SliderRange = { min: 0.1, max: 10, step: 0.1 }
+export const defaultLensRadiusRange: SliderRange = { min: 0, max: 1, step: 0.01 }
+
+// The lowest and highest value of a slider and the size of one step, all in world units.
+export interface SliderRange {
+  min: number
+  max: number
+  step: number
+}
+
 export interface SceneInfo {
   id: string
   label: string
@@ -47,4 +58,40 @@ export function sceneFromFile(file: File): SceneInfo {
 // Whether the scene came from the user's drive, and so holds an object URL that needs freeing.
 export function isFileScene(scene: SceneInfo): boolean {
   return scene.url.startsWith('blob:')
+}
+
+// Rounds a number up to 1, 2 or 5 times a power of ten, so a slider step reads cleanly.
+function niceStep(value: number): number {
+  const power = 10 ** Math.floor(Math.log10(value))
+  const fraction = value / power
+  if (fraction <= 1) {
+    return power
+  }
+  if (fraction <= 2) {
+    return 2 * power
+  }
+  return fraction <= 5 ? 5 * power : 10 * power
+}
+
+// A range of 100 steps whose largest value is at least `max`, because scene units have no fixed scale.
+function rangeUpTo(max: number, min: 'step' | 0): SliderRange {
+  const step = Number(niceStep(max / 100).toPrecision(6))
+  return { min: min === 'step' ? step : 0, max: Number((step * 100).toPrecision(6)), step }
+}
+
+// The focus range for a scene whose bounding sphere, with the starting camera inside it, has this radius. The sphere's
+// diameter reaches from the camera to the farthest point of the scene.
+export function focusRangeFor(radius: number): SliderRange {
+  return rangeUpTo(2 * radius, 'step')
+}
+
+// The lens radius range for the same sphere. A lens a twentieth of the sphere's diameter blurs strongly.
+export function lensRadiusRangeFor(radius: number): SliderRange {
+  return rangeUpTo(radius / 10, 0)
+}
+
+// Rounds a value to the nearest step of the range, within its limits.
+export function snapToRange(value: number, range: SliderRange): number {
+  const snapped = Math.round(value / range.step) * range.step
+  return Math.min(Math.max(Number(snapped.toPrecision(6)), range.min), range.max)
 }

@@ -35,11 +35,11 @@ function LoadingNotice({ onLoadingChange }: { onLoadingChange: (loading: boolean
 }
 
 // Points the camera at the middle of the scene from the front and a little above, far enough back that the whole scene
-// fits in the view.
+// fits in the view. Returns the camera's position and the point it looks at, or null for a scene with no geometry.
 function frameCamera(controls: CameraControls, root: Object3D, fovDegrees: number) {
   const box = new Box3().setFromObject(root)
   if (box.isEmpty()) {
-    return
+    return null
   }
 
   const center = box.getCenter(new Vector3())
@@ -47,6 +47,20 @@ function frameCamera(controls: CameraControls, root: Object3D, fovDegrees: numbe
   const distance = (radius / Math.sin((fovDegrees * Math.PI) / 360)) * 0.75
   const eye = center.clone().add(new Vector3(0, 0.25, 1).normalize().multiplyScalar(distance))
   controls.setLookAt(eye.x, eye.y, eye.z, center.x, center.y, center.z, false)
+  return { eye, target: center }
+}
+
+// Sizes the focus and lens sliders to the scene and focuses on the point the starting camera looks at. The focus range
+// reaches from the camera to the farthest point of the scene.
+function sizeRangesToScene(root: Object3D, eye: Vector3, target: Vector3) {
+  const box = new Box3().setFromObject(root)
+  if (box.isEmpty()) {
+    return
+  }
+
+  box.expandByPoint(eye)
+  const radius = box.getBoundingSphere(new Sphere()).radius
+  useAppStore.getState().setSceneScale(radius, eye.distanceTo(target))
 }
 
 // Loads the glTF file, packs it for the shader, checks that the GPU can hold it, and then hands the packed scene to the
@@ -71,8 +85,17 @@ function TracedScene({
   const controls = useThree(state => state.controls) as CameraControls | null
 
   useEffect(() => {
+    const { cameraFov, scene } = useAppStore.getState()
+
+    let start = null
     if (frame && controls) {
-      frameCamera(controls, gltf.scene, useAppStore.getState().cameraFov)
+      start = frameCamera(controls, gltf.scene, cameraFov)
+    } else if (scene.view) {
+      start = { eye: new Vector3(...scene.view.eye), target: new Vector3(...scene.view.target) }
+    }
+
+    if (start) {
+      sizeRangesToScene(gltf.scene, start.eye, start.target)
     }
   }, [frame, controls, gltf.scene])
 

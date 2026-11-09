@@ -31,7 +31,7 @@ const fencePollMs = 4 // browsers stretch a shorter nested timer to this, and a 
 export const idlePollMs = 16 // how often the loop looks for new work when it has nothing to draw
 const statusIntervalMs = 500 // how often the status counters are written to the store
 const revokeDelayMs = 10_000 // how long a screenshot's object URL stays valid after the download starts
-const bouncesSettleMs = 500 // how long the bounce setting must stay unchanged before it restarts accumulation
+const sliderSettleMs = 500 // how long the slider settings must stay unchanged before they restart accumulation
 
 // --- Tracer state --------------------------------------------------------------------
 
@@ -52,6 +52,8 @@ export interface TracerState {
   lastBandDoneAt: number // performance.now() when the GPU last finished a band
   restartTimestamp: number // when accumulation last restarted, for the elapsed and remaining times
   numBounces: number // the bounce depth the accumulated samples were traced at, which trails a dragged setting
+  lensRadius: number // the lens radius the accumulated samples were traced at, which trails a dragged setting
+  focusDistance: number // the focus distance the accumulated samples were traced at, which trails a dragged setting
   needsClear: boolean // true after a restart, so the next draw empties the accumulation target first
   needsDisplay: boolean // true after a sample completes, so the next rendering tick draws the display pass
   bands: Band[] // the bands still on the GPU, oldest first
@@ -83,6 +85,8 @@ export function createTracerState(): TracerState {
     lastBandDoneAt: 0,
     restartTimestamp: Date.now(),
     numBounces: useAppStore.getState().numBounces,
+    lensRadius: useAppStore.getState().lensRadius,
+    focusDistance: useAppStore.getState().focusDistance,
     needsClear: true,
     needsDisplay: false,
     bands: [],
@@ -104,6 +108,8 @@ export function renderReset(state: TracerState) {
   state.row = 0
   state.needsClear = true
   state.numBounces = useAppStore.getState().numBounces
+  state.lensRadius = useAppStore.getState().lensRadius
+  state.focusDistance = useAppStore.getState().focusDistance
   state.restartTimestamp = Date.now()
   useAppStore.getState().resetStatus()
 }
@@ -232,6 +238,9 @@ function drawBand(state: TracerState, inputs: TracerInputs): number {
   uniforms.u_num_bounces.value = state.samplesDone === 0 ? 1 : state.numBounces
   uniforms.u_shading_method.value = shadingMethod
   uniforms.u_eye_to_image.value = (height * 0.5) / Math.tan(camera.fov * 0.5 * (Math.PI / 180.0))
+  // The one-bounce preview of sample 1 is a pinhole, so a dragged camera shows a sharp image.
+  uniforms.u_lens_radius.value = state.samplesDone === 0 ? 0 : state.lensRadius
+  uniforms.u_focus_distance.value = state.focusDistance
   uniforms.u_eye_position.value.setFromMatrixPosition(camera.matrixWorld)
   uniforms.u_eye_to_world.value.copy(camera.matrixWorld)
   uniforms.u_random_sampler.value = randomTexture
@@ -328,26 +337,31 @@ export function traceStep(state: TracerState, inputs: TracerInputs, interacting:
 // Watches the store for settings that affect the render. Returns a function that stops watching.
 export function watchSettings(state: TracerState) {
   // Any setting that changes the image restarts accumulation. A new one belongs here, except one that is dragged on a
-  // slider, which needs a delay like the bounce count below.
+  // slider, which needs a delay like the bounce count, lens radius and focus distance below.
   const stopRestartSettings = useAppStore.subscribe(
     s => [s.cameraFov, s.shadingMethod],
     () => renderReset(state),
     { equalityFn: shallow },
   )
 
-  // Dragging the bounce slider would restart accumulation at every tick. Instead the render keeps its current depth
-  // until the setting has stopped changing, then restarts once at the new depth.
-  let bouncesTimer: ReturnType<typeof setTimeout> | undefined
-  const stopBounces = useAppStore.subscribe(
-    s => s.numBounces,
-    numBounces => {
-      clearTimeout(bouncesTimer)
-      bouncesTimer = setTimeout(() => {
-        if (numBounces !== state.numBounces) {
+  // Dragging the bounce, lens radius or focus slider would restart accumulation at every tick. Instead the render keeps
+  // its current values until the settings have stopped changing, then restarts once at the new ones.
+  let settleTimer: ReturnType<typeof setTimeout> | undefined
+  const stopSliders = useAppStore.subscribe(
+    s => [s.numBounces, s.lensRadius, s.focusDistance],
+    ([numBounces, lensRadius, focusDistance]) => {
+      clearTimeout(settleTimer)
+      settleTimer = setTimeout(() => {
+        if (
+          numBounces !== state.numBounces ||
+          lensRadius !== state.lensRadius ||
+          focusDistance !== state.focusDistance
+        ) {
           renderReset(state)
         }
-      }, bouncesSettleMs)
+      }, sliderSettleMs)
     },
+    { equalityFn: shallow },
   )
 
   // The sample count only moves the stop ceiling, so accumulation continues. The readout is refreshed because a stopped
@@ -358,9 +372,9 @@ export function watchSettings(state: TracerState) {
   )
 
   return () => {
-    clearTimeout(bouncesTimer)
+    clearTimeout(settleTimer)
     stopRestartSettings()
-    stopBounces()
+    stopSliders()
     stopNumSamples()
   }
 }

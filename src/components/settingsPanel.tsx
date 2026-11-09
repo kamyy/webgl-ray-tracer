@@ -3,8 +3,9 @@
  *
  * Open, it shows the sliders, number fields and shading control from `RenderSettings`, so a value can be changed while
  * the image converges behind it. The title bar collapses it to a small Settings button that restores it. On a phone in
- * portrait the open card is a bottom sheet across the full width. It is absolutely positioned, so opening and closing
- * it never resizes the canvas or restarts accumulation.
+ * portrait the open card is a bottom sheet across the full width. On a phone in landscape it is wider, with the scene
+ * cards and shading control beside the sliders, so it fits without scrolling. It is absolutely positioned, so opening
+ * and closing it never resizes the canvas or restarts accumulation.
  */
 import { useState } from 'react'
 import { RenderSettings } from './renderSettings'
@@ -56,7 +57,7 @@ export function SettingsPanel() {
   return (
     <section
       aria-label="Render settings"
-      className={`${position} max-h-[calc(100dvh-7.5rem)] w-72 overflow-y-auto rounded-2xl bg-white/70 p-3 shadow-xl backdrop-blur-md md:w-80 max-md:portrait:right-0 max-md:portrait:bottom-0 max-md:portrait:left-0 max-md:portrait:w-auto max-md:portrait:rounded-b-none max-md:portrait:pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:bg-gray-900/70`}
+      className={`${position} w-72 rounded-2xl bg-white/70 p-3 shadow-xl backdrop-blur-md md:w-80 max-md:portrait:right-0 max-md:portrait:bottom-0 max-md:portrait:left-0 max-md:portrait:w-auto max-md:portrait:rounded-b-none max-md:portrait:pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:bg-gray-900/70 short:landscape:w-[min(46rem,calc(100vw-1.5rem))]!`}
     >
       <button
         type="button"

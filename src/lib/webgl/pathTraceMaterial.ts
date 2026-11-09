@@ -33,6 +33,8 @@ export function createPathTraceMaterial(): RawShaderMaterial {
       u_num_bounces: { value: 0 },
       u_shading_method: { value: 0 },
       u_eye_to_image: { value: 0 },
+      u_lens_radius: { value: 0 },
+      u_focus_distance: { value: 0 },
       u_eye_position: { value: new Vector3() },
       u_eye_to_world: { value: new Matrix4() },
       u_random_sampler: { value: null as Texture | null },

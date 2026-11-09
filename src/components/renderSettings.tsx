@@ -18,6 +18,16 @@ const maxBounces = 16
 const minCameraFov = 10
 const maxCameraFov = 120
 
+// The tooltip of each setting.
+const hints = {
+  fov: 'Vertical field of view, in degrees. A wider angle shows more of the scene.',
+  lensRadius: 'In world space units. 0 keeps everything sharp. The range follows the scene size.',
+  focus: 'Distance from camera to sharp plane, in world space units. The range follows the scene size.',
+  samples: 'Number of samples per pixel before the render stops.',
+  bounces: 'Most bounces a ray of light may make.',
+  shading: 'Flat shows each triangle. Phong smooths across them.',
+}
+
 // The choices in the shading control, in the order they are shown.
 const shadingMethods = [
   { value: ShadingMethod.flat, label: 'Flat' },
@@ -31,24 +41,31 @@ const cardName = 'block truncate text-center text-xs font-semibold'
 
 interface RangeRowProps {
   title: string
+  hint: string // the tooltip that explains the setting
   value: number
   min: number
   max: number
+  step?: number // the smallest change the slider and the number field make, 1 when left out
   onChange: (value: number) => void
 }
 
 // One setting: a label, a slider for dragging, and a number field for typing an exact value.
-function RangeRow({ title, value, min, max, onChange }: RangeRowProps) {
+function RangeRow({ title, hint, value, min, max, step = 1, onChange }: RangeRowProps) {
   const id = useId()
 
   // The text being typed, or null while the field shows the setting. Keeping the text lets the field hold a half-typed
   // number such as the 4 on the way to 45, which is below `min` for a setting like the field of view.
   const [draft, setDraft] = useState<string | null>(null)
 
+  // Rounds a value to the nearest step, so a whole-number setting never receives a fraction.
+  function snap(number: number): number {
+    return Number((Math.round(number / step) * step).toFixed(6))
+  }
+
   // A number in range applies at once. Anything else waits in the field until the typing is finished.
   function onTyped(text: string) {
     setDraft(text)
-    const typed = parseInt(text)
+    const typed = snap(parseFloat(text))
     if (typed >= min && typed <= max) {
       onChange(typed)
     }
@@ -56,7 +73,7 @@ function RangeRow({ title, value, min, max, onChange }: RangeRowProps) {
 
   // Leaving the field ends the typing, so a number out of range is clamped and a blank field returns to the setting.
   function onTypingDone() {
-    const typed = parseInt(draft ?? '')
+    const typed = snap(parseFloat(draft ?? ''))
     if (!Number.isNaN(typed)) {
       onChange(Math.min(Math.max(typed, min), max))
     }
@@ -66,24 +83,28 @@ function RangeRow({ title, value, min, max, onChange }: RangeRowProps) {
   // `useId` links each label to its slider, so tapping the label focuses it.
   return (
     <div className="flex min-h-11 items-center gap-2.5 short:min-h-9">
-      <label htmlFor={id} className="w-20 flex-none text-xs font-semibold">
+      <label htmlFor={id} title={hint} className="w-24 flex-none text-xs font-semibold">
         {title}
       </label>
       <input
         id={id}
+        title={hint}
         className="h-8 min-w-0 flex-1 pointer-coarse:h-11 short:h-8 pointer-coarse:short:h-8"
         type="range"
         min={min}
         max={max}
+        step={step}
         value={value}
-        onChange={event => onChange(parseInt(event.target.value))}
+        onChange={event => onChange(parseFloat(event.target.value))}
       />
       <input
         className="min-h-9 w-16 flex-none rounded-lg border border-gray-300 bg-gray-100 px-2 text-right text-xs tabular-nums dark:border-gray-600 dark:bg-gray-800 short:min-h-8"
         type="number"
         min={min}
         max={max}
+        step={step}
         value={draft ?? value}
+        title={hint}
         aria-label={`${title} value`}
         onChange={event => onTyped(event.target.value)}
         onBlur={onTypingDone}
@@ -189,24 +210,77 @@ function SceneCards() {
 
 export function RenderSettings() {
   const cameraFov = useAppStore(state => state.cameraFov)
+  const lensRadius = useAppStore(state => state.lensRadius)
+  const lensRadiusRange = useAppStore(state => state.lensRadiusRange)
+  const focusDistance = useAppStore(state => state.focusDistance)
+  const focusRange = useAppStore(state => state.focusRange)
   const numSamples = useAppStore(state => state.numSamples)
   const numBounces = useAppStore(state => state.numBounces)
   const shadingMethod = useAppStore(state => state.shadingMethod)
   const setCameraFov = useAppStore(state => state.setCameraFov)
+  const setLensRadius = useAppStore(state => state.setLensRadius)
+  const setFocusDistance = useAppStore(state => state.setFocusDistance)
   const setNumSamples = useAppStore(state => state.setNumSamples)
   const setNumBounces = useAppStore(state => state.setNumBounces)
   const setShadingMethod = useAppStore(state => state.setShadingMethod)
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)]">
-      <SceneCards />
-      <RangeRow title="FOV" value={cameraFov} min={minCameraFov} max={maxCameraFov} onChange={setCameraFov} />
-      <RangeRow title="Samples" value={numSamples} min={minSamples} max={maxSamples} onChange={setNumSamples} />
-      <RangeRow title="Bounces" value={numBounces} min={minBounces} max={maxBounces} onChange={setNumBounces} />
+    <div className="grid grid-cols-[minmax(0,1fr)] short:landscape:grid-cols-[13rem_minmax(0,1fr)] short:landscape:content-start short:landscape:items-start short:landscape:gap-x-5">
+      <div className="short:landscape:col-start-1 short:landscape:row-start-1">
+        <SceneCards />
+      </div>
+
+      <div className="short:landscape:col-start-2 short:landscape:row-span-2 short:landscape:row-start-1">
+        <RangeRow
+          title="Field of view"
+          hint={hints.fov}
+          value={cameraFov}
+          min={minCameraFov}
+          max={maxCameraFov}
+          onChange={setCameraFov}
+        />
+        <RangeRow
+          title="Lens radius"
+          hint={hints.lensRadius}
+          value={lensRadius}
+          min={lensRadiusRange.min}
+          max={lensRadiusRange.max}
+          step={lensRadiusRange.step}
+          onChange={setLensRadius}
+        />
+        <RangeRow
+          title="Focus distance"
+          hint={hints.focus}
+          value={focusDistance}
+          min={focusRange.min}
+          max={focusRange.max}
+          step={focusRange.step}
+          onChange={setFocusDistance}
+        />
+        <RangeRow
+          title="Samples"
+          hint={hints.samples}
+          value={numSamples}
+          min={minSamples}
+          max={maxSamples}
+          onChange={setNumSamples}
+        />
+        <RangeRow
+          title="Bounces"
+          hint={hints.bounces}
+          value={numBounces}
+          min={minBounces}
+          max={maxBounces}
+          onChange={setNumBounces}
+        />
+      </div>
 
       {/* The shading choice is a radio group drawn as one segmented button. The radios are invisible and fill each
           half, so a press anywhere on the half selects it, and keyboard focus still works. */}
-      <fieldset className="mt-1 flex items-center">
+      <fieldset
+        className="mt-1 flex items-center short:landscape:col-start-1 short:landscape:row-start-2"
+        title={hints.shading}
+      >
         <legend className="sr-only">Shading method</legend>
         <div className="flex w-full overflow-hidden rounded-lg border border-gray-300 dark:border-gray-600">
           {shadingMethods.map(method => (
