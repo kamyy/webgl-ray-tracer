@@ -31,7 +31,7 @@ Newer scene, 50° field of view, 8 bounces.
 | Zoom   | Wheel or middle-drag | Pinch       |
 
 - **Progress** is tracked by the ring in the top left corner, with the sample count, elapsed time, time remaining and the average time per sample beside it. The render starts over from zero samples whenever the camera, a setting or the window size changes.
-- **Render settings** are in the card at the bottom left, and the chevron collapses it out of the way. They are the scene, field of view, samples per pixel, ray bounces, and Flat or Phong shading.
+- **Render settings** are in the card at the bottom left, and the chevron collapses it out of the way. They are the scene, field of view, lens radius and focus distance for depth of field, samples per pixel, ray bounces, and Flat or Phong shading.
 - The buttons at the top right switch the theme and open the About card that lists these controls and the MIT license.
 
 ## 4. Running it locally

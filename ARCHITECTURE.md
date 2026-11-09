@@ -159,18 +159,21 @@ The scene is a glTF 2.0 binary, fetched from `/scenes/` or opened from the user'
 
 drei's `PerspectiveCamera` and `CameraControls` (`src/components/viewport.tsx`) provide the camera and its mouse and touch handling. The app uses three.js's axes everywhere: the world is Y-up, which is also glTF's native orientation, and the camera looks down its own -z axis. The shader builds each ray in that camera space and multiplies it by the camera's world matrix, so no axis conversion is needed anywhere.
 
+The camera is a thin lens. `main` in `src/shaders/pathTrace.frag.glsl` starts each ray at a random point on a disk of radius `lensRadius` and aims it at the point where the pinhole ray crosses the plane `focusDistance` away. Points on that plane stay sharp and others blur, and the progressive averaging smooths the blur with no extra pass. A `lensRadius` of 0 is a pinhole. The focus distance and lens radius sliders each have 100 positions that span the scene's size, because scene units have no fixed scale.
+
 `CameraControls` gives rotate, pan and dolly with the mouse and touch for free. It has no Ctrl + left-drag pan, so panning is right-drag or two fingers. Its rotate speed is set to 0.5.
 
 ---
 
 ## 6. State management
 
-A Zustand store (`src/lib/store/appStore.ts`) holds only state the UI displays: the chosen scene, the shading method, sample and timing counters, and the sample, bounce and field-of-view settings. Zustand needs no provider component, and the render loop reads the store directly with `useAppStore.getState()`, so the settings are not copied into a second place.
+A Zustand store (`src/lib/store/appStore.ts`) holds only state the UI displays: the chosen scene, the shading method, sample and timing counters, and the sample, bounce, field-of-view, lens-radius and focus-distance settings. Zustand needs no provider component, and the render loop reads the store directly with `useAppStore.getState()`, so the settings are not copied into a second place.
 
 ```text
  ┌────────────────────────────┐                                  ┌──────────────────────────────┐
  │ PathTracer                 │   counters, twice a second       │ useAppStore                  │
- │ and the tracing engine     ├─────────────────────────────────►│   cameraFov, numSamples      │
+ │ and the tracing engine     ├─────────────────────────────────►│   cameraFov, lensRadius      │
+ │                            │                                  │   focusDistance, numSamples  │
  │                            │                                  │   numBounces, shadingMethod  │
  │                            │◄─────────────────────────────────┤   samplesDone, the times     │
  │ Owns, outside the store:   │   settings, read with getState() └──────────────┬───────────────┘
@@ -229,7 +232,7 @@ The render view fills the whole screen, and everything else floats over it.
 
 - **The view has no bars.** A header and a footer would take 100 to 200 px of height, most of it on a phone, for controls that sit idle while the image converges. A floating readout and a floating settings card cost no height, at the price of covering part of the image.
 - **The readout shows progress and the card holds the controls.** `src/components/hud.tsx` is a pill at the top left with the circular progress ring, the sample counter, the timing counters and the canvas size in pixels, plus save, theme and About buttons at the top right. The ring is the primary indicator, because a render converges over minutes and how far along it is matters more than any single setting. On a phone the pill shrinks to the ring, the sample count and the time left.
-- **The settings card collapses.** `src/components/settingsPanel.tsx` is a card at the bottom left with a row of scene cards, a slider and a number field for each of field of view, samples and bounces, plus the Flat/Phong control. It scrolls when the window is too short to show all of it. Its title bar collapses it to a small Settings button, so the whole image can be seen. On a phone in portrait the open card is a bottom sheet across the full width.
+- **The settings card collapses.** `src/components/settingsPanel.tsx` is a card at the bottom left with a row of scene cards, a slider and a number field for each of field of view, lens radius, focus distance, samples and bounces, plus the Flat/Phong control. On a phone in landscape the card is wider, with the scene cards and the Flat/Phong control in a column beside the sliders, so it fits the short window without scrolling. Its title bar collapses it to a small Settings button, so the whole image can be seen. On a phone in portrait the open card is a bottom sheet across the full width.
 - **The theme is a `dark` class on the `<html>` element.** `src/lib/hooks/useTheme.ts` sets it from the saved choice, or from the operating system's setting on a first visit, and a button at the top right switches it. Tailwind's `dark:` variant and the color variables in `src/styles/globals.css` follow the class, so no reload is needed. The render itself does not change, because only the floating controls have a theme.
 - **The save button is enabled only at 100%.** It downloads the canvas as a PNG at the drawing-buffer size, so the file never contains the floating elements or a half-converged image. The canvas is not created with `preserveDrawingBuffer`, which costs speed on some GPUs, so the button draws the display pass again just before it reads the canvas.
 - **Every floating element is absolutely positioned.** The card, the readout and the About popover overlap the view, so opening or collapsing them never changes the canvas size, rebuilds the render targets or restarts accumulation.
@@ -258,7 +261,7 @@ The minimal path tracer.
 | ~~Camera position and orientation~~                                           | The orbit controls move the camera.                                                                                               |
 | ~~Intersectable objects~~                                                     | Triangles from glTF meshes replace the book's spheres.                                                                            |
 | Gamma correction                                                              | `src/shaders/display.frag.glsl` outputs the linear average. The bundled scenes' materials and lights are tuned for linear output. |
-| Defocus blur (depth of field)                                                 | The camera is a pinhole.                                                                                                          |
+| ~~Defocus blur (depth of field)~~                                             | The `lensRadius` and `focusDistance` settings.                                                                                    |
 
 ### 10.2 Book 2: Ray Tracing: The Next Week
 

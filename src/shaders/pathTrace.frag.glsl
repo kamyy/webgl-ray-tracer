@@ -1,9 +1,10 @@
 // Fragment shader for the path-tracing pass: traces one sample of light through every pixel.
 //
-// Each pixel fires a ray from the camera through its position on the image plane, with a random jitter inside the
-// pixel. The ray is followed through the scene by walking a bounding volume hierarchy (BVH) of triangles, and bounces
-// off diffuse, reflective and glass surfaces until it reaches a light or runs out of bounces. The result is added to
-// the accumulation texture, which averages many such samples.
+// Each pixel fires a ray through its position on the image plane, with a random jitter inside the pixel. The ray
+// starts at a random point on the camera's lens, so surfaces off the focus plane blur. The ray is followed through the
+// scene by walking a bounding volume hierarchy (BVH) of triangles, and bounces off diffuse, reflective and glass
+// surfaces until it reaches a light or runs out of bounces. The result is added to the accumulation texture, which
+// averages many such samples.
 //
 // The scene arrives as packed textures. The `*_INDEX` and `*_MATERIAL` constants below must match
 // `src/lib/webgl/sceneLayout.ts`, which sets the layout the CPU writes.
@@ -95,6 +96,8 @@ uniform int u_sample_number; // number of the sample being traced, starting at 1
 uniform int u_num_bounces; // max number of ray bounces
 uniform int u_shading_method; // flat or Phong shading
 
+uniform float u_lens_radius; // radius of the camera lens in world units, 0 for a pinhole
+uniform float u_focus_distance; // distance from the eye to the plane that stays sharp, along the camera's -z axis
 uniform float u_eye_to_image; // distance from the eye to the image plane along the camera's -z axis, in pixels
 uniform vec3  u_eye_position; // eye position in world space
 uniform mat4  u_eye_to_world; // camera to world space matrix (BVH, rays and triangles are all stored in world space)
@@ -443,14 +446,19 @@ void main() {
     g_randGeneratorState = texelFetch(u_random_sampler, fragCoord, 0)
                             + uvec4(u_sample_number, u_sample_number, u_sample_number, u_sample_number);
 
-    vec4 rayTarget = u_eye_to_world * vec4( // transform ray target pos on image plane from camera space (x right, y up, looking down -z) to world space
-        v_eye_to_x + rand(),
-        v_eye_to_y + rand(),
-        -u_eye_to_image,
-        1.0
-    );
+    // The direction through this pixel in camera space (x right, y up, looking down -z), jittered inside the pixel.
+    vec3 dirCamera = normalize(vec3(v_eye_to_x + rand(), v_eye_to_y + rand(), -u_eye_to_image));
+    vec3 dirWorld = normalize((u_eye_to_world * vec4(dirCamera, 0.0)).xyz);
 
-    Ray ray = Ray(u_eye_position, normalize(rayTarget.xyz - u_eye_position));
+    // Thin lens: every ray through this pixel meets at the point where the pinhole ray crosses the focus plane. The ray
+    // starts at a random point on the lens instead of the eye, so points off that plane blur.
+    vec3 focusPoint = u_eye_position + dirWorld * (u_focus_distance / -dirCamera.z);
+    float lensRadius = u_lens_radius * sqrt(rand());
+    float lensAngle = 6.2831853 * rand();
+    vec3 lensOffset = (u_eye_to_world * vec4(lensRadius * cos(lensAngle), lensRadius * sin(lensAngle), 0.0, 0.0)).xyz;
+    vec3 origin = u_eye_position + lensOffset;
+
+    Ray ray = Ray(origin, normalize(focusPoint - origin));
     // The render target adds this output to what it already holds (additive blending). Alpha adds up to the number
     // of samples the pixel has received, which the display shader divides by.
     o_color = vec4(pathTrace(ray), 1.0);
