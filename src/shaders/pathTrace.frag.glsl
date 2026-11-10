@@ -46,6 +46,10 @@ const float PI = 3.14159265359;
 
 const int FLAT_SHADING = 0;
 
+// The bounce index, counting from 0, from which Russian roulette may end dim paths early. 3 means the fourth bounce.
+// See the comment in `pathTrace`.
+const int ROULETTE_START_BOUNCE = 3;
+
 const int EMISSIVE_MATERIAL   = 0;
 const int REFLECTIVE_MATERIAL = 1;
 const int DIELECTRIC_MATERIAL = 2;
@@ -496,6 +500,17 @@ vec3 pathTrace(Ray ray) {
         }
 
         throughput *= material.albedo;
+
+        // Russian roulette: a path continues with a chance equal to its brightest throughput channel, so a path that can
+        // only add a little light usually stops here. A surviving path is divided by that chance, which keeps the
+        // average brightness the same. The first bounces always continue, because they carry most of the light.
+        if (i >= ROULETTE_START_BOUNCE) {
+            float survival = clamp(max(throughput.r, max(throughput.g, throughput.b)), 0.05, 1.0);
+            if (rand() > survival) { // `>` because rand() can return exactly 1.0
+                break;
+            }
+            throughput /= survival;
+        }
     }
 
     return radiance;
