@@ -21,8 +21,9 @@ export const numFloatsPerFace = 24
 // equal FACES_PER_ROW in src/shaders/pathTrace.frag.glsl.
 export const facesPerRow = 64
 
-// A BVH node is three texels: the box's minimum corner, its maximum corner, and the two child indices with up to two
-// face indices. Each texel is four floats, so a node is 12 floats.
+// A BVH node is three texels: the box's minimum corner, its maximum corner, and the two child indices with a leaf's
+// first face and face count. A leaf's faces are stored next to each other. Each texel is four floats, so a node is 12
+// floats.
 export const numTexelsPerBvhNode = 3 // RGBA texels. Must equal TEXELS_PER_BVH_NODE in src/shaders/pathTrace.frag.glsl.
 export const numFloatsPerBvhNode = 12
 

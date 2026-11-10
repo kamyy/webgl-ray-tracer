@@ -65,7 +65,7 @@ export const useAppStore = create<AppState & AppActions>()(
     scene: defaultScene,
     shadingMethod: ShadingMethod.flat,
     samplesDone: 0,
-    numSamples: 100,
+    numSamples: 500,
     numBounces: 6,
     cameraFov: 45,
     lensRadius: 0,

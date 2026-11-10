@@ -265,19 +265,15 @@ bool traceBVH(Ray r, float tMax, bool anyHit, out RayHitResult nearest) {
             vec4 payload = texelFetch(u_bvh_sampler, bvhTexel(BVH_NODE_PAYLOAD_INDEX, node, obj), 0);
             int lt = int(payload.r); // left child node, or -1
             int rt = int(payload.g); // right child node, or -1
-            int f0 = int(payload.b); // a face in this node, or -1
-            int f1 = int(payload.a); // a face in this node, or -1
+            int firstFace = int(payload.b); // a leaf's first face. A leaf's faces are stored next to each other.
+            int faceCount = int(payload.a); // a leaf's number of faces, 0 for an interior node
 
-            if (f0 != -1 && rayIntersectFace(r, f0, obj, current) && current.t < nearest.t) {
-                nearest = current;
-                if (anyHit) {
-                    return true;
-                }
-            }
-            if (f1 != -1 && rayIntersectFace(r, f1, obj, current) && current.t < nearest.t) {
-                nearest = current;
-                if (anyHit) {
-                    return true;
+            for (int f = firstFace; f < firstFace + faceCount; ++f) {
+                if (rayIntersectFace(r, f, obj, current) && current.t < nearest.t) {
+                    nearest = current;
+                    if (anyHit) {
+                        return true;
+                    }
                 }
             }
 
