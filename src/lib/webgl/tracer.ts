@@ -46,7 +46,8 @@ interface Band {
 // Everything the render loop remembers between ticks. It lives in a plain object rather than React state, because
 // it changes every rendering tick and must not re-render the page.
 export interface TracerState {
-  samplesDone: number // number of samples submitted to the GPU
+  previewDone: boolean // true once the one-bounce preview after a restart has been submitted
+  samplesDone: number // number of full samples submitted to the GPU, not counting the preview
   row: number // first row of the current sample that has not been submitted yet
   msPerRow: number | null // GPU time per row, smoothed over the bands timed so far, or null before the first
   lastBandDoneAt: number // performance.now() when the GPU last finished a band
@@ -79,6 +80,7 @@ export interface TracerInputs {
 
 export function createTracerState(): TracerState {
   return {
+    previewDone: false,
     samplesDone: 0,
     row: 0,
     msPerRow: null,
@@ -104,6 +106,7 @@ export function configureRenderer(gl: WebGLRenderer) {
 
 // Restart accumulation from zero samples.
 export function renderReset(state: TracerState) {
+  state.previewDone = false
   state.samplesDone = 0
   state.row = 0
   state.needsClear = true
@@ -134,10 +137,10 @@ function formatDuration(milliseconds: number): string {
 }
 
 // Writes the sample and timing counters to the store at a few updates a second, so React does not re-render every
-// rendering tick. The one-bounce preview is not counted. A camera or setting that is being dragged restarts the render
-// before the next sample finishes, so showing the preview would flash numbers between the dashes of each restart.
+// rendering tick. Nothing is written until the first full sample, so a dragged camera, which only draws the preview,
+// leaves the readout on its dashes.
 function updateStatus(state: TracerState, numSamples: number, force: boolean) {
-  if (state.samplesDone < 2 && state.samplesDone < numSamples) {
+  if (state.samplesDone === 0) {
     return
   }
 
@@ -197,11 +200,11 @@ export function drawDisplayIfNeeded(state: TracerState, inputs: TracerInputs) {
   }
 }
 
-// Picks how many rows the next band covers. The first sample after a restart is drawn whole, because a quick preview
-// that arrives in pieces would show a half-new, half-old image to a moving camera.
-function nextBandRows(state: TracerState, height: number): number {
+// Picks how many rows the next band covers. The preview is drawn whole, because a quick preview that arrives in pieces
+// would show a half-new, half-old image to a moving camera.
+function nextBandRows(state: TracerState, height: number, isPreview: boolean): number {
   const remaining = height - state.row
-  if (state.samplesDone === 0) {
+  if (isPreview) {
     return remaining
   }
 
@@ -211,7 +214,7 @@ function nextBandRows(state: TracerState, height: number): number {
 
 // Adds a band of rows of the current sample to the running sum. Returns the number of rows drawn. The display pass runs
 // when a sample completes, at the next rendering tick.
-function drawBand(state: TracerState, inputs: TracerInputs): number {
+function drawBand(state: TracerState, inputs: TracerInputs, isPreview: boolean): number {
   const { gl, camera, width, height, packed, accumulation, completed, randomTexture, pathTrace } = inputs
   const { shadingMethod, numSamples } = useAppStore.getState()
 
@@ -224,7 +227,7 @@ function drawBand(state: TracerState, inputs: TracerInputs): number {
   }
 
   // Limit the draw to this band's rows with a scissor, a rectangle the GPU will not draw outside.
-  const rows = nextBandRows(state, height)
+  const rows = nextBandRows(state, height, isPreview)
   accumulation.scissor.set(0, state.row, width, rows)
   accumulation.scissorTest = rows < height
 
@@ -235,11 +238,11 @@ function drawBand(state: TracerState, inputs: TracerInputs): number {
   uniforms.u_num_objects.value = packed.numObjects
   uniforms.u_num_lights.value = packed.numLights
   uniforms.u_sample_number.value = state.samplesDone + 1
-  uniforms.u_num_bounces.value = state.samplesDone === 0 ? 1 : state.numBounces
+  uniforms.u_num_bounces.value = isPreview ? 1 : state.numBounces
   uniforms.u_shading_method.value = shadingMethod
   uniforms.u_eye_to_image.value = (height * 0.5) / Math.tan(camera.fov * 0.5 * (Math.PI / 180.0))
-  // The one-bounce preview of sample 1 is a pinhole, so a dragged camera shows a sharp image.
-  uniforms.u_lens_radius.value = state.samplesDone === 0 ? 0 : state.lensRadius
+  // The preview is a pinhole, so a moving camera shows a sharp image.
+  uniforms.u_lens_radius.value = isPreview ? 0 : state.lensRadius
   uniforms.u_focus_distance.value = state.focusDistance
   uniforms.u_eye_position.value.setFromMatrixPosition(camera.matrixWorld)
   uniforms.u_eye_to_world.value.copy(camera.matrixWorld)
@@ -256,7 +259,6 @@ function drawBand(state: TracerState, inputs: TracerInputs): number {
   state.row += rows
   if (state.row >= height) {
     state.row = 0
-    ++state.samplesDone
 
     // The completed target is only ever copied into, so it has no GPU memory until this call makes it. A resize or a
     // lost context frees that memory, so the call runs before every copy. It does nothing when the memory exists.
@@ -265,6 +267,20 @@ function drawBand(state: TracerState, inputs: TracerInputs): number {
     // The GPU runs commands in order, so the copy holds exactly the finished sample, even with the next band queued.
     gl.copyTextureToTexture(accumulation.texture, completed.texture)
     state.needsDisplay = true
+
+    // The preview stays on screen from the completed target, but leaves the running sum, so the full samples are not
+    // averaged with its flat ambient lighting. The clear runs in this untimed band so it does not skew the row timing.
+    // The elapsed time starts here, because the average and the remaining time count full samples only.
+    if (isPreview) {
+      state.previewDone = true
+      accumulation.scissorTest = false
+      gl.setRenderTarget(accumulation)
+      gl.clear()
+      state.restartTimestamp = Date.now()
+    } else {
+      ++state.samplesDone
+    }
+
     updateStatus(state, numSamples, true)
   } else {
     updateStatus(state, numSamples, false)
@@ -309,10 +325,10 @@ export function traceStep(state: TracerState, inputs: TracerInputs, interacting:
     renderReset(state)
   }
 
-  // While dragging, only the preview is drawn. A sample that has started is finished even when the sample ceiling drops
-  // below it, so no rows end up one sample behind the rest.
+  // While the user is moving the camera, only the preview is drawn. A sample that has started is finished even when the
+  // sample ceiling drops below it, so no rows end up one sample behind the rest.
   const { numSamples } = useAppStore.getState()
-  const isPreview = state.samplesDone === 0
+  const isPreview = !state.previewDone
   if ((state.row === 0 && state.samplesDone >= numSamples) || (!isPreview && interacting)) {
     return idlePollMs
   }
@@ -321,7 +337,7 @@ export function traceStep(state: TracerState, inputs: TracerInputs, interacting:
   }
 
   const submittedAt = performance.now()
-  const rows = drawBand(state, inputs)
+  const rows = drawBand(state, inputs, isPreview)
 
   const fence = context.fenceSync(context.SYNC_GPU_COMMANDS_COMPLETE, 0)
   if (fence) {
