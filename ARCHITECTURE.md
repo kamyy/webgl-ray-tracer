@@ -101,7 +101,7 @@ A rendering tick is one run of the render loop, which the browser starts once pe
 
 - **Sample and timing counters reach the store about twice a second**, not every rendering tick, so React does not re-render at the display refresh rate.
 
-Rendering runs until the sample count reaches the sample setting, which can change mid-render without a reset. A camera or image setting change resets the sample count and restarts accumulation. `traceStep` in `src/lib/webgl/tracer.ts` notices a camera change by comparing the camera's world matrix with the one from the previous tracing step, so it does not depend on which control moved the camera. While the camera is being dragged, only sample 1 renders, which trades image quality for a responsive drag.
+Rendering runs until the sample count reaches the sample setting, which can change mid-render without a reset. A camera or image setting change resets the sample count and restarts accumulation. `traceStep` in `src/lib/webgl/tracer.ts` notices a camera change by comparing the camera's world matrix with the one from the previous tracing step, so the restart does not depend on which control moved the camera. Holding back full samples does depend on the control, because it needs to know the user is still moving the camera. Only the preview renders while a drag is held and while `CameraControls` is still easing the camera or zooming it with the wheel. Ending at `controlend` would let each easing step restart a full sample. This trades image quality for a responsive drag.
 
 ---
 

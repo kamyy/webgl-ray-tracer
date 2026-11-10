@@ -25,7 +25,7 @@ import {
 
 interface PathTracerProps {
   packed: PackedScene | null // null while no scene is ready, and nothing is drawn
-  interactingRef: RefObject<boolean> // true while the user is dragging the camera
+  interactingRef: RefObject<boolean> // true while a drag is held or the camera is moving
 }
 
 export function PathTracer({ packed, interactingRef }: PathTracerProps) {
