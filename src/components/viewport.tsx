@@ -140,7 +140,9 @@ class SceneErrorBoundary extends Component<SceneErrorBoundaryProps, { failed: bo
   }
 }
 
-// The camera, its controls and the traced scene. `interactingRef` tells `PathTracer` when the user is dragging.
+// The camera, its controls and the traced scene. `interactingRef` tells `PathTracer` when only the preview should be
+// drawn. `interactingRef` is true while a drag is held, even when the pointer pauses, and while the camera moves. The
+// camera keeps moving for a moment after the pointer is released. The mouse wheel moves it without starting a drag.
 function Scene({
   onLoadingChange,
   onProblem,
@@ -150,8 +152,14 @@ function Scene({
 }) {
   const cameraFov = useAppStore(state => state.cameraFov)
   const scene = useAppStore(state => state.scene)
-  const interactingRef = useRef(false)
   const [packed, setPacked] = useState<PackedScene | null>(null)
+
+  const interactingRef = useRef(false)
+  const draggingRef = useRef(false) // between the controls' `controlstart` and `controlend` events
+  const movingRef = useRef(false) // between the controls' `wake` and `sleep` events
+  const updateInteracting = () => {
+    interactingRef.current = draggingRef.current || movingRef.current
+  }
 
   // Puts the camera at the scene's starting view. drei makes a new controls instance when the default camera changes,
   // so this runs on the instance that is actually used, and again when the scene changes.
@@ -173,8 +181,22 @@ function Scene({
         azimuthRotateSpeed={0.5}
         polarRotateSpeed={0.5}
         dollyDragInverted
-        onControlStart={() => (interactingRef.current = true)}
-        onControlEnd={() => (interactingRef.current = false)}
+        onControlStart={() => {
+          draggingRef.current = true
+          updateInteracting()
+        }}
+        onControlEnd={() => {
+          draggingRef.current = false
+          updateInteracting()
+        }}
+        onWake={() => {
+          movingRef.current = true
+          updateInteracting()
+        }}
+        onSleep={() => {
+          movingRef.current = false
+          updateInteracting()
+        }}
       />
       <PathTracer packed={packed} interactingRef={interactingRef} />
       {/* The key remounts the boundary, the spinner and the traced scene together, so a new scene starts clean. */}
