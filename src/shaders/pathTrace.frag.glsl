@@ -46,6 +46,10 @@ const float PI = 3.14159265359;
 
 const int FLAT_SHADING = 0;
 
+// The bounce index, counting from 0, from which Russian roulette may end dim paths early. 3 means the fourth bounce.
+// See the comment in `pathTrace`.
+const int ROULETTE_START_BOUNCE = 3;
+
 const int EMISSIVE_MATERIAL   = 0;
 const int REFLECTIVE_MATERIAL = 1;
 const int DIELECTRIC_MATERIAL = 2;
@@ -154,123 +158,187 @@ ivec3 bvhTexel(int texel, int node, int obj) {
 }
 
 // --- ray intersect objects -----------------------------------------------------------
+// Ray-triangle test (the Möller–Trumbore method), which solves for the hit distance `t` and the hit point's
+// barycentric weights in one step. Barycentric weights say how much of each vertex makes up a point on the triangle.
+// They are all between 0 and 1 and add up to 1 exactly when the point lies inside it. The test reads only the three
+// vertex positions, so a face the ray misses costs three texture reads. The caller computes the hit point and fetches
+// the normal and material for the nearest hit only.
 bool rayIntersectFace(Ray r, int face_index, int obj_index, out RayHitResult res) {
-    res.fn = texelFetch(u_face_sampler, faceTexel(FACE_NRM_INDEX, face_index, obj_index), 0).xyz; // face normal
+    vec3 p0 = texelFetch(u_face_sampler, faceTexel(VERTEX_0_POS_INDEX, face_index, obj_index), 0).xyz;
+    vec3 p1 = texelFetch(u_face_sampler, faceTexel(VERTEX_1_POS_INDEX, face_index, obj_index), 0).xyz;
+    vec3 p2 = texelFetch(u_face_sampler, faceTexel(VERTEX_2_POS_INDEX, face_index, obj_index), 0).xyz;
 
-    float fn_dot_ray_dir = dot(res.fn, r.dir);
-    if (abs(fn_dot_ray_dir) < EPSILON) {
-        return false; // ray direction almost parallel
+    vec3 e1 = p1 - p0;
+    vec3 e2 = p2 - p0;
+    vec3 pvec = cross(r.dir, e2);
+    float det = dot(e1, pvec);
+    // `det` is the cosine between the ray and the face normal, times twice the face's area. A ray within about 0.06° of
+    // the face's plane is rejected, so a grazing ray never hits the face at an unstable distance.
+    if (abs(det) < EPSILON * length(cross(e1, e2))) {
+        return false;
     }
 
-    vec3 p0 = texelFetch(u_face_sampler, faceTexel(VERTEX_0_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 0 position
+    float invDet = 1.0 / det;
+    vec3 tvec = r.origin - p0;
+    float v = dot(tvec, pvec) * invDet; // weight of vertex 1
+    if (v < 0.0 || v > 1.0) {
+        return false;
+    }
 
-    // A(origin.x + t*dir.x) + B(origin.y + t*dir.y) + C(origin.z + t*dir.z) - D = 0 (solve for t)
-    res.t = (dot(res.fn, p0) - dot(res.fn, r.origin)) / fn_dot_ray_dir;
-    if (res.t < EPSILON) return false; // contact point behind ray
+    vec3 qvec = cross(tvec, e1);
+    float w = dot(r.dir, qvec) * invDet; // weight of vertex 2
+    if (w < 0.0 || v + w > 1.0) {
+        return false;
+    }
 
-    res.p = r.origin + res.t * r.dir; // contact point on plane
-    vec3 p1 = texelFetch(u_face_sampler, faceTexel(VERTEX_1_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 1 position
-    vec3 p2 = texelFetch(u_face_sampler, faceTexel(VERTEX_2_POS_INDEX, face_index, obj_index), 0).xyz; // vertex 2 position
+    float t = dot(e2, qvec) * invDet;
+    if (t < EPSILON) { // contact point behind the ray, or at its own origin
+        return false;
+    }
 
-    // from Real-Time Collision Detection (Morgan Kaufman) by Christer Ericson
-    vec3 v0 = p1 - p0;
-    vec3 v1 = p2 - p0;
-    vec3 v2 = res.p - p0;
-    float d00 = dot(v0, v0);
-    float d01 = dot(v0, v1);
-    float d11 = dot(v1, v1);
-    float d20 = dot(v2, v0);
-    float d21 = dot(v2, v1);
-    float denominator = (d00 * d11) - (d01 * d01);
-
-    res.v = (d11 * d20 - d01 * d21) / denominator;
-    if (res.v < 0.0 || res.v > 1.0) return false;
-
-    res.w = (d00 * d21 - d01 * d20) / denominator;
-    if (res.w < 0.0 || res.w > 1.0) return false;
-
-    res.u = 1.0 - res.v - res.w;
-    if (res.u < 0.0 || res.u > 1.0) return false;
-
+    res.t = t;
+    res.u = 1.0 - v - w; // weight of vertex 0
+    res.v = v;
+    res.w = w;
     res.fi = face_index;
     res.oi = obj_index;
     return true;
 }
 
-bool rayIntersectBvhNode(Ray r, vec3 nodeMin, vec3 nodeMax, out float tEnter) { // ray intersect AABB slabs method sped up using intrinsics
-    vec3 t0 = (nodeMin - r.origin) / r.dir;
-    vec3 t1 = (nodeMax - r.origin) / r.dir;
+// Ray-box test (the slab method). A box is the overlap of three slabs, one pair of parallel planes per axis, so the
+// ray is inside the box between its latest slab entry and its earliest slab exit. The ray's direction comes already
+// inverted, so the test multiplies instead of divides. `tEnter` is where the ray enters the box, or 0 when it starts
+// inside. A box entirely behind the ray misses.
+bool rayIntersectBvhNode(Ray r, vec3 invDir, vec3 nodeMin, vec3 nodeMax, out float tEnter) {
+    vec3 t0 = (nodeMin - r.origin) * invDir;
+    vec3 t1 = (nodeMax - r.origin) * invDir;
     vec3 tmin = min(t0, t1);
     vec3 tmax = max(t0, t1);
 
-    tEnter = max(tmin.x, max(tmin.y, tmin.z)); // distance along ray where it enters the box
-    float min_tmax = min(tmax.x, min(tmax.y, tmax.z));
-
-    return tEnter < min_tmax;
+    tEnter = max(max(tmin.x, max(tmin.y, tmin.z)), 0.0);
+    float tExit = min(tmax.x, min(tmax.y, tmax.z));
+    return tEnter <= tExit;
 }
 
-bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
-    int stack[BVH_MAX_STACK_SIZE];
+// Tests a ray against BVH node `node` of object `obj`.
+bool rayIntersectNode(Ray r, vec3 invDir, int node, int obj, out float tEnter) {
+    return rayIntersectBvhNode(r, invDir,
+        texelFetch(u_bvh_sampler, bvhTexel(BVH_NODE_MIN_BOUNDS_INDEX, node, obj), 0).xyz,
+        texelFetch(u_bvh_sampler, bvhTexel(BVH_NODE_MAX_BOUNDS_INDEX, node, obj), 0).xyz,
+        tEnter);
+}
+
+// Walks each object's BVH tree for face hits closer than `tMax`, and returns whether it found one. With `anyHit` it
+// returns on the first hit, which is all a shadow ray needs. Otherwise it keeps the nearest hit in `nearest`.
+//
+// A node's children are tested before they are pushed, and the nearer one is pushed last, so it is visited first.
+// Finding a close hit early lets the walk skip every node whose box starts farther away. The entry distance kept
+// beside each stacked node is checked again when the node is popped.
+bool traceBVH(Ray r, float tMax, bool anyHit, out RayHitResult nearest) {
+    int stackNode[BVH_MAX_STACK_SIZE];
+    float stackT[BVH_MAX_STACK_SIZE];
     RayHitResult current;
-    vec4 texel;
+    vec3 invDir = 1.0 / r.dir;
 
-    int lt_idx, rt_idx;
-    int f0_idx, f1_idx;
-    int node_idx;
-    int top;
-    float tEnter;
+    nearest.t = tMax;
 
-    nearest.t = MAX_FLT;
+    for (int obj = 0; obj < u_num_objects; ++obj) { // each mesh has its own tree, with its root at node 0
+        float tRoot;
+        if (!rayIntersectNode(r, invDir, 0, obj, tRoot) || tRoot >= nearest.t) {
+            continue;
+        }
 
-    for (int obj_idx = 0; obj_idx < u_num_objects; ++obj_idx) { // for each mesh object/BVH tree
-        stack[0] = 0; // push root BV index which is always 0 on to empty stack
-        top = 0;
+        // The stack holds each node still to visit and the distance where the ray enters its box. The pushes are written
+        // out instead of calling a function, because passing the arrays to a function copies them on every call.
+        int top = 0;
+        stackNode[0] = 0;
+        stackT[0] = tRoot;
 
         while (top > -1) {
-            node_idx = stack[top--]; // pop node index from top of stack
-            if (rayIntersectBvhNode(r,
-                texelFetch(u_bvh_sampler, bvhTexel(BVH_NODE_MIN_BOUNDS_INDEX, node_idx, obj_idx), 0).xyz,// node min bounds
-                texelFetch(u_bvh_sampler, bvhTexel(BVH_NODE_MAX_BOUNDS_INDEX, node_idx, obj_idx), 0).xyz,// node max bounds
-                tEnter
-            ) && tEnter < nearest.t) { // skip subtrees that can't be closer than the nearest hit found so far
-                texel = texelFetch(u_bvh_sampler, bvhTexel(BVH_NODE_PAYLOAD_INDEX, node_idx, obj_idx), 0);
-                lt_idx = int(texel.r); // index of L child BV node
-                rt_idx = int(texel.g); // index of R child BV node
-                f0_idx = int(texel.b); // index of a face inside current BV bounds
-                f1_idx = int(texel.a); // index of a face inside current BV bounds
+            int node = stackNode[top];
+            float tNode = stackT[top];
+            --top;
+            if (tNode >= nearest.t) { // a closer hit was found after this node was pushed
+                continue;
+            }
 
-                if (lt_idx != -1) { stack[++top] = lt_idx; } // push lt BV index on to stack
-                if (rt_idx != -1) { stack[++top] = rt_idx; } // push rt BV index on to stack
+            vec4 payload = texelFetch(u_bvh_sampler, bvhTexel(BVH_NODE_PAYLOAD_INDEX, node, obj), 0);
+            int lt = int(payload.r); // left child node, or -1
+            int rt = int(payload.g); // right child node, or -1
+            int f0 = int(payload.b); // a face in this node, or -1
+            int f1 = int(payload.a); // a face in this node, or -1
 
-                if (f0_idx != -1 && rayIntersectFace(r, f0_idx, obj_idx, current) && current.t < nearest.t) {
-                    nearest = current;
+            if (f0 != -1 && rayIntersectFace(r, f0, obj, current) && current.t < nearest.t) {
+                nearest = current;
+                if (anyHit) {
+                    return true;
                 }
-                if (f1_idx != -1 && rayIntersectFace(r, f1_idx, obj_idx, current) && current.t < nearest.t) {
-                    nearest = current;
+            }
+            if (f1 != -1 && rayIntersectFace(r, f1, obj, current) && current.t < nearest.t) {
+                nearest = current;
+                if (anyHit) {
+                    return true;
                 }
+            }
+
+            float tL;
+            float tR;
+            bool hitL = lt != -1 && rayIntersectNode(r, invDir, lt, obj, tL) && tL < nearest.t;
+            bool hitR = rt != -1 && rayIntersectNode(r, invDir, rt, obj, tR) && tR < nearest.t;
+
+            // Push the farther child first, so the nearer one is popped next. After the swap, `lt` is the nearer child.
+            if (hitL && hitR && tR < tL) {
+                int swapNode = lt;
+                lt = rt;
+                rt = swapNode;
+                float swapT = tL;
+                tL = tR;
+                tR = swapT;
+            }
+            if (hitR) {
+                ++top;
+                stackNode[top] = rt;
+                stackT[top] = tR;
+            }
+            if (hitL) {
+                ++top;
+                stackNode[top] = lt;
+                stackT[top] = tL;
             }
         }
     }
 
-    if (nearest.t != MAX_FLT) { // ray has a nearest hit
-        if (u_shading_method == FLAT_SHADING) { // use the face normal for flat shading
-            nearest.n = nearest.fn;
-        } else { // interpolate vertex normals using barycentric coordinates to implement Phong shading
-            float u = nearest.u;
-            float v = nearest.v;
-            float w = 1.0 - u - v;
-            int obj_index = nearest.oi;
-            int face_index = nearest.fi;
-            nearest.n = normalize(
-                (texelFetch(u_face_sampler, faceTexel(VERTEX_0_NRM_INDEX, face_index, obj_index), 0).xyz * u) +
-                (texelFetch(u_face_sampler, faceTexel(VERTEX_1_NRM_INDEX, face_index, obj_index), 0).xyz * v) +
-                (texelFetch(u_face_sampler, faceTexel(VERTEX_2_NRM_INDEX, face_index, obj_index), 0).xyz * w)
-            );
-        }
-        nearest.mi = int(texelFetch(u_face_sampler, faceTexel(FACE_MATERIAL_INDEX, nearest.fi, nearest.oi), 0).x); // material index
-        return true;
+    return nearest.t < tMax;
+}
+
+// Whether anything blocks a ray before distance `maxT`.
+bool rayOccluded(Ray r, float maxT) {
+    RayHitResult blocker;
+    return traceBVH(r, maxT, true, blocker);
+}
+
+// Finds the nearest hit along a ray, and fetches its position, normals and material.
+bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
+    if (!traceBVH(r, MAX_FLT, false, nearest)) {
+        return false;
     }
-    return false;
+
+    // Shading data for the nearest hit only.
+    int obj_index = nearest.oi;
+    int face_index = nearest.fi;
+    nearest.p = r.origin + nearest.t * r.dir;
+    nearest.fn = texelFetch(u_face_sampler, faceTexel(FACE_NRM_INDEX, face_index, obj_index), 0).xyz;
+    if (u_shading_method == FLAT_SHADING) { // use the face normal for flat shading
+        nearest.n = nearest.fn;
+    } else { // interpolate vertex normals using barycentric coordinates to implement Phong shading
+        nearest.n = normalize(
+            (texelFetch(u_face_sampler, faceTexel(VERTEX_0_NRM_INDEX, face_index, obj_index), 0).xyz * nearest.u) +
+            (texelFetch(u_face_sampler, faceTexel(VERTEX_1_NRM_INDEX, face_index, obj_index), 0).xyz * nearest.v) +
+            (texelFetch(u_face_sampler, faceTexel(VERTEX_2_NRM_INDEX, face_index, obj_index), 0).xyz * nearest.w)
+        );
+    }
+    nearest.mi = int(texelFetch(u_face_sampler, faceTexel(FACE_MATERIAL_INDEX, face_index, obj_index), 0).x); // material index
+    return true;
 }
 
 // --- ray cast from eye through image pixel -------------------------------------------
@@ -372,8 +440,7 @@ vec3 sampleDirectLight(RayHitResult hit, vec3 albedo) {
         return vec3(0.0);
     }
 
-    RayHitResult blocker;
-    if (rayIntersectBVH(Ray(origin, dir), blocker) && blocker.t < dist - 2.0 * EPSILON) {
+    if (rayOccluded(Ray(origin, dir), dist - 2.0 * EPSILON)) {
         return vec3(0.0);
     }
 
@@ -433,6 +500,17 @@ vec3 pathTrace(Ray ray) {
         }
 
         throughput *= material.albedo;
+
+        // Russian roulette: a path continues with a chance equal to its brightest throughput channel, so a path that can
+        // only add a little light usually stops here. A surviving path is divided by that chance, which keeps the
+        // average brightness the same. The first bounces always continue, because they carry most of the light.
+        if (i >= ROULETTE_START_BOUNCE) {
+            float survival = clamp(max(throughput.r, max(throughput.g, throughput.b)), 0.05, 1.0);
+            if (rand() > survival) { // `>` because rand() can return exactly 1.0
+                break;
+            }
+            throughput /= survival;
+        }
     }
 
     return radiance;
