@@ -17,6 +17,15 @@ enum Axis {
 // that rays miss through rounding.
 const bvMinDelta = 0.01
 
+// A node with this many faces or fewer may become a leaf. A bigger leaf means fewer nodes for a ray to step through,
+// at the price of testing faces the ray misses.
+const maxLeafFaces = 8
+
+// The cost of visiting a node, relative to testing one face, in the surface area heuristic (SAH). A node with few
+// enough faces becomes a leaf when testing all its faces costs no more than one node visit plus the face tests expected
+// in its children. The value is tuned on the bundled scenes.
+const nodeVisitCost = 2.0
+
 let maxDepth = 0 // deepest BVH tree level split while building, reported back so `packScene` can check it against the shader's stack
 
 interface Vec3 {
@@ -35,7 +44,6 @@ interface Face {
   n2: Vec3 // vertex normal 2
 
   faceNormal: Vec3
-  faceIndex: number // index into root face array
   materialIndex: number // index into material array
 
   min: Vec3 // min corner of the face's bounding box
@@ -110,26 +118,39 @@ class BvhNode {
   max: Vec3 // max corner
   leftChild: number // left child node index
   rightChild: number // right child node index
-  faceIndices: number[] // indices of the faces stored in this node
+  firstFace: number // a leaf's first face in the object's leaf-ordered face list, 0 for an interior node
+  faceCount: number // a leaf's number of faces, 0 for an interior node
 
   constructor(min: Vec3, max: Vec3) {
     this.min = min
     this.max = max
     this.leftChild = -2.0
     this.rightChild = -2.0
-    this.faceIndices = [-2.0, -2.0]
+    this.firstFace = 0
+    this.faceCount = 0
   }
 
-  subDivide(faces: Face[], bvhNodes: BvhNode[], depth: number = 0) {
-    if (faces.length <= this.faceIndices.length) {
-      // all the faces fit in this node
-      faces.forEach((face, i) => (this.faceIndices[i] = face.faceIndex))
-    } else {
-      maxDepth = Math.max(maxDepth, depth)
-      // pick the axis/position that minimizes expected ray traversal cost (SAH)
-      const { index, sorted } = BvhNode.findBestSplit(faces)
-      this.splitAcross(index, sorted, bvhNodes, depth)
+  // Splits the faces between two children, or keeps them in this node as a leaf. A leaf's faces are appended to
+  // `leafFaces`, so each leaf's faces sit next to each other in the faces texture.
+  subDivide(faces: Face[], bvhNodes: BvhNode[], leafFaces: Face[], depth: number = 0) {
+    // Pick the axis and position that minimize the expected traversal cost (SAH). The children's face costs are weighted
+    // by the chance a ray through this node also crosses each child, the ratio of their surface areas. A single face, or
+    // faces with no area, can't be split usefully, so they get an infinite split cost.
+    const { index, sorted, cost, area } = BvhNode.findBestSplit(faces)
+    const splitCost = area > 0 ? nodeVisitCost + cost / area : Infinity
+    if (faces.length <= maxLeafFaces && faces.length <= splitCost) {
+      this.makeLeaf(faces, leafFaces)
+      return
     }
+
+    maxDepth = Math.max(maxDepth, depth)
+    this.splitAcross(index, sorted, bvhNodes, leafFaces, depth)
+  }
+
+  makeLeaf(faces: Face[], leafFaces: Face[]) {
+    this.firstFace = leafFaces.length
+    this.faceCount = faces.length
+    leafFaces.push(...faces)
   }
 
   static surfaceArea(min: Vec3, max: Vec3): number {
@@ -141,10 +162,13 @@ class BvhNode {
 
   // sweep all 3 axes and every candidate split position, return the one with
   // the lowest surface-area-heuristic cost: SA(left) * |left| + SA(right) * |right|
-  static findBestSplit(faces: Face[]): { index: number; sorted: Face[] } {
+  // `area` is the surface area of the box around all the faces, without the `bvMinDelta` padding, so it matches the
+  // children's areas in `cost`.
+  static findBestSplit(faces: Face[]): { index: number; sorted: Face[]; cost: number; area: number } {
     let bestIndex = Math.ceil(faces.length / 2)
     let bestCost = Number.MAX_VALUE
     let bestSorted = faces
+    let area = 0
 
     ;[Axis.x, Axis.y, Axis.z].forEach(axis => {
       const sorted = [...faces].sort(
@@ -174,6 +198,8 @@ class BvhNode {
           Math.max(prefixMax[i].z, fMax.z),
         )
       }
+
+      area = BvhNode.surfaceArea(prefixMin[n], prefixMax[n])
 
       suffixMin[n] = empty.min
       suffixMax[n] = empty.max
@@ -205,10 +231,10 @@ class BvhNode {
       }
     })
 
-    return { index: bestIndex, sorted: bestSorted }
+    return { index: bestIndex, sorted: bestSorted, cost: bestCost, area }
   }
 
-  splitAcross(index: number, sorted: Face[], bvhNodes: BvhNode[], depth: number) {
+  splitAcross(index: number, sorted: Face[], bvhNodes: BvhNode[], leafFaces: Face[], depth: number) {
     const leftFaces = sorted.slice(0, index) // left faces
     const rightFaces = sorted.slice(index, sorted.length) // right faces
     let leftNode = null
@@ -229,10 +255,10 @@ class BvhNode {
     }
 
     if (leftNode) {
-      leftNode.subDivide(leftFaces, bvhNodes, depth + 1)
+      leftNode.subDivide(leftFaces, bvhNodes, leafFaces, depth + 1)
     }
     if (rightNode) {
-      rightNode.subDivide(rightFaces, bvhNodes, depth + 1)
+      rightNode.subDivide(rightFaces, bvhNodes, leafFaces, depth + 1)
     }
   }
 }
@@ -274,7 +300,6 @@ function buildObject(mesh: BvhRequestMesh): { faces: Face[]; bvhNodes: BvhNode[]
       n2: readVec3(mesh.normals, o + 6),
       faceNormal,
       materialIndex: mesh.materialIndex,
-      faceIndex,
       min: vec3(Math.min(p0.x, p1.x, p2.x), Math.min(p0.y, p1.y, p2.y), Math.min(p0.z, p1.z, p2.z)),
       max: vec3(Math.max(p0.x, p1.x, p2.x), Math.max(p0.y, p1.y, p2.y), Math.max(p0.z, p1.z, p2.z)),
       centroid: vec3((p0.x + p1.x + p2.x) / 3.0, (p0.y + p1.y + p2.y) / 3.0, (p0.z + p1.z + p2.z) / 3.0),
@@ -284,11 +309,12 @@ function buildObject(mesh: BvhRequestMesh): { faces: Face[]; bvhNodes: BvhNode[]
   const { min, max } = boundsOf(faces) // root bounding box over all faces
 
   const bvhNodes: BvhNode[] = []
+  const leafFaces: Face[] = [] // the faces in the order the leaves hold them, which is the order they are packed in
   const root = new BvhNode(min, max)
   bvhNodes.push(root)
-  root.subDivide(faces, bvhNodes)
+  root.subDivide(faces, bvhNodes, leafFaces)
 
-  return { faces, bvhNodes }
+  return { faces: leafFaces, bvhNodes }
 }
 
 // Writes the face texels the shader reads, one slice of maxNumFaces faces per object.
@@ -346,8 +372,8 @@ function packBvhNodes(objects: { bvhNodes: BvhNode[] }[], maxNumBvhNodes: number
 
       data[i++] = bv.leftChild + 0.5 // left child node index is cast to int in fragment shader
       data[i++] = bv.rightChild + 0.5 // right child node index is cast to int in fragment shader
-      data[i++] = bv.faceIndices[0] + 0.5 // face index is cast to int in fragment shader
-      data[i++] = bv.faceIndices[1] + 0.5 // face index is cast to int in fragment shader
+      data[i++] = bv.firstFace + 0.5 // first face index is cast to int in fragment shader
+      data[i++] = bv.faceCount + 0.5 // face count is cast to int in fragment shader
     })
   })
   return data
