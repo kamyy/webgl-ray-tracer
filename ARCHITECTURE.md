@@ -144,7 +144,9 @@ The scene is a glTF 2.0 binary, fetched from `/scenes/` or opened from the user'
 `src/shaders/pathTrace.frag.glsl` traces one sample per pixel.
 
 - **The random number generator combines three Tausworthe steps with a linear congruential generator.** Each pixel is seeded from the texture that `createRandomTexture` in `src/lib/webgl/randomTexture.ts` builds, and perturbed by the sample number, so every sample uses different random numbers and the average converges.
-- **`rayIntersectBVH` walks every object's tree with an explicit stack.** It skips any subtree whose entry distance is farther than the nearest hit found so far.
+- **`traceBVH` walks every object's tree with an explicit stack, nearer child first.** It tests both children's boxes before pushing them and pushes the nearer one last, so a close hit is found early and every subtree that starts farther away is skipped. Each stacked node keeps its entry distance, because a closer hit found after the push makes the node worthless.
+  - The triangle test is the Möller–Trumbore method, a standard test that solves for the hit distance and the hit point's barycentric weights (how much of each vertex makes up the point) from the three vertex positions. The normals and material are read once, for the nearest hit, instead of for every triangle tested.
+  - Shadow rays stop at the first blocker closer than the light (`rayOccluded`), because they only need to know whether the light is visible.
 - **`pathTrace` unrolls the recursive algorithm into a loop**, because GLSL can't recurse. It keeps a running `throughput` and adds light to `radiance`, and it stops at an emissive material. A path that runs out of bounces adds the albedo of the surface it ended on, an ambient glow that lights areas no ray reaches a light from.
   - Reflective surfaces pick the mirror lobe (`rayBounceOffMirror`) or the diffuse lobe (`rayBounceOffDiffuse`) with the chance `reflectionRatio`, and `reflectionGloss` sets how sharp the mirror lobe is.
   - Dielectric surfaces (`rayBounceOffDielectricSurface`) use the Schlick approximation to choose between reflecting and refracting.

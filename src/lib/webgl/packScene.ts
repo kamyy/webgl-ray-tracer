@@ -264,8 +264,8 @@ export async function packScene(root: Object3D): Promise<PackedScene> {
   const lights = packLights(meshFaces, materials)
   const bvh = await buildBvh({ meshes: meshFaces })
 
-  // Traversal pops a node and pushes both children, so a node split at depth d leaves d + 2 entries on the shader's
-  // stack. A deeper tree would overflow it and corrupt the render without any error.
+  // Traversal pops a node and pushes the children its ray hits, at most two, so a node split at depth d leaves at most
+  // d + 2 entries on the shader's stack. A deeper tree would overflow it and corrupt the render without any error.
   if (bvh.maxDepth + 2 > bvhMaxStackSize) {
     throw new Error(
       `a mesh is too deeply nested for the renderer (BVH depth ${bvh.maxDepth}, limit ${bvhMaxStackSize - 2}). ` +
