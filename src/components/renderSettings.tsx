@@ -2,13 +2,15 @@
  * The scene cards, sliders, number fields and radio buttons that change what is rendered and how.
  *
  * Each slider is paired with a number field, so a value can be dragged to or typed exactly. Each control writes its
- * value to the app store. `PathTracer` watches those values and restarts accumulation when one changes. The scene
- * cards write the chosen scene to the store, which remounts the traced scene.
+ * value to the app store, and `PathTracer` watches those values. The settings come in two titled groups. An image
+ * setting keeps the samples traced so far. A tracing setting changes what is traced, so a change restarts
+ * accumulation. The scene cards write the chosen scene to the store, which remounts the traced scene.
  */
 import { useGLTF } from '@react-three/drei'
 import { useId, useRef, useState } from 'react'
 import { isFileScene, sceneFromFile, scenes, type SceneInfo } from '../lib/scenes'
 import { ShadingMethod, useAppStore } from '../lib/store/appStore'
+import { Icon } from './icon'
 
 // The limits of each setting. They bound both the sliders and the number fields.
 const minSamples = 1
@@ -17,14 +19,21 @@ const minBounces = 1
 const maxBounces = 16
 const minCameraFov = 10
 const maxCameraFov = 120
+const minExposure = 0.1
+const maxExposure = 3
+const minContrast = 1
+const maxContrast = 2
+const imageSettingStep = 0.05 // the exposure and contrast step
 
 // The tooltip of each setting.
 const hints = {
-  fov: 'Vertical field of view, in degrees. A wider angle shows more of the scene.',
-  lensRadius: 'In world space units. 0 keeps everything sharp. The range follows the scene size.',
-  focus: 'Distance from camera to sharp plane, in world space units. The range follows the scene size.',
-  samples: 'Number of samples per pixel before the render stops.',
-  bounces: 'Most bounces a ray of light may make.',
+  fov: 'Vertical field of view, in degrees.',
+  lensRadius: 'In world space units. A larger lens blurs more outside the focus distance.',
+  focus: 'In world space units. Objects at this distance from the camera stay sharp.',
+  samples: 'Number of samples per pixel to complete the render.',
+  bounces: 'Max number of times a ray may bounce off surfaces.',
+  exposure: 'Brightens or darkens the whole image.',
+  contrast: 'Deepens shadows and strengthens colors.',
   shading: 'Flat shows each triangle. Phong smooths across them.',
 }
 
@@ -47,6 +56,11 @@ interface RangeRowProps {
   max: number
   step?: number // the smallest change the slider and the number field make, 1 when left out
   onChange: (value: number) => void
+}
+
+interface SettingsGroupProps {
+  title: string
+  children: React.ReactNode
 }
 
 // One setting: a label, a slider for dragging, and a number field for typing an exact value.
@@ -110,6 +124,18 @@ function RangeRow({ title, hint, value, min, max, step = 1, onChange }: RangeRow
         onBlur={onTypingDone}
       />
     </div>
+  )
+}
+
+// A titled box around a group of settings. The box is a fieldset, so the title sits on its border and screen readers
+// announce it with each setting in the group. `min-w-0` lets the box shrink inside a grid column, which a fieldset
+// otherwise refuses to do below its content's width.
+function SettingsGroup({ title, children }: SettingsGroupProps) {
+  return (
+    <fieldset className="mt-1 min-w-0 rounded-xl border border-gray-300 px-2 pb-1.5 dark:border-gray-600 short:mt-0">
+      <legend className="px-1 text-xs font-bold tracking-wide uppercase">{title}</legend>
+      {children}
+    </fieldset>
   )
 }
 
@@ -188,18 +214,9 @@ function SceneCards() {
         <span
           className={`${cardPicture} ${openCardPicture} peer-hover:border-(--accent) peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--accent)`}
         >
-          <svg
-            className="h-6 w-6"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
+          <Icon className="h-6 w-6">
             <path d="M12 5v14M5 12h14" />
-          </svg>
+          </Icon>
         </span>
         <span className={cardName}>{openCardName}</span>
         <input ref={fileInput} type="file" accept=".glb,model/gltf-binary" className="hidden" onChange={onFilePicked} />
@@ -208,98 +225,140 @@ function SceneCards() {
   )
 }
 
-export function RenderSettings() {
+// The flat or Phong choice, drawn as one segmented button. The radios are invisible and fill each half, so a press
+// anywhere on the half selects it, and keyboard focus still works.
+function ShadingControl() {
+  const shadingMethod = useAppStore(state => state.shadingMethod)
+  const setShadingMethod = useAppStore(state => state.setShadingMethod)
+
+  return (
+    <fieldset className="mt-1 flex items-center" title={hints.shading}>
+      <legend className="sr-only">Shading method</legend>
+      <div className="flex w-full overflow-hidden rounded-lg border border-gray-300 dark:border-gray-600">
+        {shadingMethods.map(method => (
+          <label key={method.value} className="relative flex-1">
+            <input
+              className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              type="radio"
+              name="shadingMethod"
+              value={method.value}
+              checked={shadingMethod === method.value}
+              onChange={() => setShadingMethod(method.value)}
+            />
+            <span className="block min-h-11 content-center px-4 text-center text-xs font-semibold text-gray-600 peer-checked:bg-(--accent) peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-2 peer-focus-visible:outline-(--accent) dark:text-gray-400 dark:peer-checked:text-gray-900 short:min-h-9">
+              {method.label}
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  )
+}
+
+// The settings that change what is traced. A change restarts accumulation.
+function TracingSettings() {
   const cameraFov = useAppStore(state => state.cameraFov)
   const lensRadius = useAppStore(state => state.lensRadius)
   const lensRadiusRange = useAppStore(state => state.lensRadiusRange)
   const focusDistance = useAppStore(state => state.focusDistance)
   const focusRange = useAppStore(state => state.focusRange)
-  const numSamples = useAppStore(state => state.numSamples)
   const numBounces = useAppStore(state => state.numBounces)
-  const shadingMethod = useAppStore(state => state.shadingMethod)
   const setCameraFov = useAppStore(state => state.setCameraFov)
   const setLensRadius = useAppStore(state => state.setLensRadius)
   const setFocusDistance = useAppStore(state => state.setFocusDistance)
-  const setNumSamples = useAppStore(state => state.setNumSamples)
   const setNumBounces = useAppStore(state => state.setNumBounces)
-  const setShadingMethod = useAppStore(state => state.setShadingMethod)
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] short:landscape:grid-cols-[13rem_minmax(0,1fr)] short:landscape:content-start short:landscape:items-start short:landscape:gap-x-5">
-      <div className="short:landscape:col-start-1 short:landscape:row-start-1">
-        <SceneCards />
-      </div>
+    <SettingsGroup title="Tracing">
+      <RangeRow
+        title="Field of view"
+        hint={hints.fov}
+        value={cameraFov}
+        min={minCameraFov}
+        max={maxCameraFov}
+        onChange={setCameraFov}
+      />
+      <RangeRow
+        title="Lens radius"
+        hint={hints.lensRadius}
+        value={lensRadius}
+        min={lensRadiusRange.min}
+        max={lensRadiusRange.max}
+        step={lensRadiusRange.step}
+        onChange={setLensRadius}
+      />
+      <RangeRow
+        title="Focus distance"
+        hint={hints.focus}
+        value={focusDistance}
+        min={focusRange.min}
+        max={focusRange.max}
+        step={focusRange.step}
+        onChange={setFocusDistance}
+      />
+      <RangeRow
+        title="Ray bounces"
+        hint={hints.bounces}
+        value={numBounces}
+        min={minBounces}
+        max={maxBounces}
+        onChange={setNumBounces}
+      />
+      <ShadingControl />
+    </SettingsGroup>
+  )
+}
 
-      <div className="short:landscape:col-start-2 short:landscape:row-span-2 short:landscape:row-start-1">
-        <RangeRow
-          title="Field of view"
-          hint={hints.fov}
-          value={cameraFov}
-          min={minCameraFov}
-          max={maxCameraFov}
-          onChange={setCameraFov}
-        />
-        <RangeRow
-          title="Lens radius"
-          hint={hints.lensRadius}
-          value={lensRadius}
-          min={lensRadiusRange.min}
-          max={lensRadiusRange.max}
-          step={lensRadiusRange.step}
-          onChange={setLensRadius}
-        />
-        <RangeRow
-          title="Focus distance"
-          hint={hints.focus}
-          value={focusDistance}
-          min={focusRange.min}
-          max={focusRange.max}
-          step={focusRange.step}
-          onChange={setFocusDistance}
-        />
-        <RangeRow
-          title="Samples"
-          hint={hints.samples}
-          value={numSamples}
-          min={minSamples}
-          max={maxSamples}
-          onChange={setNumSamples}
-        />
-        <RangeRow
-          title="Bounces"
-          hint={hints.bounces}
-          value={numBounces}
-          min={minBounces}
-          max={maxBounces}
-          onChange={setNumBounces}
-        />
-      </div>
+// The settings that keep the samples traced so far. The sample count moves where the render stops, and the exposure
+// and contrast redraw the finished average.
+function ImageSettings() {
+  const numSamples = useAppStore(state => state.numSamples)
+  const exposure = useAppStore(state => state.exposure)
+  const contrast = useAppStore(state => state.contrast)
+  const setNumSamples = useAppStore(state => state.setNumSamples)
+  const setExposure = useAppStore(state => state.setExposure)
+  const setContrast = useAppStore(state => state.setContrast)
 
-      {/* The shading choice is a radio group drawn as one segmented button. The radios are invisible and fill each
-          half, so a press anywhere on the half selects it, and keyboard focus still works. */}
-      <fieldset
-        className="mt-1 flex items-center short:landscape:col-start-1 short:landscape:row-start-2"
-        title={hints.shading}
-      >
-        <legend className="sr-only">Shading method</legend>
-        <div className="flex w-full overflow-hidden rounded-lg border border-gray-300 dark:border-gray-600">
-          {shadingMethods.map(method => (
-            <label key={method.value} className="relative flex-1">
-              <input
-                className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                type="radio"
-                name="shadingMethod"
-                value={method.value}
-                checked={shadingMethod === method.value}
-                onChange={() => setShadingMethod(method.value)}
-              />
-              <span className="block min-h-11 content-center px-4 text-center text-xs font-semibold text-gray-600 peer-checked:bg-(--accent) peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-2 peer-focus-visible:outline-(--accent) dark:text-gray-400 dark:peer-checked:text-gray-900 short:min-h-9">
-                {method.label}
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
+  return (
+    <SettingsGroup title="Image">
+      <RangeRow
+        title="Samples"
+        hint={hints.samples}
+        value={numSamples}
+        min={minSamples}
+        max={maxSamples}
+        onChange={setNumSamples}
+      />
+      <RangeRow
+        title="Exposure"
+        hint={hints.exposure}
+        value={exposure}
+        min={minExposure}
+        max={maxExposure}
+        step={imageSettingStep}
+        onChange={setExposure}
+      />
+      <RangeRow
+        title="Contrast"
+        hint={hints.contrast}
+        value={contrast}
+        min={minContrast}
+        max={maxContrast}
+        step={imageSettingStep}
+        onChange={setContrast}
+      />
+    </SettingsGroup>
+  )
+}
+
+// One column on a desktop and on a phone in portrait. On a phone in landscape the window is too short for one column,
+// so the scene cards, the image settings and the tracing settings sit side by side.
+export function RenderSettings() {
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)] short:landscape:grid-cols-[minmax(0,22%)_minmax(0,1fr)_minmax(0,1fr)] short:landscape:items-start short:landscape:gap-x-4">
+      <SceneCards />
+      <ImageSettings />
+      <TracingSettings />
     </div>
   )
 }
