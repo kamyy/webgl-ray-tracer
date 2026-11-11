@@ -133,18 +133,18 @@ function packMaterials(materials: MeshPhysicalMaterial[]): Float32Array {
   materials.forEach((material, id) => {
     let i = numFloatsPerMaterial * id
     let materialClass = REFLECTIVE_MATERIAL
-    let albedo = material.color.clone()
+    let color = material.color.clone() // the base color, or the emitted light for a light
 
     if (isEmissive(material)) {
       materialClass = EMISSIVE_MATERIAL
-      albedo = material.emissive.clone().multiplyScalar(material.emissiveIntensity)
+      color = material.emissive.clone().multiplyScalar(material.emissiveIntensity)
     } else if (material.transmission > 0.5) {
       materialClass = DIELECTRIC_MATERIAL
     }
 
-    data[i++] = albedo.r
-    data[i++] = albedo.g
-    data[i++] = albedo.b
+    data[i++] = color.r
+    data[i++] = color.g
+    data[i++] = color.b
     data[i++] = 1.0
 
     data[i++] = materialClass + 0.5 // material class is cast to int in fragment shader
@@ -191,7 +191,7 @@ function packLights(meshFaces: BvhRequestMesh[], materials: MeshPhysicalMaterial
       totalArea += area
       lights.push(p0.x, p0.y, p0.z, totalArea)
       lights.push(p1.x, p1.y, p1.z, 0)
-      lights.push(p2.x, p2.y, p2.z, mesh.materialIndex)
+      lights.push(p2.x, p2.y, p2.z, mesh.materialIndex + 0.5) // material index is cast to int in fragment shader
     }
   }
 
