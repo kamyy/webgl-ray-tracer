@@ -33,7 +33,7 @@ struct RayHitResult {
 
 struct Material {
     int   materialClass;
-    vec3  albedo;
+    vec3  baseColor;
     float reflectionRatio;
     float reflectionGloss;
     float refractionIndex;
@@ -76,13 +76,18 @@ const int BVH_NODES_PER_ROW = 64;
 const int TEXELS_PER_FACE = 8;
 const int TEXELS_PER_BVH_NODE = 3;
 
-const int MATERIAL_ALBEDO_INDEX = 0;
+const int MATERIAL_COLOR_INDEX = 0;
 const int MATERIAL_ATTRIB_INDEX = 1;
 
 // Lights wrap onto rows of this many entries, like faces. Both constants must equal their counterparts in
 // `src/lib/webgl/sceneLayout.ts`: `lightsPerRow` and `numTexelsPerLight`.
 const int LIGHTS_PER_ROW = 64;
 const int TEXELS_PER_LIGHT = 3;
+
+// The first light texel's w holds the running area total, and the third light texel's w holds the material index.
+const int LIGHT_VERTEX_0_INDEX = 0;
+const int LIGHT_VERTEX_1_INDEX = 1;
+const int LIGHT_VERTEX_2_INDEX = 2;
 
 // --- globals -------------------------------------------------------------------------
 uvec4 g_randGeneratorState; // random number generator current state
@@ -393,31 +398,31 @@ void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Material mat
 // `rayBounceOffDiffuse` sends the ray along n + a random point in the unit ball. That direction has the density
 // 2 * cos(theta)^3 / PI per unit of solid angle, with theta measured from the normal. A light sample must use the same
 // density, or the lit areas would come out a different brightness than the bounce rays give.
-vec3 sampleDirectLight(RayHitResult hit, vec3 albedo) {
+vec3 sampleDirectLight(RayHitResult hit, vec3 baseColor) {
     if (u_num_lights == 0) {
         return vec3(0.0);
     }
 
     // The first texel's w holds the running total of the light areas, so a binary search finds the light that the
     // random target falls in.
-    float totalArea = texelFetch(u_light_sampler, lightTexel(0, u_num_lights - 1), 0).w;
+    float totalArea = texelFetch(u_light_sampler, lightTexel(LIGHT_VERTEX_0_INDEX, u_num_lights - 1), 0).w;
     float target = rand() * totalArea;
     int low = 0;
     int high = u_num_lights - 1;
     while (low < high) {
         int mid = (low + high) / 2;
-        if (texelFetch(u_light_sampler, lightTexel(0, mid), 0).w < target) {
+        if (texelFetch(u_light_sampler, lightTexel(LIGHT_VERTEX_0_INDEX, mid), 0).w < target) {
             low = mid + 1;
         } else {
             high = mid;
         }
     }
 
-    vec3 p0 = texelFetch(u_light_sampler, lightTexel(0, low), 0).xyz;
-    vec3 p1 = texelFetch(u_light_sampler, lightTexel(1, low), 0).xyz;
-    vec4 texel2 = texelFetch(u_light_sampler, lightTexel(2, low), 0);
+    vec3 p0 = texelFetch(u_light_sampler, lightTexel(LIGHT_VERTEX_0_INDEX, low), 0).xyz;
+    vec3 p1 = texelFetch(u_light_sampler, lightTexel(LIGHT_VERTEX_1_INDEX, low), 0).xyz;
+    vec4 texel2 = texelFetch(u_light_sampler, lightTexel(LIGHT_VERTEX_2_INDEX, low), 0);
     vec3 p2 = texel2.xyz;
-    vec3 emission = texelFetch(u_material_sampler, ivec2(MATERIAL_ALBEDO_INDEX, int(texel2.w)), 0).xyz;
+    vec3 emission = texelFetch(u_material_sampler, ivec2(MATERIAL_COLOR_INDEX, int(texel2.w)), 0).xyz;
 
     // A uniformly distributed point on the light's face.
     float r1 = sqrt(rand());
@@ -440,10 +445,10 @@ vec3 sampleDirectLight(RayHitResult hit, vec3 albedo) {
         return vec3(0.0);
     }
 
-    // The bounce direction's density, times the albedo and the light's emission, times the area-to-solid-angle
+    // The bounce direction's density, times the base color and the light's emission, times the area-to-solid-angle
     // conversion, divided by the chance of picking this point (one over the total light area).
     float density = 2.0 * cosSurface * cosSurface * cosSurface / PI;
-    return albedo * emission * (density * cosLight * totalArea / (dist * dist));
+    return baseColor * emission * (density * cosLight * totalArea / (dist * dist));
 }
 
 vec3 pathTrace(Ray ray) {
@@ -459,7 +464,8 @@ vec3 pathTrace(Ray ray) {
             break;
         }
 
-        material.albedo = texelFetch(u_material_sampler, ivec2(MATERIAL_ALBEDO_INDEX, hit.mi), 0).xyz;
+        // The color texel holds the emitted light for an emissive material, and the base color for any other.
+        vec3 color = texelFetch(u_material_sampler, ivec2(MATERIAL_COLOR_INDEX, hit.mi), 0).xyz;
         texel = texelFetch(u_material_sampler, ivec2(MATERIAL_ATTRIB_INDEX, hit.mi), 0);
         material.materialClass = int(texel.x);
         material.reflectionRatio = texel.y;
@@ -467,14 +473,17 @@ vec3 pathTrace(Ray ray) {
         material.refractionIndex = texel.w;
 
         if (material.materialClass == EMISSIVE_MATERIAL) {
+            vec3 emission = color;
             if (countEmission) {
-                radiance += throughput * material.albedo;
+                radiance += throughput * emission;
             }
             break;
         }
 
+        material.baseColor = color;
+
         if (i == u_num_bounces) { // out of bounces, so the surface glows with its own color as ambient light
-            radiance += throughput * material.albedo;
+            radiance += throughput * material.baseColor;
             break;
         }
 
@@ -486,7 +495,7 @@ vec3 pathTrace(Ray ray) {
                 }
                 countEmission = true;
             } else {
-                radiance += throughput * sampleDirectLight(hit, material.albedo);
+                radiance += throughput * sampleDirectLight(hit, material.baseColor);
                 rayBounceOffDiffuse(ray, hit);
                 countEmission = false;
             }
@@ -495,7 +504,7 @@ vec3 pathTrace(Ray ray) {
             countEmission = true;
         }
 
-        throughput *= material.albedo;
+        throughput *= material.baseColor;
 
         // Russian roulette: a path continues with a chance equal to its brightest throughput channel, so a path that can
         // only add a little light usually stops here. A surviving path is divided by that chance, which keeps the

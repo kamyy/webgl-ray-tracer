@@ -11,6 +11,7 @@ import { useTheme } from '../lib/hooks/useTheme'
 import { useAppStore } from '../lib/store/appStore'
 import { saveScreenshot } from '../lib/webgl/screenshot'
 import { About } from './about'
+import { Icon } from './icon'
 import { Popover } from './popover'
 import { ProgressRing } from './progressRing'
 
@@ -24,26 +25,6 @@ const glass = 'bg-white/70 shadow-xl backdrop-blur-md dark:bg-gray-900/70'
 const roundButton = `grid size-12 place-items-center rounded-full hover:bg-white dark:hover:bg-gray-800 ${glass}`
 
 const mutedText = 'text-gray-600 dark:text-gray-400'
-
-// --- Shared --------------------------------------------------------------------------
-
-// A 20 px line icon. The caller supplies the SVG shapes, drawn on a 24 by 24 grid.
-function Icon({ children }: { children: React.ReactNode }) {
-  return (
-    <svg
-      className="h-5 w-5"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
-  )
-}
 
 // --- Progress pill -------------------------------------------------------------------
 
@@ -132,14 +113,14 @@ function ThemeButton() {
   const { theme, toggleTheme } = useTheme()
 
   let icon = (
-    <Icon>
+    <Icon strokeWidth={1.8}>
       <path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z" />
     </Icon>
   )
   let label = 'Switch to dark mode'
   if (theme === 'dark') {
     icon = (
-      <Icon>
+      <Icon strokeWidth={1.8}>
         <circle cx="12" cy="12" r="4" />
         <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4" />
       </Icon>
@@ -167,7 +148,7 @@ function ScreenshotButton() {
       className={`${roundButton} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/70 dark:disabled:hover:bg-gray-900/70`}
       onClick={saveScreenshot}
     >
-      <Icon>
+      <Icon strokeWidth={1.8}>
         <path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14" />
       </Icon>
     </button>
@@ -198,7 +179,7 @@ function AboutButton() {
         className={roundButton}
         onClick={() => setOpen(!open)}
       >
-        <Icon>
+        <Icon strokeWidth={1.8}>
           <circle cx="12" cy="12" r="9" />
           <path d="M12 11v5M12 8h.01" />
         </Icon>

@@ -1,26 +1,31 @@
 /**
- * The scenes the app can render, and where the camera starts in each.
+ * The scenes the app can render, where the camera starts in each, and the exposure and contrast each starts with.
  *
  * The two bundled scenes are glTF binaries in a private S3 bucket that CloudFront serves at `/scenes/`. Each has a
  * starting `view` that places the camera in the scene's own units, where y is up. A scene the user opens from their own
  * drive has no `view`, so `TracedScene` in `src/components/viewport.tsx` frames it once it has loaded and its size is
- * known.
+ * known. The bundled scenes' materials were tuned together with their exposure and contrast. A scene from the user's
+ * drive gets an exposure and contrast of 1, which shows its materials as they were authored.
  */
 
 export const scenes: SceneInfo[] = [
   {
     id: 'suzanne',
     label: 'Suzanne',
-    url: '/scenes/suzanne.glb',
+    url: '/scenes/suzanne-A.glb',
     thumbnail: '/thumbnails/suzanne.jpg',
     view: { eye: [0, 2, 10], target: [0, 2, 0] },
+    exposure: 0.9,
+    contrast: 1.4,
   },
   {
     id: 'tricycle',
     label: 'Tricycle',
-    url: '/scenes/tricycle.glb',
+    url: '/scenes/tricycle-A.glb',
     thumbnail: '/thumbnails/tricycle.jpg',
     view: { eye: [0, 2, 10], target: [0, 1.5, 0] },
+    exposure: 0.9,
+    contrast: 1.4,
   },
 ]
 
@@ -43,6 +48,8 @@ export interface SceneInfo {
   url: string
   thumbnail?: string // a small picture of the scene, for the scene cards
   view?: { eye: [number, number, number]; target: [number, number, number] }
+  exposure?: number // the exposure the scene loads and resets with, 1 when left out
+  contrast?: number // the contrast the scene loads and resets with, 1 when left out
 }
 
 // Makes a scene from a file the user picked. The browser serves the file from memory at an object URL, which stays valid
@@ -53,6 +60,11 @@ export function sceneFromFile(file: File): SceneInfo {
     label: file.name,
     url: URL.createObjectURL(file),
   }
+}
+
+// The exposure and contrast a scene loads with, and that the reset button returns to.
+export function imageSettingsFor(scene: SceneInfo): { exposure: number; contrast: number } {
+  return { exposure: scene.exposure ?? 1, contrast: scene.contrast ?? 1 }
 }
 
 // Whether the scene came from the user's drive, and so holds an object URL that needs freeing.

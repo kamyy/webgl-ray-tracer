@@ -56,7 +56,7 @@ export interface TracerState {
   lensRadius: number // the lens radius the accumulated samples were traced at, which trails a dragged setting
   focusDistance: number // the focus distance the accumulated samples were traced at, which trails a dragged setting
   needsClear: boolean // true after a restart, so the next draw empties the accumulation target first
-  needsDisplay: boolean // true after a sample completes, so the next rendering tick draws the display pass
+  needsDisplay: boolean // true after a sample completes or an image setting changes, so the next tick draws the display pass
   bands: Band[] // the bands still on the GPU, oldest first
   lastStatusTimestamp: number // when the counters were last written to the store
   lastCameraMatrix: Matrix4 // the camera's world matrix at the last frame, to notice that it moved
@@ -163,9 +163,13 @@ function updateStatus(state: TracerState, numSamples: number, force: boolean) {
 
 // --- Drawing -------------------------------------------------------------------------
 
-// Draws the average of the last completed sum to the canvas.
+// Draws the average of the last completed sum to the canvas, with the current exposure and contrast. Reading them here
+// keeps the picture, a redraw and a screenshot in step with the sliders.
 function drawDisplay(gl: WebGLRenderer, display: ShaderTriangle, completed: WebGLRenderTarget) {
+  const { exposure, contrast } = useAppStore.getState()
   display.material.uniforms.u_color_sampler.value = completed.texture
+  display.material.uniforms.u_exposure.value = exposure
+  display.material.uniforms.u_contrast.value = contrast
   gl.setRenderTarget(null)
   gl.render(display.scene, orthographicCamera)
 }
@@ -192,7 +196,7 @@ export function downloadScreenshot(gl: WebGLRenderer, display: ShaderTriangle, c
   }, 'image/png')
 }
 
-// Draws the display pass when a sample completed since the last time it was drawn.
+// Draws the display pass when a sample completed, or an image setting changed, since the last time it was drawn.
 export function drawDisplayIfNeeded(state: TracerState, inputs: TracerInputs) {
   if (state.needsDisplay) {
     state.needsDisplay = false
@@ -352,8 +356,9 @@ export function traceStep(state: TracerState, inputs: TracerInputs, interacting:
 
 // Watches the store for settings that affect the render. Returns a function that stops watching.
 export function watchSettings(state: TracerState) {
-  // Any setting that changes the image restarts accumulation. A new one belongs here, except one that is dragged on a
-  // slider, which needs a delay like the bounce count, lens radius and focus distance below.
+  // Any setting that changes what is traced restarts accumulation. A new one belongs here, except one that is dragged on
+  // a slider, which needs a delay like the bounce count, lens radius and focus distance below. A setting that only
+  // changes how the display pass draws the samples belongs with the exposure and contrast at the end instead.
   const stopRestartSettings = useAppStore.subscribe(
     s => [s.cameraFov, s.shadingMethod],
     () => renderReset(state),
@@ -387,10 +392,22 @@ export function watchSettings(state: TracerState) {
     numSamples => updateStatus(state, numSamples, true),
   )
 
+  // The exposure and contrast only change how the display pass draws the samples already traced, so they redraw the
+  // picture instead of restarting. A finished render traces nothing more, so without this redraw the picture would keep
+  // the old values.
+  const stopImageSettings = useAppStore.subscribe(
+    s => [s.exposure, s.contrast],
+    () => {
+      state.needsDisplay = true
+    },
+    { equalityFn: shallow },
+  )
+
   return () => {
     clearTimeout(settleTimer)
     stopRestartSettings()
     stopSliders()
     stopNumSamples()
+    stopImageSettings()
   }
 }

@@ -30,8 +30,11 @@ Newer scene, 50° field of view, 8 bounces.
 | Pan    | Right-drag           | Two fingers |
 | Zoom   | Wheel or middle-drag | Pinch       |
 
-- **Progress** is tracked by the ring in the top left corner, with the sample count, elapsed time, time remaining and the average time per sample beside it. The render starts over from zero samples whenever the camera, a setting or the window size changes.
-- **Render settings** are in the card at the bottom left, and the chevron collapses it out of the way. They are the scene, field of view, lens radius and focus distance for depth of field, samples per pixel, ray bounces, and Flat or Phong shading.
+- **Progress** is tracked by the ring in the top left corner, with the sample count, elapsed time, time remaining and the average time per sample beside it. The render starts over from zero samples whenever the camera, a tracing setting or the window size changes.
+- **Render settings** are in the card at the bottom left, and the chevron collapses it out of the way. Below the scene cards are two groups.
+  - **Image** holds samples per pixel, exposure and contrast. Changing them keeps the samples traced so far, so they can be adjusted after the render finishes.
+  - **Tracing** holds field of view, lens radius and focus distance for depth of field, ray bounces, and Flat or Phong shading. Changing them restarts the render.
+- **Reset** in the card's title bar returns every setting to its default, after a confirmation.
 - The buttons at the top right switch the theme and open the About card that lists these controls and the MIT license.
 
 ## 4. Running it locally
