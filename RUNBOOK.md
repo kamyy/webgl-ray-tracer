@@ -7,7 +7,8 @@ How to run, check and deploy the app. [`AGENTS.md`](AGENTS.md) is what breaks if
   - [1.2 Dev server](#12-dev-server)
   - [1.3 Checks](#13-checks)
   - [1.4 Checking a render](#14-checking-a-render)
-  - [1.5 Changing the scene](#15-changing-the-scene)
+  - [1.5 Preparing a scene](#15-preparing-a-scene)
+  - [1.6 Adding a bundled scene](#16-adding-a-bundled-scene)
 - [2. Deploying](#2-deploying)
 - [3. Managing AWS with Terraform](#3-managing-aws-with-terraform)
   - [3.1 Create the state bucket and the Terraform role](#31-create-the-state-bucket-and-the-terraform-role)
@@ -61,11 +62,36 @@ A shader, BVH or scene change needs a look in the browser, because nothing else 
 4. Drag to orbit, then release. Accumulation should start over from zero samples.
 5. Resize the window, or use the browser's device toolbar, and check the readout and the settings card in portrait and landscape, collapse the card, and open the About popover. The render should restart when the size changes. A window above the `md` breakpoint should show a view no larger than 2560 by 1440.
 
-### 1.5 Changing the scene
+### 1.5 Preparing a scene
 
 A user opens their own scene at run time. The settings card shows each bundled scene as a picture card, plus an "Open .glb" card that opens the browser's file picker. A file opened this way is loaded in the browser and never uploaded.
 
-To add a bundled scene, export a glTF binary (`.glb`) from Blender with Draco compression on, positions at 16 bits and normals at 12 bits. Set each material's base color, metallic, roughness and (for lights) emission strength, and (for glass) transmission and IOR. Upload the file to the scenes bucket with your own AWS credentials, under the `scenes/` key prefix. The `deploy` job never uploads scenes, so this is a manual step. The upload sets a one-year `Cache-Control` header, so give a changed scene a new file name and update its `url` in `src/lib/scenes.ts`. Overwriting a file would leave browsers and CloudFront serving the old copy.
+Export the scene from Blender as a glTF binary (`.glb`) with Draco compression on, positions at 16 bits, normals at 12 bits and texture coordinates at 14 bits. Blender's default of 12 bits for texture coordinates can shift an image by a texel or two on a large texture atlas. The renderer reads less of the file than Blender or a glTF viewer shows, so check the scene against this list first.
+
+- **Lighting**
+  - Make every light a mesh with an Emission strength above 0, such as a plane. The renderer only collects meshes, so Blender's point, sun, spot and area lamps give no light, and a scene lit only by them renders almost black.
+  - Close the scene in, or add a large emissive mesh as a sky. A ray that leaves the scene returns black, so the World background adds no light.
+- **Materials**
+  - Set Metallic and Roughness as constant values. When a texture is plugged into either one, the exporter writes a factor of 1.0, and the renderer ignores the texture but reads the factor. The surface then renders as a full mirror or as fully rough.
+  - Treat Metallic as the chance that a ray bounces like a mirror. At 0.3, 30% of rays reflect and the rest scatter diffusely. Roughness blurs only the mirror bounces, so it does nothing at Metallic 0.
+  - Expect the Base Color to tint every bounce, mirror reflections included.
+  - Set Transmission above 0.5 for glass, and set its IOR (index of refraction), which controls how strongly it bends light. A surface with Transmission at 0.5 or below renders as opaque.
+- **Textures**
+  - Plug images into Base Color only. Normal, metallic and roughness textures are ignored, so bake fine detail into the base color or model it.
+  - Leave Emission Color unplugged on a surface that should not glow. An image plugged into it exports with an emission factor beside it, and the renderer turns the whole surface into a light of that single color.
+  - Model cut-out shapes such as leaves and fences as geometry. An image's alpha is ignored, so an alpha-clipped leaf renders as a solid rectangle.
+  - Give every textured mesh a UV map, the texture coordinates that place the image on each face. A mesh without one renders in a single color taken from a corner of the image, with no warning.
+  - Use the Image Texture node's Extension setting and a Mapping node freely. Repeat, Extend and Mirror, and the mapping's offset, rotation and scale, all carry over.
+  - Keep images as PNG, JPEG or WebP. A file whose textures were converted to KTX2, a GPU-compressed format, fails to load.
+  - Use at most `maxBaseColorMaps` (in `src/lib/webgl/sceneLayout.ts`) base color textures. An image used with two different Extension settings counts as two. If a scene needs more, combine its images into one texture atlas, a single image holding them side by side, with Blender's texture baking. The atlas takes one slot. A texture that repeats across a surface can't go in the atlas, because its UVs run past its own region into the neighbouring images.
+- **Geometry**
+  - Join small objects into one mesh with Ctrl+J. Every mesh is padded to the size of the largest one, so many small meshes beside a large one waste memory.
+  - Split a very large mesh into several. A single huge mesh can fail with the "too deeply nested" error in [Troubleshooting](#4-troubleshooting).
+  - Shade Smooth only shows when the app's Shading method setting is Phong. The setting starts at Flat, which draws every face flat.
+
+### 1.6 Adding a bundled scene
+
+Upload the `.glb` exported in [Preparing a scene](#15-preparing-a-scene) to the scenes bucket with your own AWS credentials, under the `scenes/` key prefix. The `deploy` job never uploads scenes, so this is a manual step. The upload sets a one-year `Cache-Control` header, so give a changed scene a new file name and update its `url` in `src/lib/scenes.ts`. Overwriting a file would leave browsers and CloudFront serving the old copy.
 
 ```bash
 aws s3 cp suzanne.glb s3://webgl-ray-tracer.orky.net-scenes/scenes/suzanne.glb --content-type model/gltf-binary \
