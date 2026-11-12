@@ -14,8 +14,9 @@
  *   u_bvh_sampler                    u_face_sampler                   u_material_sampler
  *   ┌──────────────────────┐         ┌──────────────────────┐         ┌──────────────────────┐
  *   │ node: box min/max,   │firstFace│ face: normal, three  │ mat     │ material: color,     │
- *   │ left, right child,   ├────────►│ vertices and vertex  ├────────►│ class, reflection,   │
- *   │ firstFace, faceCount │         │ normals, mat index   │ index   │ gloss, refraction    │
+ *   │ left, right child,   ├────────►│ vertices, vertex     ├────────►│ color map slot,      │
+ *   │ firstFace, faceCount │         │ normals and UVs, mat │ index   │ class, reflection,   │
+ *   │                      │         │ index                │         │ gloss, refraction    │
  *   └──────────────────────┘         └──────────────────────┘         └──────────────────────┘
  *    one layer per mesh               one layer per mesh                         ▲
  *                                                                                │
@@ -33,7 +34,7 @@
 // fixed-size array with no bounds checking, so a tree deeper than this silently corrupts the render.
 export const bvhMaxStackSize = 24
 
-// A face is eight RGB texels of three floats each, so a face is 24 floats. The shader reads texel `t` of a face with
+// A face is ten RGB texels of three floats each, so a face is 30 floats. The shader reads texel `t` of a face with
 // the constant in the right column:
 //
 //   texel │ r                 g        b        │ shader constant
@@ -46,17 +47,22 @@ export const bvhMaxStackSize = 24
 //     5   │ vertex 1 nrm x    y        z        │ VERTEX_1_NRM_INDEX
 //     6   │ vertex 2 nrm x    y        z        │ VERTEX_2_NRM_INDEX
 //     7   │ material index    unused   unused   │ FACE_MATERIAL_INDEX
-export const numTexelsPerFace = 8 // RGB texels. Must equal TEXELS_PER_FACE in src/shaders/pathTrace.frag.glsl.
-export const numFloatsPerFace = 24
+//     8   │ vertex 0 u        v        vertex 1 u │ VERTEX_UV_0_INDEX
+//     9   │ vertex 1 v        vertex 2 u        v │ VERTEX_UV_1_INDEX
+//
+// The UVs are the texture coordinates of the material's base color map, with the map's offset, repeat and rotation
+// already applied. A face whose material has no map holds zeros there.
+export const numTexelsPerFace = 10 // RGB texels. Must equal TEXELS_PER_FACE in src/shaders/pathTrace.frag.glsl.
+export const numFloatsPerFace = 30
 
 // Each mesh's faces wrap onto rows of `facesPerRow` faces, which keeps the texture's height under a phone GPU's texture
 // size limit. Must equal FACES_PER_ROW in src/shaders/pathTrace.frag.glsl.
 //
 // Face `f` of mesh `m` starts at x = (f % facesPerRow) * numTexelsPerFace, y = floor(f / facesPerRow), layer = m.
-// With the current values, 64 faces of 8 texels, a row looks like this:
+// With the current values, 64 faces of 10 texels, a row looks like this:
 //
-//          ◄─────────────── facesPerRow × numTexelsPerFace = 512 texels ───────────────►
-//          x=0        x=8        x=16                 x=504
+//          ◄─────────────── facesPerRow × numTexelsPerFace = 640 texels ───────────────►
+//          x=0        x=10       x=20                 x=630
 //         ┌──────────┬──────────┬──────────┬─────────┬──────────┐
 //   y = 0 │ face 0   │ face 1   │ face 2   │   ...   │ face 63  │
 //   y = 1 │ face 64  │ face 65  │ face 66  │   ...   │ face 127 │
@@ -92,10 +98,12 @@ export const bvhNodesPerRow = 64
 //
 //   texel │ r          g                  b         a                │ shader constant
 //   ──────┼────────────────────────────────────────────────────────────┼───────────────────────
-//     0   │ color r    g                  b         1.0              │ MATERIAL_COLOR_INDEX
+//     0   │ color r    g                  b         color map slot   │ MATERIAL_COLOR_INDEX
 //     1   │ class      reflection ratio   gloss     refractive index │ MATERIAL_ATTRIB_INDEX
 //
-// The color is the emitted light for an emissive material and the base color for any other.
+// The color is the emitted light for an emissive material and the base color for any other. The color map slot picks
+// which of the shader's `u_base_color_samplers` multiplies the base color, or is -1 when the material has no map. The
+// shader tests for a slot of 0 or more before converting it to an integer, so -1 needs no extra 0.5.
 export const numTexelsPerMaterial = 2 // RGBA texels
 export const numFloatsPerMaterial = 8
 
@@ -114,6 +122,12 @@ export const numFloatsPerLight = 12
 // x = (l % lightsPerRow) * numTexelsPerLight, y = floor(l / lightsPerRow). Must equal LIGHTS_PER_ROW in
 // src/shaders/pathTrace.frag.glsl.
 export const lightsPerRow = 64
+
+// The most base color textures a scene may use, where a texture is one image with one set of wrap modes and filter.
+// Each one is bound to its own texture unit, and WebGL 2 promises
+// only 16 units to a fragment shader, of which the path tracer's scene textures take 5. Must equal MAX_BASE_COLOR_MAPS
+// in src/shaders/pathTrace.frag.glsl.
+export const maxBaseColorMaps = 8
 
 // The material classes the shader branches on. The values must equal the `*_MATERIAL` constants in the shader.
 export const EMISSIVE_MATERIAL = 0

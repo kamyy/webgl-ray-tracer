@@ -67,13 +67,15 @@ const int VERTEX_0_NRM_INDEX = 4;
 const int VERTEX_1_NRM_INDEX = 5;
 const int VERTEX_2_NRM_INDEX = 6;
 const int FACE_MATERIAL_INDEX = 7;
+const int VERTEX_UV_0_INDEX = 8; // u0, v0, u1
+const int VERTEX_UV_1_INDEX = 9; // v1, u2, v2
 
 // Faces and BVH nodes wrap onto rows of this many entries, so a mesh with many faces needs a short texture instead of a
 // tall one. All four constants must equal their counterparts in `src/lib/webgl/sceneLayout.ts`: `facesPerRow`,
 // `bvhNodesPerRow`, `numTexelsPerFace` and `numTexelsPerBvhNode`.
 const int FACES_PER_ROW = 64;
 const int BVH_NODES_PER_ROW = 64;
-const int TEXELS_PER_FACE = 8;
+const int TEXELS_PER_FACE = 10;
 const int TEXELS_PER_BVH_NODE = 3;
 
 const int MATERIAL_COLOR_INDEX = 0;
@@ -89,6 +91,9 @@ const int LIGHT_VERTEX_0_INDEX = 0;
 const int LIGHT_VERTEX_1_INDEX = 1;
 const int LIGHT_VERTEX_2_INDEX = 2;
 
+// The number of base color map samplers. Must equal `maxBaseColorMaps` in `src/lib/webgl/sceneLayout.ts`.
+const int MAX_BASE_COLOR_MAPS = 8;
+
 // --- globals -------------------------------------------------------------------------
 uvec4 g_randGeneratorState; // random number generator current state
 
@@ -98,6 +103,7 @@ uniform highp sampler2DArray u_face_sampler;
 uniform highp sampler2DArray u_bvh_sampler;
 uniform highp sampler2D u_material_sampler;
 uniform highp sampler2D u_light_sampler; // one emissive face per entry, see `src/lib/webgl/sceneLayout.ts`
+uniform highp sampler2D u_base_color_samplers[MAX_BASE_COLOR_MAPS]; // only slots the materials name are read
 
 uniform int u_num_objects; // number of models/objects to render
 uniform int u_num_lights; // number of emissive faces in the lights texture, 0 when the scene has no light
@@ -342,6 +348,30 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     return true;
 }
 
+// --- base color maps -----------------------------------------------------------------
+// The hit point's texture coordinates, blended from the face's three vertex UVs by the barycentric weights.
+vec2 hitUv(RayHitResult hit) {
+    vec3 uv0 = texelFetch(u_face_sampler, faceTexel(VERTEX_UV_0_INDEX, hit.fi, hit.oi), 0).xyz;
+    vec3 uv1 = texelFetch(u_face_sampler, faceTexel(VERTEX_UV_1_INDEX, hit.fi, hit.oi), 0).xyz;
+    return uv0.xy * hit.u + vec2(uv0.z, uv1.x) * hit.v + uv1.yz * hit.w;
+}
+
+// The color of map `slot` at `uv`, already in linear light because the maps are sRGB textures. GLSL ES 3.00 indexes a
+// sampler array only with a constant, so each slot needs its own case. `textureLod` reads the full-size image, because
+// there are no screen-space derivatives to pick a mipmap level with inside the bounce loop.
+vec3 sampleBaseColorMap(int slot, vec2 uv) {
+    switch (slot) {
+        case 0: return textureLod(u_base_color_samplers[0], uv, 0.0).rgb;
+        case 1: return textureLod(u_base_color_samplers[1], uv, 0.0).rgb;
+        case 2: return textureLod(u_base_color_samplers[2], uv, 0.0).rgb;
+        case 3: return textureLod(u_base_color_samplers[3], uv, 0.0).rgb;
+        case 4: return textureLod(u_base_color_samplers[4], uv, 0.0).rgb;
+        case 5: return textureLod(u_base_color_samplers[5], uv, 0.0).rgb;
+        case 6: return textureLod(u_base_color_samplers[6], uv, 0.0).rgb;
+        default: return textureLod(u_base_color_samplers[7], uv, 0.0).rgb;
+    }
+}
+
 // --- ray cast from eye through image pixel -------------------------------------------
 float schlick(float cosine, float rindex) {
     float  r0 = (1.0 - rindex) / (1.0 + rindex); r0 *= r0;
@@ -464,8 +494,10 @@ vec3 pathTrace(Ray ray) {
             break;
         }
 
-        // The color texel holds the emitted light for an emissive material, and the base color for any other.
-        vec3 color = texelFetch(u_material_sampler, ivec2(MATERIAL_COLOR_INDEX, hit.mi), 0).xyz;
+        // The color texel holds the emitted light for an emissive material, and the base color for any other. Its w is
+        // the base color map slot, or -1 for none.
+        vec4 colorTexel = texelFetch(u_material_sampler, ivec2(MATERIAL_COLOR_INDEX, hit.mi), 0);
+        vec3 color = colorTexel.xyz;
         texel = texelFetch(u_material_sampler, ivec2(MATERIAL_ATTRIB_INDEX, hit.mi), 0);
         material.materialClass = int(texel.x);
         material.reflectionRatio = texel.y;
@@ -481,6 +513,9 @@ vec3 pathTrace(Ray ray) {
         }
 
         material.baseColor = color;
+        if (colorTexel.w >= 0.0) {
+            material.baseColor *= sampleBaseColorMap(int(colorTexel.w), hitUv(hit));
+        }
 
         if (i == u_num_bounces) { // out of bounces, so the surface glows with its own color as ambient light
             radiance += throughput * material.baseColor;
