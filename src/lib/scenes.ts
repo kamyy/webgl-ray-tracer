@@ -12,7 +12,7 @@ export const scenes: SceneInfo[] = [
   {
     id: 'suzanne',
     label: 'Suzanne',
-    url: '/scenes/suzanne-A.glb',
+    url: '/scenes/suzanne-B.glb',
     thumbnail: '/thumbnails/suzanne.jpg',
     view: { eye: [0, 2, 10], target: [0, 2, 0] },
     exposure: 0.9,
@@ -21,7 +21,7 @@ export const scenes: SceneInfo[] = [
   {
     id: 'tricycle',
     label: 'Tricycle',
-    url: '/scenes/tricycle-A.glb',
+    url: '/scenes/tricycle-B.glb',
     thumbnail: '/thumbnails/tricycle.jpg',
     view: { eye: [0, 2, 10], target: [0, 1.5, 0] },
     exposure: 0.9,
