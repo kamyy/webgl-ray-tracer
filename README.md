@@ -6,15 +6,15 @@ Live at [https://webgl-ray-tracer.orky.net](https://webgl-ray-tracer.orky.net).
 
 ## 1. Pre-rendered examples
 
-Each render is 1280 by 720 with 4000 samples per pixel, and the settings card and the progress readout are collapsed.
+Each render has 3000 samples per pixel and 6 bounces, with the settings card and the progress readout collapsed. Each was rendered at 1920 by 1080 and scaled to 1280 by 720. The lens radius sets how much the camera's depth of field blurs whatever lies away from the focus distance.
 
-Original scene, 45° field of view, 8 bounces.
+Suzanne, 75° field of view, lens radius 0.12, focused on the glass.
 
-![Original scene, 45° field of view, 8 bounces](screenshots/suzanne-fov45-b8.png)
+![Suzanne, 75° field of view, lens radius 0.12, focused on the glass](screenshots/suzanne-fov75-glass.png)
 
-Newer scene, 50° field of view, 8 bounces.
+Tricycle, 72° field of view, lens radius 0.03, focused on the tricycle. The mirror reflects the painting on the opposite wall.
 
-![Newer scene, 50° field of view, 8 bounces](screenshots/tricycle-fov50-b8.png)
+![Tricycle, 72° field of view, lens radius 0.03, focused on the tricycle](screenshots/tricycle-fov72-mirror.png)
 
 ## 2. What you need
 
