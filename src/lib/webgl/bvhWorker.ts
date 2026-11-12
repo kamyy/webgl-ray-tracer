@@ -34,6 +34,11 @@ interface Vec3 {
   z: number
 }
 
+interface Vec2 {
+  u: number
+  v: number
+}
+
 interface Face {
   p0: Vec3 // vertex position 0
   p1: Vec3 // vertex position 1
@@ -43,6 +48,10 @@ interface Face {
   n1: Vec3 // vertex normal 1
   n2: Vec3 // vertex normal 2
 
+  uv0: Vec2 // vertex texture coordinates 0
+  uv1: Vec2 // vertex texture coordinates 1
+  uv2: Vec2 // vertex texture coordinates 2
+
   faceNormal: Vec3
   materialIndex: number // index into material array
 
@@ -51,10 +60,11 @@ interface Face {
   centroid: Vec3 // average of the three vertex positions, which the split sorts by
 }
 
-/** One mesh as world-space faces, 9 floats per face (three verts of x, y, z). */
+/** One mesh as world-space faces, 9 floats per face (three verts of x, y, z) and 6 UV floats per face. */
 export interface BvhRequestMesh {
   positions: Float32Array
   normals: Float32Array
+  uvs: Float32Array
   materialIndex: number
 }
 
@@ -267,6 +277,10 @@ function readVec3(array: Float32Array, offset: number): Vec3 {
   return vec3(array[offset], array[offset + 1], array[offset + 2])
 }
 
+function readVec2(array: Float32Array, offset: number): Vec2 {
+  return { u: array[offset], v: array[offset + 1] }
+}
+
 function sub(a: Vec3, b: Vec3): Vec3 {
   return vec3(a.x - b.x, a.y - b.y, a.z - b.z)
 }
@@ -290,6 +304,7 @@ function buildObject(mesh: BvhRequestMesh): { faces: Face[]; bvhNodes: BvhNode[]
     const p1 = readVec3(mesh.positions, o + 3)
     const p2 = readVec3(mesh.positions, o + 6)
     const faceNormal = normalize(cross(sub(p1, p0), sub(p2, p0)))
+    const uvOffset = faceIndex * 6
 
     faces.push({
       p0,
@@ -298,6 +313,9 @@ function buildObject(mesh: BvhRequestMesh): { faces: Face[]; bvhNodes: BvhNode[]
       n0: readVec3(mesh.normals, o),
       n1: readVec3(mesh.normals, o + 3),
       n2: readVec3(mesh.normals, o + 6),
+      uv0: readVec2(mesh.uvs, uvOffset),
+      uv1: readVec2(mesh.uvs, uvOffset + 2),
+      uv2: readVec2(mesh.uvs, uvOffset + 4),
       faceNormal,
       materialIndex: mesh.materialIndex,
       min: vec3(Math.min(p0.x, p1.x, p2.x), Math.min(p0.y, p1.y, p2.y), Math.min(p0.z, p1.z, p2.z)),
@@ -349,6 +367,13 @@ function packFaces(objects: { faces: Face[] }[], maxNumFaces: number): Float32Ar
 
       data[i] = face.materialIndex + 0.5 // material index is cast to int in fragment shader
       i += 3
+
+      data[i++] = face.uv0.u
+      data[i++] = face.uv0.v // vertex texture coordinates
+      data[i++] = face.uv1.u
+      data[i++] = face.uv1.v
+      data[i++] = face.uv2.u
+      data[i++] = face.uv2.v
     })
   })
   return data

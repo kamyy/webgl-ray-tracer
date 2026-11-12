@@ -255,6 +255,7 @@ function drawBand(state: TracerState, inputs: TracerInputs, isPreview: boolean):
   uniforms.u_bvh_sampler.value = packed.bvhTexture
   uniforms.u_material_sampler.value = packed.materialsTexture
   uniforms.u_light_sampler.value = packed.lightsTexture
+  uniforms.u_base_color_samplers.value = packed.baseColorMaps
 
   // Shader triangle: trace the band and add it to the running sum.
   gl.setRenderTarget(accumulation)

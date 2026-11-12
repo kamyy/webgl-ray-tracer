@@ -7,8 +7,10 @@
  * for the person looking at a blank view, or null when everything fits.
  */
 import { PackedScene } from './packScene'
+import { maxBaseColorMaps } from './sceneLayout'
 
-const numSamplerTextureUnits = 6 // random seeds, faces, BVH nodes, materials, lights and the accumulated color
+// The path-tracing shader's samplers: random seeds, faces, BVH nodes, materials, lights and the base color maps.
+const numSamplerTextureUnits = 5 + maxBaseColorMaps
 
 export function supportsWebGL2(): boolean {
   return document.createElement('canvas').getContext('webgl2') !== null

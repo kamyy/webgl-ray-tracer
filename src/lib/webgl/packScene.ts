@@ -3,13 +3,15 @@
  *
  * Every mesh becomes one object with its own BVH tree. The faces and BVH nodes are built and packed on a worker
  * thread (see `src/lib/webgl/bvhWorker.ts`), and the materials are packed here, straight from the three.js material
- * that `GLTFLoader` created. The result is three data textures: faces and BVH nodes with one array layer per
- * object, and materials with one row per material.
+ * that `GLTFLoader` created. The result is four data textures: faces and BVH nodes with one array layer per
+ * object, materials with one row per material, and lights. The materials' base color maps are passed through as they
+ * are, because the shader binds each one to a sampler of its own.
  */
 import {
   DataArrayTexture,
   DataTexture,
   FloatType,
+  LinearFilter,
   Matrix3,
   Mesh,
   MeshPhysicalMaterial,
@@ -19,6 +21,7 @@ import {
   RGBAFormat,
   RGBFormat,
   Texture,
+  Vector2,
   Vector3,
 } from 'three'
 import type { BvhRequest, BvhRequestMesh, BvhResult } from './bvhWorker'
@@ -29,6 +32,7 @@ import {
   EMISSIVE_MATERIAL,
   facesPerRow,
   lightsPerRow,
+  maxBaseColorMaps,
   numFloatsPerBvhNode,
   numFloatsPerFace,
   numFloatsPerLight,
@@ -51,6 +55,13 @@ export interface PackedScene {
   materialsTexture: DataTexture
   lightsTexture: DataTexture
   numLights: number
+  baseColorMaps: (Texture | null)[] // one entry per shader slot, null for a slot no material uses
+}
+
+// The base color maps by shader slot, and each material's slot, or -1 for a material without a map.
+interface BaseColorMaps {
+  maps: (Texture | null)[]
+  slots: number[]
 }
 
 // A glTF mesh without normals is flat shaded, so each vertex takes the normal of its face.
@@ -70,7 +81,12 @@ function writeFlatNormals(pos: Float32Array, nrm: Float32Array) {
 }
 
 // Turns a mesh into world-space faces for the BVH worker, three verts of x, y, z per face.
-function extractFaces(mesh: Mesh, materialIndex: number): BvhRequestMesh {
+//
+// Each face vertex also gets the texture coordinates of the material's base color map, with the map's offset, repeat
+// and rotation applied, so the shader can use them as they are. A mesh without a map gets zero UVs, which the shader
+// never reads. A mesh with a map but without the UV set the map names also gets zeros, so the whole mesh takes the
+// map's color at one corner.
+function extractFaces(mesh: Mesh, materialIndex: number, map: Texture | null): BvhRequestMesh {
   const mtx = mesh.matrixWorld
   const nrmMtx = new Matrix3().getNormalMatrix(mtx)
   const posAttrib = mesh.geometry.getAttribute('position')
@@ -78,9 +94,15 @@ function extractFaces(mesh: Mesh, materialIndex: number): BvhRequestMesh {
   const indices = mesh.geometry.getIndex()
   const numFaceVerts = indices ? indices.count : posAttrib.count
 
+  // `map.channel` names the UV set the material uses, and set 0 is the `uv` attribute.
+  const uvAttrib = map ? mesh.geometry.getAttribute(map.channel === 0 ? 'uv' : `uv${map.channel}`) : undefined
+  map?.updateMatrix()
+
   const pos = new Float32Array(numFaceVerts * 3)
   const nrm = new Float32Array(numFaceVerts * 3)
+  const uvs = new Float32Array(numFaceVerts * 2)
   const vec = new Vector3()
+  const uv = new Vector2()
   for (let faceVert = 0; faceVert < numFaceVerts; ++faceVert) {
     const meshVert = indices ? indices.getX(faceVert) : faceVert
     vec
@@ -94,13 +116,20 @@ function extractFaces(mesh: Mesh, materialIndex: number): BvhRequestMesh {
         .normalize()
         .toArray(nrm, faceVert * 3)
     }
+
+    // `Vector2.fromBufferAttribute` is typed to refuse an interleaved attribute, so the UV is read by component.
+    if (map && uvAttrib) {
+      uv.set(uvAttrib.getX(meshVert), uvAttrib.getY(meshVert))
+        .applyMatrix3(map.matrix)
+        .toArray(uvs, faceVert * 2)
+    }
   }
 
   if (!nrmAttrib) {
     writeFlatNormals(pos, nrm)
   }
 
-  return { positions: pos, normals: nrm, materialIndex }
+  return { positions: pos, normals: nrm, uvs, materialIndex }
 }
 
 // Builds the BVH on a worker thread, so a large scene does not freeze the page.
@@ -117,7 +146,7 @@ function buildBvh(request: BvhRequest): Promise<BvhResult> {
     }
     worker.postMessage(
       request,
-      request.meshes.flatMap(mesh => [mesh.positions.buffer, mesh.normals.buffer]),
+      request.meshes.flatMap(mesh => [mesh.positions.buffer, mesh.normals.buffer, mesh.uvs.buffer]),
     )
   })
 }
@@ -127,8 +156,65 @@ function isEmissive(material: MeshPhysicalMaterial): boolean {
   return material.emissive.r > 0 || material.emissive.g > 0 || material.emissive.b > 0
 }
 
+// The map that tints a material's base color. A light's color is its emission, so a light's map is not used.
+function baseColorMap(material: MeshPhysicalMaterial): Texture | null {
+  return isEmissive(material) ? null : material.map
+}
+
+// Whether two maps draw the same image the same way. `GLTFLoader` makes a separate texture for each texture transform
+// or sampler of one image. The transforms are already applied to the UVs, so only the wrap modes and the filter keep
+// two such textures apart.
+function samplesAlike(a: Texture, b: Texture): boolean {
+  return a.source === b.source && a.wrapS === b.wrapS && a.wrapT === b.wrapT && a.magFilter === b.magFilter
+}
+
+// Gives each base color texture a sampler slot, shared by the maps that sample alike. A texture is one image with one
+// set of wrap modes and filter, so an image used with two wrap modes takes two slots.
+function collectBaseColorMaps(materials: MeshPhysicalMaterial[]): BaseColorMaps {
+  const maps: Texture[] = []
+  const slots = materials.map(material => {
+    const map = baseColorMap(material)
+    if (!map) {
+      return -1
+    }
+
+    const slot = maps.findIndex(other => samplesAlike(other, map))
+    if (slot !== -1) {
+      return slot
+    }
+
+    maps.push(map)
+    return maps.length - 1
+  })
+
+  if (maps.length > maxBaseColorMaps) {
+    throw new Error(
+      `the scene uses ${maps.length} base color textures, and the renderer supports ${maxBaseColorMaps}. ` +
+        'An image used with two different wrap settings counts twice. ' +
+        'Combine images into an atlas or remove some before exporting.',
+    )
+  }
+
+  // The shader only reads the full-size image, so a mipmap chain would take GPU memory for nothing. The magnification
+  // filter stays as the file set it.
+  for (const map of maps) {
+    map.generateMipmaps = false
+    map.minFilter = LinearFilter
+    map.needsUpdate = true
+  }
+
+  // Every shader slot needs an entry, or three.js binds fewer texture units than the shader declares. three.js binds an
+  // empty texture for a null entry.
+  const slotMaps: (Texture | null)[] = new Array(maxBaseColorMaps).fill(null)
+  maps.forEach((map, slot) => {
+    slotMaps[slot] = map
+  })
+
+  return { maps: slotMaps, slots }
+}
+
 // Writes the texels the shader reads for each material, straight from the three.js material.
-function packMaterials(materials: MeshPhysicalMaterial[]): Float32Array {
+function packMaterials(materials: MeshPhysicalMaterial[], mapSlots: number[]): Float32Array {
   const data = new Float32Array(numFloatsPerMaterial * materials.length)
   materials.forEach((material, id) => {
     let i = numFloatsPerMaterial * id
@@ -145,7 +231,7 @@ function packMaterials(materials: MeshPhysicalMaterial[]): Float32Array {
     data[i++] = color.r
     data[i++] = color.g
     data[i++] = color.b
-    data[i++] = 1.0
+    data[i++] = mapSlots[id] // -1 for no map, which the shader tests for before converting to int
 
     data[i++] = materialClass + 0.5 // material class is cast to int in fragment shader
     data[i++] = material.metalness // reflection ratio
@@ -250,13 +336,18 @@ export async function packScene(root: Object3D): Promise<PackedScene> {
   }
 
   const materials: MeshPhysicalMaterial[] = []
-  const meshFaces = meshes.map(mesh => {
+  for (const mesh of meshes) {
     checkMaterial(mesh.material)
     const material = mesh.material as MeshPhysicalMaterial
     if (!materials.includes(material)) {
       materials.push(material)
     }
-    return extractFaces(mesh, materials.indexOf(material))
+  }
+  const baseColorMaps = collectBaseColorMaps(materials)
+
+  const meshFaces = meshes.map(mesh => {
+    const material = mesh.material as MeshPhysicalMaterial
+    return extractFaces(mesh, materials.indexOf(material), baseColorMap(material))
   })
   checkPackedSize(meshFaces)
 
@@ -297,7 +388,7 @@ export async function packScene(root: Object3D): Promise<PackedScene> {
   setExactTexels(bvhTexture)
 
   const materialsTexture = new DataTexture(
-    packMaterials(materials),
+    packMaterials(materials, baseColorMaps.slots),
     numTexelsPerMaterial,
     materials.length,
     RGBAFormat,
@@ -313,5 +404,6 @@ export async function packScene(root: Object3D): Promise<PackedScene> {
     materialsTexture,
     lightsTexture: createLightsTexture(lights),
     numLights: lights.length / numFloatsPerLight,
+    baseColorMaps: baseColorMaps.maps,
   }
 }

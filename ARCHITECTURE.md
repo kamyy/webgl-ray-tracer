@@ -124,8 +124,9 @@ The scene is a glTF 2.0 binary, fetched from `/scenes/` or opened from the user'
  │ facesTexture and bvhTexture: one array layer per mesh       │
  │ materialsTexture: one row per material                      │
  │ lightsTexture: one entry per emissive face                  │
+ │ baseColorMaps: each material.map as loaded                  │
  └──────────────────────────────┬──────────────────────────────┘
-                                │ texelFetch
+                                │ texelFetch, textureLod
                                 ▼
                      src/shaders/pathTrace.frag.glsl
 ```
@@ -135,6 +136,8 @@ The scene is a glTF 2.0 binary, fetched from `/scenes/` or opened from the user'
 - **The tree is built in a Web Worker.** The SAH sweep sorts the faces three times per node, which takes seconds for a large mesh and freezes the page if it runs on the main thread. The main thread sends world-space faces and receives the packed arrays as transferable buffers, so nothing is copied. The cost is that the BVH code can't import three.js or touch `window`, because the worker has neither.
 - **Traversal uses a fixed-size stack, so tree depth is capped** at `bvhMaxStackSize`. GLSL has no recursion, and a dynamically sized stack isn't available.
 - **Faces, BVH nodes, materials and lights are packed into `Float32Array`s** and uploaded as `TEXTURE_2D_ARRAY` and `TEXTURE_2D` textures, one array layer per mesh. A light is one face of an emissive mesh. `packLights` writes the list before the faces go to the worker, because sending them empties the position arrays. `NEAREST` filtering with `texelFetch` reads the exact texel. Uniform buffers hold far less data than a texture.
+- **Each base color map keeps its own sampler, so a scene may use at most `maxBaseColorMaps` of them, currently 8.** A base color map is the image that tints a material's surface color. The shader picks one of `u_base_color_samplers` with a `switch`, since GLSL ES 3.00 indexes a sampler array only with a constant. Binding the textures `GLTFLoader` already made needs no copy and keeps each texture's own size, wrap mode, filter and sRGB decoding. The alternative, resizing every image into the layers of one texture array, allows hundreds of images but forces one shared size and a copy pass. The cost is the cap: WebGL 2 promises 16 texture units to a fragment shader, and the scene textures take 5. The texture transform is applied to the UVs, the per-vertex texture coordinates that place the image on a face, before packing, so textures that differ only by transform share a slot. Textures that share an image but differ in wrap mode or filter take a slot each.
+- **The base color maps have no mipmaps.** A mipmap chain is a set of copies of an image at half, quarter and smaller sizes, which a rasterizer reads for distant surfaces. `textureLod` reads the full-size image, because the bounce loop has no screen-space derivatives to choose a level with. Those derivatives are how fast the texture coordinates change from one pixel to the next, which only the GPU's rasterizer works out. The jittered samples already average a distant texture over each pixel. The magnification filter stays as the file sets it. Linear, the glTF default, smooths a close-up texture, where every sample in a pixel lands in the same texel.
 - **glTF was chosen because its material fields already describe what the shader needs.** `metalness` becomes the reflection ratio, `1 - roughness` the gloss, `transmission` and `ior` select and drive dielectric materials, and `emissive` times `emissiveIntensity` makes a light. The alternative, OBJ with MTL, has no standard fields for emission, glass or roughness, so a scene needed hardcoded material names. The cost is that a scene must be authored or exported with these PBR fields set.
 - **The geometry is Draco-compressed** at 16-bit positions and 12-bit normals. The default quantization is coarse enough to show as faceting on smooth surfaces and as gaps between triangles. `DRACOLoader` decodes the file in a web worker. The decoder is served from `public/draco/` instead of a CDN, so the app works offline and makes no third-party request.
 
@@ -271,14 +274,15 @@ The minimal path tracer.
 
 Speed and a wider range of effects.
 
-| Milestone                                 | Notes                                                                                                   |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| ~~Bounding volume hierarchy (BVH)~~       | Built in a Web Worker and walked with an explicit stack ([Scene loading & BVH](#3-scene-loading--bvh)). |
-| ~~Emissive materials~~                    | A ray that hits an emissive surface ends.                                                               |
-| Motion blur                               | Needs a random time per ray and moving objects.                                                         |
-| Textures: checker, image and Perlin noise | Needs the glTF texture coordinates.                                                                     |
-| Instancing                                | Each mesh has its own BVH, and the scene is flattened to world-space faces.                             |
-| Volumes: smoke and fog                    | Needs a constant-density medium with random scatter distance.                                           |
+| Milestone                           | Notes                                                                                                       |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| ~~Bounding volume hierarchy (BVH)~~ | Built in a Web Worker and walked with an explicit stack ([Scene loading & BVH](#3-scene-loading--bvh)).     |
+| ~~Emissive materials~~              | A ray that hits an emissive surface ends.                                                                   |
+| Motion blur                         | Needs a random time per ray and moving objects.                                                             |
+| ~~Image textures~~                  | The glTF base color map, up to `maxBaseColorMaps` per scene ([Scene loading & BVH](#3-scene-loading--bvh)). |
+| Textures: checker and Perlin noise  | Procedural, so a material needs a texture kind beside the glTF fields.                                      |
+| Instancing                          | Each mesh has its own BVH, and the scene is flattened to world-space faces.                                 |
+| Volumes: smoke and fog              | Needs a constant-density medium with random scatter distance.                                               |
 
 ### 10.3 Book 3: Ray Tracing: The Rest of Your Life
 

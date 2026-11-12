@@ -71,14 +71,15 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
   // The heads-up display saves the image through this registration.
   useEffect(() => registerScreenshot(() => downloadScreenshot(gl, display, completed)), [gl, display, completed])
 
-  // The packed textures leave the GPU when the scene is replaced. A bundled scene keeps its packed data in memory, so
-  // choosing it again uploads the textures again.
+  // The packed textures and the base color maps leave the GPU when the scene is replaced. A bundled scene keeps its
+  // packed data and images in memory, so choosing it again uploads the textures again.
   useEffect(() => {
     return () => {
       packed?.facesTexture.dispose()
       packed?.bvhTexture.dispose()
       packed?.materialsTexture.dispose()
       packed?.lightsTexture.dispose()
+      packed?.baseColorMaps.forEach(map => map?.dispose())
     }
   }, [packed])
 
