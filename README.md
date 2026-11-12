@@ -50,7 +50,7 @@ Then open the address Vite prints. [`RUNBOOK.md`](RUNBOOK.md) covers the other c
 
 ## 5. Your own scene
 
-The thumbnails in the settings card pick one of the bundled glTF 2.0 scenes, and the "Open .glb" card loads a `.glb` file from your own drive. The file is read in the browser and never uploaded. It must be a self-contained `.glb` whose materials use plain PBR factors, because textures are ignored. [Rendering gotchas](AGENTS.md#3-rendering-gotchas) in [`AGENTS.md`](AGENTS.md) lists how each material field is read.
+The thumbnails in the settings card pick one of the bundled glTF 2.0 scenes, and the "Open .glb" card loads a `.glb` file from your own drive. The file is read in the browser and never uploaded. It must be a self-contained `.glb`. Base color textures are read, and the other material textures are not. [Preparing a scene](RUNBOOK.md#15-preparing-a-scene) in [`RUNBOOK.md`](RUNBOOK.md) lists how each material field and texture is read.
 
 ## 6. How it started
 

@@ -77,7 +77,7 @@ A GPU path tracer that runs entirely in the browser through WebGL 2. React and T
 
 A single Vite + React app, with no server runtime.
 
-- `public/` — the scene card pictures in `public/thumbnails/` and the Draco decoder in `public/draco/`. Vite copies it into `dist/` as-is. The glTF scenes are not in git, and `.gitignore` excludes `public/*.glb` ([Changing the scene](RUNBOOK.md#15-changing-the-scene)).
+- `public/` — the scene card pictures in `public/thumbnails/` and the Draco decoder in `public/draco/`. Vite copies it into `dist/` as-is. The glTF scenes are not in git, and `.gitignore` excludes `public/*.glb` ([Adding a bundled scene](RUNBOOK.md#16-adding-a-bundled-scene)).
 - `src/shaders/` — the GLSL vertex and fragment shaders, imported into the app as strings.
 - `src/components/` — React components, styled with Tailwind CSS utility classes.
   - `src/components/about.tsx` — the camera controls, license and links shown in the About card.
@@ -109,6 +109,10 @@ A single Vite + React app, with no server runtime.
   - `numFloatsPerFace`, `numFloatsPerBvhNode`, `numFloatsPerMaterial` and `numFloatsPerLight` in `src/lib/webgl/sceneLayout.ts` set the layout the CPU writes. `src/lib/webgl/bvhWorker.ts` packs the faces and BVH nodes with them, and `src/lib/webgl/packScene.ts` packs the materials and the lights.
   - The `*_INDEX` constants in `src/shaders/pathTrace.frag.glsl` set the layout the shader reads.
   - `bvhNodesPerRow`, `facesPerRow`, `lightsPerRow`, `numTexelsPerBvhNode`, `numTexelsPerFace` and `numTexelsPerLight` in `src/lib/webgl/sceneLayout.ts` must equal `BVH_NODES_PER_ROW`, `FACES_PER_ROW`, `LIGHTS_PER_ROW`, `TEXELS_PER_BVH_NODE`, `TEXELS_PER_FACE` and `TEXELS_PER_LIGHT` in the shader. They wrap each mesh, and the lights, onto rows so the textures stay under a phone GPU's height limit.
+  - The number of base color map slots is written in three places, which must agree:
+    - `maxBaseColorMaps` in `src/lib/webgl/sceneLayout.ts`.
+    - `MAX_BASE_COLOR_MAPS` in `src/shaders/pathTrace.frag.glsl`.
+    - The `switch` in `sampleBaseColorMap`, in the same shader file, which needs one case per slot.
   - A mismatch renders wrong geometry or colors and reports no error.
 - **The BVH is built in a Web Worker.** `src/lib/webgl/packScene.ts` sends world-space faces to `src/lib/webgl/bvhWorker.ts` and receives the packed arrays back, so the worker cannot import anything that touches `window` or three.js.
 - **Never pass the BVH traversal stack arrays to a GLSL function.** GLSL passes arrays by value, so a helper that pushes onto `stackNode` and `stackT` in `traceBVH` copies both arrays on every call, which makes rendering about 10 times slower. The pushes in `src/shaders/pathTrace.frag.glsl` are written out inline for this reason.
@@ -117,7 +121,8 @@ A single Vite + React app, with no server runtime.
 - **`exposure` and `contrast` redraw instead of restarting.** They only change how the display pass draws the samples already traced, so the image settings subscription in `src/lib/webgl/tracer.ts` sets `needsDisplay`. A finished render traces nothing more, so a new display-only setting that skips `needsDisplay` leaves the canvas showing the old value. `drawDisplay` reads both from the store before every draw.
 - **While the user is moving the camera, only the one-bounce preview renders.** `CameraControls` in `src/components/viewport.tsx` sets `interactingRef` from its `controlstart`, `controlend`, `wake` and `sleep` events. A new way to move the camera must set `interactingRef` too, or every step of the move queues full-sample bands and the readout flickers ([Rendering](ARCHITECTURE.md#2-rendering-pipeline)).
 - **Only `src/shaders/display.frag.glsl` leaves linear light.** The accumulation target and `src/shaders/pathTrace.frag.glsl` must hold linear values, because averaging values that were already converted gives the wrong average ([Rendering pipeline](ARCHITECTURE.md#2-rendering-pipeline)).
-- **Material behavior comes from the glTF material fields.** `packMaterials` in `src/lib/webgl/packScene.ts` reads them: a non-zero `emissive` makes a light, `transmission` above 0.5 makes glass, and everything else is reflective with `metalness` as the reflection ratio and `1 - roughness` as the gloss. A glTF exported without these fields renders every surface as diffuse. Textures are ignored.
+- **Material behavior comes from the glTF material fields.** `packMaterials` in `src/lib/webgl/packScene.ts` reads them, and [Preparing a scene](RUNBOOK.md#15-preparing-a-scene) lists what each field and texture does. A glTF exported without these fields renders every surface as diffuse.
+- **A scene may use at most `maxBaseColorMaps` base color textures.** `collectBaseColorMaps` in `src/lib/webgl/packScene.ts` counts one image used with two wrap settings as two textures. It throws for a scene with more, and the view shows the message ([Scene loading & BVH](ARCHITECTURE.md#3-scene-loading--bvh)).
 - **A scene opened from the user's drive is served from an object URL that `chooseScene` in `src/components/renderSettings.tsx` frees when another scene replaces it.** It has no starting `view`, so `TracedScene` in `src/components/viewport.tsx` frames the camera on it after it loads. Only a self-contained `.glb` works, because the browser gives the loader no neighbouring files.
 - **The focus distance and lens radius slider ranges come from the loaded scene.** `sizeRangesToScene` in `src/components/viewport.tsx` writes the ranges and the starting focus to the store each time a scene loads, so any new way of loading a scene must call it.
 - **The Zustand store holds UI and render-status state only.** The camera, render targets, textures and sample counter live in React Three Fiber and `PathTracer`, because they change every sample and must not trigger React re-renders.
@@ -213,7 +218,7 @@ There is no test suite or runner. `pnpm lint`, `pnpm typecheck` and `pnpm build`
 
 ## 6. State / what's next
 
-The path tracer renders the bundled scenes, and any glTF scene whose materials use constant PBR factors. Known gaps:
+The path tracer renders the bundled scenes, and any glTF scene whose materials use constant PBR factors and base color textures. Known gaps:
 
-1. **No textures.** Only constant material factors are read ([Rendering gotchas](#3-rendering-gotchas)).
+1. **Only base color textures, and a capped number of them per scene.** Every other material property is a constant factor ([Rendering gotchas](#3-rendering-gotchas)).
 2. **No automated tests.** Shader and BVH regressions only show up in a manual render.
