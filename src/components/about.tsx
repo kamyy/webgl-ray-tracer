@@ -10,11 +10,12 @@ const gestures = [
   { action: 'Rotate', mouse: 'Left-drag', touch: 'One finger' },
   { action: 'Pan', mouse: 'Right-drag', touch: 'Two fingers' },
   { action: 'Zoom', mouse: 'Wheel or middle-drag', touch: 'Pinch' },
+  { action: 'Focus', mouse: 'Click', touch: 'Tap' },
 ]
 
 export function About() {
   return (
-    <div className="text-base">
+    <div className="text-base short:text-sm">
       {/* The gesture table. */}
       <table className="w-full border-collapse">
         <thead>
@@ -27,16 +28,16 @@ export function About() {
         <tbody>
           {gestures.map(gesture => (
             <tr key={gesture.action} className="border-t border-gray-300 align-top dark:border-gray-600">
-              <td className="py-1.5 pr-2 font-semibold">{gesture.action}</td>
-              <td className="py-1.5 pr-2">{gesture.mouse}</td>
-              <td className="py-1.5">{gesture.touch}</td>
+              <td className="py-1.5 pr-2 font-semibold short:py-1">{gesture.action}</td>
+              <td className="py-1.5 pr-2 short:py-1">{gesture.mouse}</td>
+              <td className="py-1.5 short:py-1">{gesture.touch}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
       {/* The license and the project links. */}
-      <div className="mt-3 text-gray-600 dark:text-gray-400">
+      <div className="mt-3 text-gray-600 dark:text-gray-400 short:mt-2">
         <p>
           MIT License ·{' '}
           <a className="text-[#0000ee] underline dark:text-sky-400" href="https://github.com/kamyy/webgl-ray-tracer">

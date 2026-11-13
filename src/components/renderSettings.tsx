@@ -7,10 +7,13 @@
  * accumulation. The scene cards write the chosen scene to the store, which remounts the traced scene.
  */
 import { useGLTF } from '@react-three/drei'
-import { useId, useRef, useState } from 'react'
+import { useRef } from 'react'
 import { isFileScene, sceneFromFile, scenes, type SceneInfo } from '../lib/scenes'
 import { ShadingMethod, useAppStore } from '../lib/store/appStore'
 import { Icon } from './icon'
+import { RangeRow } from './rangeRow'
+import { SegmentedControl } from './segmentedControl'
+import { SettingsGroup } from './settingsGroup'
 
 // The limits of each setting. They bound both the sliders and the number fields.
 const minSamples = 1
@@ -44,100 +47,13 @@ const shadingMethods = [
 ]
 
 // The classes the three scene cards share. `peer` on the radio lets the picture and the name react to it being checked.
+// On a phone in landscape the cards stack in one column, each a small picture with its name beside it, so the column
+// is no taller than the tracing settings beside it. That column is as wide as its cards, so the name has a maximum
+// width there, or a long file name would widen the column.
+const card = 'relative flex flex-col gap-1 short:landscape:flex-row short:landscape:items-center short:landscape:gap-2'
 const cardPicture =
-  'block aspect-[4/3] rounded-lg bg-cover bg-center ring-2 ring-transparent outline-1 -outline-offset-1 outline-gray-300 dark:outline-gray-600'
-const cardName = 'block truncate text-center text-xs font-semibold'
-
-interface RangeRowProps {
-  title: string
-  hint: string // the tooltip that explains the setting
-  value: number
-  min: number
-  max: number
-  step?: number // the smallest change the slider and the number field make, 1 when left out
-  onChange: (value: number) => void
-}
-
-interface SettingsGroupProps {
-  title: string
-  children: React.ReactNode
-}
-
-// One setting: a label, a slider for dragging, and a number field for typing an exact value.
-function RangeRow({ title, hint, value, min, max, step = 1, onChange }: RangeRowProps) {
-  const id = useId()
-
-  // The text being typed, or null while the field shows the setting. Keeping the text lets the field hold a half-typed
-  // number such as the 4 on the way to 45, which is below `min` for a setting like the field of view.
-  const [draft, setDraft] = useState<string | null>(null)
-
-  // Rounds a value to the nearest step, so a whole-number setting never receives a fraction.
-  function snap(number: number): number {
-    return Number((Math.round(number / step) * step).toFixed(6))
-  }
-
-  // A number in range applies at once. Anything else waits in the field until the typing is finished.
-  function onTyped(text: string) {
-    setDraft(text)
-    const typed = snap(parseFloat(text))
-    if (typed >= min && typed <= max) {
-      onChange(typed)
-    }
-  }
-
-  // Leaving the field ends the typing, so a number out of range is clamped and a blank field returns to the setting.
-  function onTypingDone() {
-    const typed = snap(parseFloat(draft ?? ''))
-    if (!Number.isNaN(typed)) {
-      onChange(Math.min(Math.max(typed, min), max))
-    }
-    setDraft(null)
-  }
-
-  // `useId` links each label to its slider, so tapping the label focuses it.
-  return (
-    <div className="flex min-h-11 items-center gap-2.5 short:min-h-9">
-      <label htmlFor={id} title={hint} className="w-24 flex-none text-xs font-semibold">
-        {title}
-      </label>
-      <input
-        id={id}
-        title={hint}
-        className="h-8 min-w-0 flex-1 pointer-coarse:h-11 short:h-8 pointer-coarse:short:h-8"
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={event => onChange(parseFloat(event.target.value))}
-      />
-      <input
-        className="min-h-9 w-16 flex-none rounded-lg border border-gray-300 bg-gray-100 px-2 text-right text-xs tabular-nums dark:border-gray-600 dark:bg-gray-800 short:min-h-8"
-        type="number"
-        min={min}
-        max={max}
-        step={step}
-        value={draft ?? value}
-        title={hint}
-        aria-label={`${title} value`}
-        onChange={event => onTyped(event.target.value)}
-        onBlur={onTypingDone}
-      />
-    </div>
-  )
-}
-
-// A titled box around a group of settings. The box is a fieldset, so the title sits on its border and screen readers
-// announce it with each setting in the group. `min-w-0` lets the box shrink inside a grid column, which a fieldset
-// otherwise refuses to do below its content's width.
-function SettingsGroup({ title, children }: SettingsGroupProps) {
-  return (
-    <fieldset className="mt-1 min-w-0 rounded-xl border border-gray-300 px-2 pb-1.5 dark:border-gray-600 short:mt-0">
-      <legend className="px-1 text-xs font-bold tracking-wide uppercase">{title}</legend>
-      {children}
-    </fieldset>
-  )
-}
+  'block aspect-[4/3] rounded-lg bg-cover bg-center ring-2 ring-transparent outline-1 -outline-offset-1 outline-gray-300 dark:outline-gray-600 short:landscape:w-20 short:landscape:flex-none'
+const cardName = 'block truncate text-center text-xs font-semibold short:landscape:max-w-22 short:landscape:text-left'
 
 // Switches the app to another scene. Writing it to the store remounts the traced scene. A scene from the user's drive
 // holds an object URL and a cached copy of the loaded file, so both are freed once another scene replaces it.
@@ -158,7 +74,7 @@ function chooseScene(scene: SceneInfo) {
   }
 }
 
-// The scenes to render, drawn as a row of pictures. The last card opens the browser's file picker, so a `.glb` from the
+// The scenes to render, drawn as a row of pictures, or a column on a phone in landscape. The last card opens the browser's file picker, so a `.glb` from the
 // user's own drive loads like a bundled scene. While such a file is loaded, that card shows its name and is the
 // selected one.
 function SceneCards() {
@@ -185,10 +101,10 @@ function SceneCards() {
   }
 
   return (
-    <fieldset className="mt-1 mb-2 grid grid-cols-3 gap-2">
+    <fieldset className="mt-1 mb-2 grid grid-cols-3 gap-2 short:landscape:grid-cols-1 short:landscape:gap-1.5">
       <legend className="sr-only">Scene</legend>
       {scenes.map(scene => (
-        <label key={scene.id} className="relative flex cursor-pointer flex-col gap-1">
+        <label key={scene.id} className={`${card} cursor-pointer`}>
           <input
             className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
             type="radio"
@@ -204,7 +120,7 @@ function SceneCards() {
         </label>
       ))}
 
-      <div className="relative flex flex-col gap-1">
+      <div className={card}>
         <button
           type="button"
           aria-label={fileLoaded ? `Open another .glb file. Loaded: ${current.label}` : 'Open a .glb file'}
@@ -225,36 +141,6 @@ function SceneCards() {
   )
 }
 
-// The flat or Phong choice, drawn as one segmented button. The radios are invisible and fill each half, so a press
-// anywhere on the half selects it, and keyboard focus still works.
-function ShadingControl() {
-  const shadingMethod = useAppStore(state => state.shadingMethod)
-  const setShadingMethod = useAppStore(state => state.setShadingMethod)
-
-  return (
-    <fieldset className="mt-1 flex items-center" title={hints.shading}>
-      <legend className="sr-only">Shading method</legend>
-      <div className="flex w-full overflow-hidden rounded-lg border border-gray-300 dark:border-gray-600">
-        {shadingMethods.map(method => (
-          <label key={method.value} className="relative flex-1">
-            <input
-              className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              type="radio"
-              name="shadingMethod"
-              value={method.value}
-              checked={shadingMethod === method.value}
-              onChange={() => setShadingMethod(method.value)}
-            />
-            <span className="block min-h-11 content-center px-4 text-center text-xs font-semibold text-gray-600 peer-checked:bg-(--accent) peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-2 peer-focus-visible:outline-(--accent) dark:text-gray-400 dark:peer-checked:text-gray-900 short:min-h-9">
-              {method.label}
-            </span>
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  )
-}
-
 // The settings that change what is traced. A change restarts accumulation.
 function TracingSettings() {
   const cameraFov = useAppStore(state => state.cameraFov)
@@ -263,10 +149,12 @@ function TracingSettings() {
   const focusDistance = useAppStore(state => state.focusDistance)
   const focusRange = useAppStore(state => state.focusRange)
   const numBounces = useAppStore(state => state.numBounces)
+  const shadingMethod = useAppStore(state => state.shadingMethod)
   const setCameraFov = useAppStore(state => state.setCameraFov)
   const setLensRadius = useAppStore(state => state.setLensRadius)
   const setFocusDistance = useAppStore(state => state.setFocusDistance)
   const setNumBounces = useAppStore(state => state.setNumBounces)
+  const setShadingMethod = useAppStore(state => state.setShadingMethod)
 
   return (
     <SettingsGroup title="Tracing">
@@ -304,7 +192,13 @@ function TracingSettings() {
         max={maxBounces}
         onChange={setNumBounces}
       />
-      <ShadingControl />
+      <SegmentedControl
+        legend="Shading method"
+        options={shadingMethods}
+        value={shadingMethod}
+        hint={hints.shading}
+        onChange={setShadingMethod}
+      />
     </SettingsGroup>
   )
 }
@@ -355,7 +249,7 @@ function ImageSettings() {
 // so the scene cards, the image settings and the tracing settings sit side by side.
 export function RenderSettings() {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] short:landscape:grid-cols-[minmax(0,22%)_minmax(0,1fr)_minmax(0,1fr)] short:landscape:items-start short:landscape:gap-x-4">
+    <div className="grid grid-cols-[minmax(0,1fr)] short:landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] short:landscape:items-start short:landscape:gap-x-4">
       <SceneCards />
       <ImageSettings />
       <TracingSettings />

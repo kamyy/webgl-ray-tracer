@@ -4,13 +4,12 @@
  * Open, it shows the sliders, number fields and shading control from `RenderSettings`, so a value can be changed while
  * the image converges behind it. The title bar collapses it to a small Settings button that restores it. Its Reset
  * button returns every setting to its default, and the focus, exposure and contrast to the loaded scene's own values,
- * after the user confirms. On a phone in portrait the open card is a bottom sheet across the full width. On a phone in
- * landscape it is wider, with the scene cards, the image settings and the tracing settings side by side, so it fits
- * without scrolling. A window too short
- * for the card scrolls it instead of letting it cover the readout. It is absolutely positioned, so opening and closing
- * it never resizes the canvas or restarts accumulation.
+ * after the user confirms. On a phone the open card stays clear of the row of round buttons at the bottom right. In
+ * portrait it spans the screen above the row, and in landscape it stops short of the row's left end, with the scene
+ * cards, the image settings and the tracing settings side by side so it fits without scrolling. A window too short for the card scrolls it instead of letting it cover the readout. It
+ * is absolutely positioned, so opening and closing it never resizes the canvas or restarts accumulation.
  */
-import { useState } from 'react'
+import { useEffect } from 'react'
 import { useAppStore } from '../lib/store/appStore'
 import { Icon } from './icon'
 import { RenderSettings } from './renderSettings'
@@ -59,8 +58,24 @@ function ResetButton() {
 }
 
 export function SettingsPanel() {
-  // Starts open, so the settings are visible the first time the page loads.
-  const [open, setOpen] = useState(true)
+  // Starts open, so the settings are visible the first time the page loads. Opening a popover closes it.
+  const open = useAppStore(state => state.openPanel === 'settings')
+  const setOpenPanel = useAppStore(state => state.setOpenPanel)
+
+  // Escape collapses the open card, as it closes a popover.
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpenPanel(null)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open, setOpenPanel])
 
   // Collapsed: just a button that opens the card again.
   if (!open) {
@@ -69,7 +84,7 @@ export function SettingsPanel() {
         type="button"
         aria-expanded={false}
         className={`${position} flex min-h-12 items-center gap-2 rounded-full bg-white/70 px-5 text-sm font-bold shadow-xl backdrop-blur-md hover:bg-white dark:bg-gray-900/70 dark:hover:bg-gray-800`}
-        onClick={() => setOpen(true)}
+        onClick={() => setOpenPanel('settings')}
       >
         <SlidersIcon />
         Settings
@@ -81,7 +96,7 @@ export function SettingsPanel() {
   return (
     <section
       aria-label="Render settings"
-      className={`${position} max-h-[calc(100%-7rem)] w-72 overflow-y-auto overscroll-contain rounded-2xl bg-white/70 p-3 shadow-xl backdrop-blur-md md:w-80 max-md:portrait:right-0 max-md:portrait:bottom-0 max-md:portrait:left-0 max-md:portrait:w-auto max-md:portrait:rounded-b-none max-md:portrait:pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:bg-gray-900/70 short:landscape:w-[min(62rem,calc(100vw-1.5rem))]!`}
+      className={`${position} max-h-[calc(100%-7rem)] w-72 overflow-y-auto overscroll-contain rounded-2xl bg-white/70 p-3 shadow-xl backdrop-blur-md md:w-80 max-md:portrait:right-[max(0.75rem,env(safe-area-inset-right))] max-md:portrait:bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+3.5rem)] max-md:portrait:max-h-[calc(100%-10.5rem)] max-md:portrait:w-auto dark:bg-gray-900/70 short:landscape:w-[min(62rem,calc(100vw-15.5rem))]!`}
     >
       <div className="mb-1 flex items-center gap-1">
         <button
@@ -89,7 +104,7 @@ export function SettingsPanel() {
           aria-expanded
           aria-label="Hide render settings"
           className="flex min-h-9 min-w-0 flex-1 items-center justify-between rounded-lg px-1 text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-800"
-          onClick={() => setOpen(false)}
+          onClick={() => setOpenPanel(null)}
         >
           <span className="flex items-center gap-2">
             <SlidersIcon />
