@@ -36,7 +36,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Vite serves the app on `http://localhost:3000` and opens the browser. It needs a browser with WebGL 2 and a reasonably powerful GPU (roughly an Nvidia GeForce 1080 or better).
+Vite serves the app on `http://localhost:3000`. Open that address in a browser with WebGL 2 and a reasonably powerful GPU (roughly an Nvidia GeForce 1080 or better).
 
 ### 1.3 Checks
 
