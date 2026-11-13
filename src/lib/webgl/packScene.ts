@@ -56,6 +56,12 @@ export interface PackedScene {
   lightsTexture: DataTexture
   numLights: number
   baseColorMaps: (Texture | null)[] // one entry per shader slot, null for a slot no material uses
+  root: Object3D // the loaded glTF scene, which the wireframe view draws
+  maxNumFaces: number // the face slots per mesh, filled or padding
+  maxNumBvhNodes: number // the node slots per mesh in `bvhTexture`, filled or padding
+  bvhNodeDepths: Uint8Array // each node slot's depth below its mesh's root, 255 for padding
+  bvhDepth: number // the deepest node's depth, leaves included
+  bvhParents: Int32Array // each node slot's parent node in the same mesh, -1 for a root or padding
 }
 
 // The base color maps by shader slot, and each material's slot, or -1 for a material without a map.
@@ -405,5 +411,11 @@ export async function packScene(root: Object3D): Promise<PackedScene> {
     lightsTexture: createLightsTexture(lights),
     numLights: lights.length / numFloatsPerLight,
     baseColorMaps: baseColorMaps.maps,
+    root,
+    maxNumFaces: bvh.maxNumFaces,
+    maxNumBvhNodes: bvh.maxNumBvhNodes,
+    bvhNodeDepths: bvh.bvhNodeDepths,
+    bvhDepth: bvh.bvhDepth,
+    bvhParents: bvh.bvhParents,
   }
 }

@@ -8,6 +8,7 @@
 import { useThree } from '@react-three/fiber'
 import { RefObject, useEffect, useMemo, useState } from 'react'
 import { PerspectiveCamera } from 'three'
+import { useSelectedFace } from '../lib/hooks/useSelectedFace'
 import { useShaderTriangles } from '../lib/hooks/useShaderTriangles'
 import { useTracerTargets } from '../lib/hooks/useTracerTargets'
 import { useTracingLoop } from '../lib/hooks/useTracingLoop'
@@ -22,6 +23,7 @@ import {
   TracerInputs,
   watchSettings,
 } from '../lib/webgl/tracer'
+import { createWireframe } from '../lib/webgl/wireframe'
 
 interface PathTracerProps {
   packed: PackedScene | null // null while no scene is ready, and nothing is drawn
@@ -39,12 +41,16 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
   const { accumulation, completed, randomTexture } = useTracerTargets(width, height)
   const { pathTrace, display } = useShaderTriangles()
   const [state] = useState(createTracerState)
+  const wireframe = useMemo(() => (packed ? createWireframe(packed) : null), [packed])
+  useSelectedFace(packed, wireframe)
 
   // The objects the tracing loop draws with. It is null while no scene is ready.
   const inputs = useMemo<TracerInputs | null>(
     () =>
-      packed ? { gl, camera, width, height, packed, accumulation, completed, randomTexture, pathTrace, display } : null,
-    [gl, camera, width, height, packed, accumulation, completed, randomTexture, pathTrace, display],
+      packed && wireframe
+        ? { gl, camera, width, height, packed, accumulation, completed, randomTexture, pathTrace, display, wireframe }
+        : null,
+    [gl, camera, width, height, packed, accumulation, completed, randomTexture, pathTrace, display, wireframe],
   )
 
   useEffect(() => {
@@ -68,8 +74,16 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
     return () => canvas.removeEventListener('webglcontextrestored', restart)
   }, [gl, state])
 
-  // The heads-up display saves the image through this registration.
-  useEffect(() => registerScreenshot(() => downloadScreenshot(gl, display, completed)), [gl, display, completed])
+  // The heads-up display saves the image through this registration. Saving draws the traced image alone, so the next
+  // frame draws any BVH boxes over it again.
+  useEffect(
+    () =>
+      registerScreenshot(() => {
+        downloadScreenshot(gl, display, completed)
+        state.wireframeKey = ''
+      }),
+    [gl, display, completed, state],
+  )
 
   // The packed textures and the base color maps leave the GPU when the scene is replaced. A bundled scene keeps its
   // packed data and images in memory, so choosing it again uploads the textures again.
@@ -82,6 +96,9 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
       packed?.baseColorMaps.forEach(map => map?.dispose())
     }
   }, [packed])
+
+  // The wireframe's materials and box lines leave the GPU with the scene. A new one is made if the scene is chosen again.
+  useEffect(() => () => wireframe?.dispose(), [wireframe])
 
   useTracingLoop(state, inputs, interactingRef)
 

@@ -55,6 +55,10 @@ export const bvhMaxStackSize = 24
 export const numTexelsPerFace = 10 // RGB texels. Must equal TEXELS_PER_FACE in src/shaders/pathTrace.frag.glsl.
 export const numFloatsPerFace = 30
 
+// Where vertex 0's position starts within a face's floats, texel 1. Vertices 1 and 2 follow it. The CPU readers of the
+// face data use it, so it must move with the table above.
+export const faceVertex0Offset = 3
+
 // Each mesh's faces wrap onto rows of `facesPerRow` faces, which keeps the texture's height under a phone GPU's texture
 // size limit. Must equal FACES_PER_ROW in src/shaders/pathTrace.frag.glsl.
 //
@@ -87,6 +91,12 @@ export const facesPerRow = 64
 // would be written as -0.5 and read as node 0, the root.
 export const numTexelsPerBvhNode = 3 // RGBA texels. Must equal TEXELS_PER_BVH_NODE in src/shaders/pathTrace.frag.glsl.
 export const numFloatsPerBvhNode = 12
+
+// Where each texel above starts within a node's floats. The CPU readers of the BVH data use them, so they must move
+// with the table above.
+export const bvhNodeMinOffset = 0 // the box's min corner x, y and z
+export const bvhNodeMaxOffset = 4 // the box's max corner x, y and z
+export const bvhNodePayloadOffset = 8 // left child, right child, first face and face count, each stored plus 0.5
 
 // BVH nodes wrap onto rows the same way faces do, one layer per mesh. Node `n` of mesh `m` starts at
 // x = (n % bvhNodesPerRow) * numTexelsPerBvhNode, y = floor(n / bvhNodesPerRow), layer = m. Must equal

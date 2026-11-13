@@ -29,13 +29,16 @@ Tricycle, 72° field of view, lens radius 0.03, focused on the tricycle. The mir
 | Rotate | Left-drag            | One finger  |
 | Pan    | Right-drag           | Two fingers |
 | Zoom   | Wheel or middle-drag | Pinch       |
+| Focus  | Click                | Tap         |
 
 - **Progress** is tracked by the ring in the top left corner, with the sample count, elapsed time, time remaining and the average time per sample beside it. The render starts over from zero samples whenever the camera, a tracing setting or the window size changes.
 - **Render settings** are in the card at the bottom left, and the chevron collapses it out of the way. Below the scene cards are two groups.
   - **Image** holds samples per pixel, exposure and contrast. Changing them keeps the samples traced so far, so they can be adjusted after the render finishes.
   - **Tracing** holds field of view, lens radius and focus distance for depth of field, ray bounces, and Flat or Phong shading. Changing them restarts the render.
 - **Reset** in the card's title bar returns every setting to its default, after a confirmation.
-- The buttons at the top right switch the theme and open the About card that lists these controls and the MIT license.
+- **Focus** follows a click or tap on the render once the lens radius is above 0, so the surface under it becomes sharp.
+- **The buttons at the bottom right** open the wireframe debugging card, download the finished image, switch the theme, and open the About card that lists these controls and the MIT license.
+- **Wireframe debugging** draws the triangle edges in place of the render, or the bounding volume hierarchy (BVH) boxes over it. The boxes can be limited to a band of depths, or to the boxes around one clicked or tapped triangle.
 
 ## 4. Running it locally
 

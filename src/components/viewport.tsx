@@ -9,8 +9,9 @@
 import { CameraControls, PerspectiveCamera, useGLTF } from '@react-three/drei'
 import { Canvas, useThree } from '@react-three/fiber'
 import { Component, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { Box3, Sphere, Vector3, type Object3D } from 'three'
+import { Box3, Sphere, Vector3, type Object3D, type PerspectiveCamera as ThreePerspectiveCamera } from 'three'
 import { usePackedScene } from '../lib/hooks/usePackedScene'
+import { useTapToFocus } from '../lib/hooks/useTapToFocus'
 import { useAppStore } from '../lib/store/appStore'
 import { checkGpuLimits, checkSceneLimits, supportsWebGL2 } from '../lib/webgl/checkGpuLimits'
 import type { PackedScene } from '../lib/webgl/packScene'
@@ -63,6 +64,20 @@ function sizeRangesToScene(root: Object3D, eye: Vector3, target: Vector3) {
   useAppStore.getState().setSceneScale(radius, eye.distanceTo(target))
 }
 
+// Sets the camera's near and far planes from the scene's size, so the wireframe view, which three.js rasterizes, is not
+// clipped in a scene much smaller or larger than the bundled ones. The path tracer ignores both planes.
+function fitClippingToScene(camera: ThreePerspectiveCamera, root: Object3D) {
+  const box = new Box3().setFromObject(root)
+  if (box.isEmpty()) {
+    return
+  }
+
+  const radius = box.getBoundingSphere(new Sphere()).radius
+  camera.near = radius / 1000
+  camera.far = radius * 1000
+  camera.updateProjectionMatrix()
+}
+
 // Loads the glTF file, packs it for the shader, checks that the GPU can hold it, and then hands the packed scene to the
 // path tracer. Both the load and the packing suspend, so the nearest `<Suspense>` shows the spinner until they finish.
 // The path tracer lives outside this component, so a new scene reuses its compiled shaders and render targets.
@@ -83,6 +98,16 @@ function TracedScene({
   const gltf = useGLTF(url)
   const packed = usePackedScene(gltf.scene)
   const controls = useThree(state => state.controls) as CameraControls | null
+  const camera = useThree(state => state.camera) as ThreePerspectiveCamera
+  useTapToFocus(packed)
+
+  useEffect(() => {
+    fitClippingToScene(camera, gltf.scene)
+  }, [camera, gltf.scene])
+
+  useEffect(() => {
+    useAppStore.getState().setBvhDepthLimit(packed.bvhDepth)
+  }, [packed])
 
   useEffect(() => {
     const { cameraFov, scene } = useAppStore.getState()
@@ -174,7 +199,7 @@ function Scene({
 
   return (
     <>
-      <PerspectiveCamera makeDefault fov={cameraFov} near={0.1} far={100} position={scene.view?.eye} />
+      <PerspectiveCamera makeDefault fov={cameraFov} position={scene.view?.eye} />
       <CameraControls
         ref={startAtScene}
         makeDefault

@@ -20,6 +20,7 @@ import { shallow } from 'zustand/shallow'
 import { useAppStore } from '../store/appStore'
 import { PackedScene } from './packScene'
 import { orthographicCamera, ShaderTriangle } from './shaderTriangle'
+import { Wireframe } from './wireframe'
 
 // The tracing loop keeps this many bands submitted to the GPU. It learns that one finished by polling on a timer, so
 // the second band keeps the GPU busy until the next poll. The desktop can wait for both before it draws a window.
@@ -60,6 +61,9 @@ export interface TracerState {
   bands: Band[] // the bands still on the GPU, oldest first
   lastStatusTimestamp: number // when the counters were last written to the store
   lastCameraMatrix: Matrix4 // the camera's world matrix at the last frame, to notice that it moved
+  pausedAt: number | null // Date.now() when the mesh wireframe paused tracing, or null while tracing runs
+  wireframeKey: string // the wireframe settings and selection last drawn, or empty to force the next wireframe draw
+  lastDrawnCamera: Matrix4 // the camera's world matrix when the canvas was last drawn, to notice that it moved
 }
 
 // The objects that one frame of drawing needs, gathered so the drawing helpers take one argument.
@@ -74,6 +78,7 @@ export interface TracerInputs {
   randomTexture: DataTexture
   pathTrace: ShaderTriangle
   display: ShaderTriangle
+  wireframe: Wireframe
 }
 
 // --- Setup ---------------------------------------------------------------------------
@@ -94,6 +99,9 @@ export function createTracerState(): TracerState {
     bands: [],
     lastStatusTimestamp: 0,
     lastCameraMatrix: new Matrix4(),
+    pausedAt: useAppStore.getState().showMeshWireframe ? Date.now() : null,
+    wireframeKey: '',
+    lastDrawnCamera: new Matrix4(),
   }
 }
 
@@ -114,6 +122,10 @@ export function renderReset(state: TracerState) {
   state.lensRadius = useAppStore.getState().lensRadius
   state.focusDistance = useAppStore.getState().focusDistance
   state.restartTimestamp = Date.now()
+  if (state.pausedAt !== null) {
+    state.pausedAt = state.restartTimestamp
+  }
+  state.wireframeKey = '' // a resize or a lost context empties the canvas, so any wireframe is drawn again
   useAppStore.getState().resetStatus()
 }
 
@@ -150,7 +162,8 @@ function updateStatus(state: TracerState, numSamples: number, force: boolean) {
   }
   state.lastStatusTimestamp = now
 
-  const elapsed = now - state.restartTimestamp
+  // A paused render's clock stops when the pause starts, so the paused time stays out of every counter.
+  const elapsed = (state.pausedAt ?? now) - state.restartTimestamp
   const average = elapsed / Math.max(state.samplesDone, 1)
   const eta = (numSamples - state.samplesDone) * average
   useAppStore.getState().setStatus({
@@ -196,11 +209,74 @@ export function downloadScreenshot(gl: WebGLRenderer, display: ShaderTriangle, c
   }, 'image/png')
 }
 
-// Draws the display pass when a sample completed, or an image setting changed, since the last time it was drawn.
-export function drawDisplayIfNeeded(state: TracerState, inputs: TracerInputs) {
-  if (state.needsDisplay) {
+// Draws the BVH boxes over whatever the canvas holds. The renderer never clears on its own. With the selected-triangle filter
+// on, only the tapped triangle and the boxes around it are drawn, at every depth. Otherwise every box in the
+// chosen band of levels is drawn.
+function drawBoxes(gl: WebGLRenderer, camera: PerspectiveCamera, wireframe: Wireframe) {
+  const { bvhMinDepth, bvhMaxDepth, showSelectedBoxesOnly } = useAppStore.getState()
+  gl.setRenderTarget(null)
+  if (showSelectedBoxesOnly) {
+    gl.render(wireframe.selection, camera)
+    return
+  }
+
+  gl.render(wireframe.boxes(bvhMinDepth, bvhMaxDepth), camera)
+}
+
+// The wireframe settings and selection that decide what a wireframe draw shows, or empty while no wireframe is on.
+function wireframeKey(wireframe: Wireframe): string {
+  const { showMeshWireframe, showBvhWireframe, showSelectedBoxesOnly, bvhMinDepth, bvhMaxDepth } =
+    useAppStore.getState()
+  if (!showMeshWireframe && !showBvhWireframe) {
+    return ''
+  }
+  return [
+    showMeshWireframe,
+    showBvhWireframe,
+    showSelectedBoxesOnly,
+    bvhMinDepth,
+    bvhMaxDepth,
+    wireframe.selectionVersion(),
+  ].join(':')
+}
+
+// Draws the canvas when something on it changed since the last draw. The canvas keeps what was drawn, so an unchanged
+// frame is skipped and the GPU stays free for tracing.
+// - The mesh wireframe replaces the traced image on black. It is drawn when the camera or a wireframe setting changed.
+// - The traced image is drawn when a sample completed or an image setting changed. With the BVH boxes on, it is also
+//   drawn when the camera or a wireframe setting changed, because the boxes are drawn over it.
+// - The BVH boxes are drawn over whichever of the two was just drawn.
+export function drawFrame(state: TracerState, inputs: TracerInputs) {
+  const { gl, camera, wireframe } = inputs
+  const { showMeshWireframe, showBvhWireframe } = useAppStore.getState()
+
+  // `CameraControls` moves the camera earlier in this frame, but three.js only refreshes a camera's world matrix when
+  // the scene the camera belongs to is drawn. The camera belongs to React Three Fiber's scene, which this loop never
+  // draws, so the matrix is refreshed here. Without it the wireframe would follow the camera a frame late.
+  camera.updateMatrixWorld()
+
+  const key = wireframeKey(wireframe)
+  const cameraMoved = !state.lastDrawnCamera.equals(camera.matrixWorld)
+  const wireframeChanged = key !== state.wireframeKey || (key !== '' && cameraMoved)
+  state.wireframeKey = key
+  state.lastDrawnCamera.copy(camera.matrixWorld)
+
+  if (showMeshWireframe) {
+    if (!wireframeChanged) {
+      return
+    }
+    gl.setRenderTarget(null)
+    gl.clear()
+    gl.render(wireframe.faces, camera)
+  } else if (state.needsDisplay || (showBvhWireframe && wireframeChanged)) {
     state.needsDisplay = false
-    drawDisplay(inputs.gl, inputs.display, inputs.completed)
+    drawDisplay(gl, inputs.display, inputs.completed)
+  } else {
+    return
+  }
+
+  if (showBvhWireframe) {
+    drawBoxes(gl, camera, wireframe)
   }
 }
 
@@ -330,6 +406,12 @@ export function traceStep(state: TracerState, inputs: TracerInputs, interacting:
     renderReset(state)
   }
 
+  // The mesh wireframe pauses tracing. The camera check above still runs during the pause, so moving the camera then
+  // throws away the samples, and tracing starts over when the pause ends.
+  if (state.pausedAt !== null) {
+    return idlePollMs
+  }
+
   // While the user is moving the camera, only the preview is drawn. A sample that has started is finished even when the
   // sample ceiling drops below it, so no rows end up one sample behind the rest.
   const { numSamples } = useAppStore.getState()
@@ -404,11 +486,38 @@ export function watchSettings(state: TracerState) {
     { equalityFn: shallow },
   )
 
+  // The mesh wireframe pauses tracing while it is shown. The paused time is left out of the elapsed, average and
+  // remaining times, which count tracing time only. Switching back redraws the traced image, which a finished render
+  // would otherwise leave covered by the last wireframe frame.
+  const stopMeshWireframe = useAppStore.subscribe(
+    s => s.showMeshWireframe,
+    shown => {
+      if (shown) {
+        state.pausedAt = Date.now()
+      } else if (state.pausedAt !== null) {
+        state.restartTimestamp += Date.now() - state.pausedAt
+        state.pausedAt = null
+        state.needsDisplay = true
+      }
+    },
+  )
+
+  // The BVH boxes draw over the traced image without pausing it. Turning them off redraws the image, which a finished
+  // render would otherwise leave with the last boxes drawn on it.
+  const stopBvhWireframe = useAppStore.subscribe(
+    s => s.showBvhWireframe,
+    () => {
+      state.needsDisplay = true
+    },
+  )
+
   return () => {
     clearTimeout(settleTimer)
     stopRestartSettings()
     stopSliders()
     stopNumSamples()
     stopImageSettings()
+    stopMeshWireframe()
+    stopBvhWireframe()
   }
 }

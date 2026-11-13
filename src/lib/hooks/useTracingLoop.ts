@@ -8,7 +8,7 @@
  */
 import { useFrame } from '@react-three/fiber'
 import { RefObject, useEffect } from 'react'
-import { drawDisplayIfNeeded, idlePollMs, TracerInputs, TracerState, traceStep } from '../webgl/tracer'
+import { drawFrame, idlePollMs, TracerInputs, TracerState, traceStep } from '../webgl/tracer'
 
 const errorRetryMs = 1000 // how long the loop waits after a step throws
 
@@ -31,10 +31,10 @@ export function useTracingLoop(state: TracerState, inputs: TracerInputs | null, 
     return () => clearTimeout(timer)
   }, [state, inputs, interactingRef])
 
-  // The display pass runs once per screen refresh, however many samples were traced since the last one.
+  // The canvas is drawn once per screen refresh, however many samples were traced since the last one.
   useFrame(() => {
     if (inputs) {
-      drawDisplayIfNeeded(state, inputs)
+      drawFrame(state, inputs)
     }
   }, 1)
 }
