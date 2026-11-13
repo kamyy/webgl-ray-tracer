@@ -81,14 +81,18 @@ A single Vite + React app, with no server runtime.
 - `src/shaders/` — the GLSL vertex and fragment shaders, imported into the app as strings.
 - `src/components/` — React components, styled with Tailwind CSS utility classes.
   - `src/components/about.tsx` — the camera controls, license and links shown in the About card.
-  - `src/components/hud.tsx` — the progress readout, the theme switch and the About button.
+  - `src/components/hud.tsx` — the progress readout, the save, theme and About buttons, and the wireframe button.
   - `src/components/icon.tsx` — `Icon`, the line icon every button draws its symbol with.
   - `src/components/pathTracer.tsx` — `PathTracer`, which draws the samples.
-  - `src/components/popover.tsx` — the card the About button opens.
+  - `src/components/popover.tsx` — the card the About and wireframe buttons open, with a title bar that closes it.
   - `src/components/progressRing.tsx` — the circular progress ring inside the readout.
+  - `src/components/rangeRow.tsx` — `RangeRow`, a slider paired with a number field.
   - `src/components/renderSettings.tsx` — the settings controls, including the scene cards.
+  - `src/components/segmentedControl.tsx` — `SegmentedControl`, a choice between a few options drawn as one split button.
+  - `src/components/settingsGroup.tsx` — `SettingsGroup`, the titled fieldset that groups related controls.
   - `src/components/settingsPanel.tsx` — the collapsible settings card.
   - `src/components/viewport.tsx` — the render view.
+  - `src/components/wireframeSettings.tsx` — the wireframe switches and BVH depth sliders in the wireframe popover.
 - `src/styles/` — `globals.css`, which imports Tailwind and holds the range slider rules that Tailwind has no utilities for.
 - `src/lib/scenes.ts` — the bundled scenes with their starting camera views, and the helpers for a scene opened from the user's drive.
 - `src/lib/store/` — the Zustand store for UI and rendering-status state only.
@@ -105,9 +109,12 @@ A single Vite + React app, with no server runtime.
 - **`bvhMaxStackSize` in `src/lib/webgl/sceneLayout.ts` must equal `BVH_MAX_STACK_SIZE` in `src/shaders/pathTrace.frag.glsl`.**
   - The shader's BVH traversal stack is a fixed-size array with no bounds checking, so a deeper tree silently corrupts the render.
   - `packScene` in `src/lib/webgl/packScene.ts` throws when the built tree is deeper than the limit, and the view shows the message.
-- **The packed texture layout is defined twice and the two copies must change together.**
+- **The packed texture layout is read in three places, which must change together.**
   - `numFloatsPerFace`, `numFloatsPerBvhNode`, `numFloatsPerMaterial` and `numFloatsPerLight` in `src/lib/webgl/sceneLayout.ts` set the layout the CPU writes. `src/lib/webgl/bvhWorker.ts` packs the faces and BVH nodes with them, and `src/lib/webgl/packScene.ts` packs the materials and the lights.
   - The `*_INDEX` constants in `src/shaders/pathTrace.frag.glsl` set the layout the shader reads.
+  - `faceVertex0Offset`, `bvhNodeMinOffset`, `bvhNodeMaxOffset` and `bvhNodePayloadOffset` in `src/lib/webgl/sceneLayout.ts` locate the texels the CPU reads back. These files read the face and BVH node data with them, so the offsets must change with the layout:
+    - `src/lib/webgl/bvhRaycast.ts`
+    - `src/lib/webgl/wireframe.ts`
   - `bvhNodesPerRow`, `facesPerRow`, `lightsPerRow`, `numTexelsPerBvhNode`, `numTexelsPerFace` and `numTexelsPerLight` in `src/lib/webgl/sceneLayout.ts` must equal `BVH_NODES_PER_ROW`, `FACES_PER_ROW`, `LIGHTS_PER_ROW`, `TEXELS_PER_BVH_NODE`, `TEXELS_PER_FACE` and `TEXELS_PER_LIGHT` in the shader. They wrap each mesh, and the lights, onto rows so the textures stay under a phone GPU's height limit.
   - The number of base color map slots is written in three places, which must agree:
     - `maxBaseColorMaps` in `src/lib/webgl/sceneLayout.ts`.
@@ -125,6 +132,14 @@ A single Vite + React app, with no server runtime.
 - **A scene may use at most `maxBaseColorMaps` base color textures.** `collectBaseColorMaps` in `src/lib/webgl/packScene.ts` counts one image used with two wrap settings as two textures. It throws for a scene with more, and the view shows the message ([Scene loading & BVH](ARCHITECTURE.md#3-scene-loading--bvh)).
 - **A scene opened from the user's drive is served from an object URL that `chooseScene` in `src/components/renderSettings.tsx` frees when another scene replaces it.** It has no starting `view`, so `TracedScene` in `src/components/viewport.tsx` frames the camera on it after it loads. Only a self-contained `.glb` works, because the browser gives the loader no neighbouring files.
 - **The focus distance and lens radius slider ranges come from the loaded scene.** `sizeRangesToScene` in `src/components/viewport.tsx` writes the ranges and the starting focus to the store each time a scene loads, so any new way of loading a scene must call it.
+- **The BVH depth sliders and the camera's near and far planes also come from the loaded scene.** `TracedScene` in `src/components/viewport.tsx` calls `setBvhDepthLimit` and `fitClippingToScene` when a scene loads, so any new way of loading a scene must call them too. Without `fitClippingToScene`, the rasterized wireframe of a very small or very large scene is clipped.
+- **The mesh wireframe pauses tracing, and the BVH boxes do not.** While `showMeshWireframe` is on, `traceStep` submits no bands, and the mesh wireframe subscription in `watchSettings` keeps the paused time out of the readout's times. These files hold the wireframe:
+  - `src/lib/webgl/tracer.ts` draws it in `drawFrame`.
+  - `src/lib/webgl/wireframe.ts` builds its three.js objects.
+- **`drawFrame` redraws the canvas only when something on it changed.** The canvas keeps what was last drawn, so an unchanged frame is skipped and the GPU stays free for tracing.
+  - It compares the camera's world matrix and `wireframeKey`, the wireframe settings and selection, with the last draw. A new wireframe setting that changes what is drawn must be added to `wireframeKey`, or the canvas keeps showing the old drawing.
+  - Anything else that draws to the canvas must clear `state.wireframeKey`, so the next frame draws the wireframe again. `renderReset` does, because a resize or a lost context empties the canvas, and so does the save button.
+  - Turning a wireframe off sets `needsDisplay`, or a finished render keeps the last wireframe drawing on screen.
 - **The Zustand store holds UI and render-status state only.** The camera, render targets, textures and sample counter live in React Three Fiber and `PathTracer`, because they change every sample and must not trigger React re-renders.
 - **The render view's size cap comes from `src/lib/webgl/renderLimits.ts`.** `src/index.tsx` turns it into CSS variables for the `main` element that holds `Viewport`, `Hud` and `SettingsPanel`. Keep the readout, the settings card and the popover absolutely positioned inside `main`, or opening one resizes the canvas and restarts accumulation ([Layout](ARCHITECTURE.md#9-layout)).
 - **The app needs WebGL 2 with `EXT_color_buffer_float`, `EXT_float_blend` and enough texture units, and the GPU's texture limits must fit the scene.** `src/lib/webgl/checkGpuLimits.ts` checks them, and `src/components/viewport.tsx` shows the failure as a sentence in the view. The scene limits compare the real texture sizes with the GPU's limits, so a phone with small limits can still run a small scene.
