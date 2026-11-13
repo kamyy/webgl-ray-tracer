@@ -28,6 +28,9 @@ const nodeVisitCost = 2.0
 
 let maxDepth = 0 // deepest BVH tree level split while building, reported back so `packScene` can check it against the shader's stack
 
+// The depth written for a padding slot that holds no node, so the wireframe skips it.
+const noNodeDepth = 255
+
 interface Vec3 {
   x: number
   y: number
@@ -79,6 +82,9 @@ export interface BvhResult {
   faces: Float32Array
   bvhNodes: Float32Array
   maxDepth: number
+  bvhNodeDepths: Uint8Array // each node's depth below its root, in the same slices as `bvhNodes`, 255 for padding
+  bvhDepth: number // the deepest node's depth, leaves included
+  bvhParents: Int32Array // each node's parent node in the same mesh, in the same slices as `bvhNodes`, -1 for a root
 }
 
 function vec3(x: number, y: number, z: number): Vec3 {
@@ -130,14 +136,20 @@ class BvhNode {
   rightChild: number // right child node index
   firstFace: number // a leaf's first face in the object's leaf-ordered face list, 0 for an interior node
   faceCount: number // a leaf's number of faces, 0 for an interior node
+  depth: number // levels below the root, which is 0
+  index: number // this node's position in the mesh's node list
+  parent: number // the parent node's index, -1 for the root
 
-  constructor(min: Vec3, max: Vec3) {
+  constructor(min: Vec3, max: Vec3, depth: number, index: number, parent: number) {
     this.min = min
     this.max = max
     this.leftChild = -2.0
     this.rightChild = -2.0
     this.firstFace = 0
     this.faceCount = 0
+    this.depth = depth
+    this.index = index
+    this.parent = parent
   }
 
   // Splits the faces between two children, or keeps them in this node as a leaf. A leaf's faces are appended to
@@ -253,14 +265,14 @@ class BvhNode {
     if (leftFaces.length > 0) {
       const { min, max } = boundsOf(leftFaces)
       this.leftChild = bvhNodes.length
-      leftNode = new BvhNode(min, max)
+      leftNode = new BvhNode(min, max, depth + 1, bvhNodes.length, this.index)
       bvhNodes.push(leftNode)
     }
 
     if (rightFaces.length > 0) {
       const { min, max } = boundsOf(rightFaces)
       this.rightChild = bvhNodes.length
-      rightNode = new BvhNode(min, max)
+      rightNode = new BvhNode(min, max, depth + 1, bvhNodes.length, this.index)
       bvhNodes.push(rightNode)
     }
 
@@ -328,7 +340,7 @@ function buildObject(mesh: BvhRequestMesh): { faces: Face[]; bvhNodes: BvhNode[]
 
   const bvhNodes: BvhNode[] = []
   const leafFaces: Face[] = [] // the faces in the order the leaves hold them, which is the order they are packed in
-  const root = new BvhNode(min, max)
+  const root = new BvhNode(min, max, 0, 0, -1)
   bvhNodes.push(root)
   root.subDivide(faces, bvhNodes, leafFaces)
 
@@ -404,6 +416,41 @@ function packBvhNodes(objects: { bvhNodes: BvhNode[] }[], maxNumBvhNodes: number
   return data
 }
 
+// Writes each node's depth, one slice of maxNumBvhNodes per object like `packBvhNodes`. The wireframe view uses the
+// depths to show a band of tree levels. They stay out of the BVH texture, because the shader never reads them.
+function packBvhNodeDepths(objects: { bvhNodes: BvhNode[] }[], maxNumBvhNodes: number): Uint8Array {
+  const data = new Uint8Array(maxNumBvhNodes * objects.length).fill(noNodeDepth)
+  objects.forEach((obj, id) => {
+    obj.bvhNodes.forEach((bv, n) => {
+      data[maxNumBvhNodes * id + n] = Math.min(bv.depth, noNodeDepth - 1)
+    })
+  })
+  return data
+}
+
+// Writes each node's parent, one slice of maxNumBvhNodes per object like `packBvhNodes`. The wireframe view walks
+// these from a leaf to the root to find the boxes around a face. The shader never reads them.
+function packBvhParents(objects: { bvhNodes: BvhNode[] }[], maxNumBvhNodes: number): Int32Array {
+  const data = new Int32Array(maxNumBvhNodes * objects.length).fill(-1)
+  objects.forEach((obj, id) => {
+    obj.bvhNodes.forEach((bv, n) => {
+      data[maxNumBvhNodes * id + n] = bv.parent
+    })
+  })
+  return data
+}
+
+// The deepest node of every object, leaves included.
+function deepestNode(objects: { bvhNodes: BvhNode[] }[]): number {
+  let deepest = 0
+  objects.forEach(obj => {
+    obj.bvhNodes.forEach(bv => {
+      deepest = Math.max(deepest, bv.depth)
+    })
+  })
+  return Math.min(deepest, noNodeDepth - 1)
+}
+
 function roundUp(value: number, multiple: number) {
   return Math.ceil(value / multiple) * multiple
 }
@@ -428,6 +475,11 @@ self.onmessage = (event: MessageEvent<BvhRequest>) => {
     faces: packFaces(objects, maxNumFaces),
     bvhNodes: packBvhNodes(objects, maxNumBvhNodes),
     maxDepth,
+    bvhNodeDepths: packBvhNodeDepths(objects, maxNumBvhNodes),
+    bvhDepth: deepestNode(objects),
+    bvhParents: packBvhParents(objects, maxNumBvhNodes),
   }
-  self.postMessage(result, { transfer: [result.faces.buffer, result.bvhNodes.buffer] })
+  self.postMessage(result, {
+    transfer: [result.faces.buffer, result.bvhNodes.buffer, result.bvhNodeDepths.buffer, result.bvhParents.buffer],
+  })
 }
