@@ -174,7 +174,7 @@ drei's `PerspectiveCamera` and `CameraControls` (`src/components/viewport.tsx`) 
 
 The camera is a thin lens. `main` in `src/shaders/pathTrace.frag.glsl` starts each ray at a random point on a disk of radius `lensRadius` and aims it at the point where the pinhole ray crosses the plane `focusDistance` away. Points on that plane stay sharp and others blur, and the progressive averaging smooths the blur with no extra pass. A `lensRadius` of 0 is a pinhole. The focus distance and lens radius sliders each have 100 positions that span the scene's size, because scene units have no fixed scale.
 
-`CameraControls` gives rotate, pan and dolly with the mouse and touch for free. It has no Ctrl + left-drag pan, so panning is right-drag or two fingers. Its rotate speed is set to 0.5.
+`CameraControls` gives rotate, pan and dolly with the mouse and touch for free. It has no Ctrl + left-drag pan, so panning is right-drag or two fingers. Its rotate speed is set to 0.5. Dolly heads toward the pointer, aimed at the pointer's spot on a plane through the orbit target that faces the camera. The library casts no ray into the scene, so dolly passes through any surface in front of that plane. Each dolly step also moves the orbit target toward that spot, so later rotation pivots near where the user zoomed. A dolly step shrinks the distance to the target by a fixed fraction. Without a floor, the camera would slow to a stall as it neared the target. `infinityDolly` stops the distance at `minDistance`, a quarter of the scene's bounding sphere radius, and pushes the target forward instead, so dolly keeps a steady speed through the scene.
 
 ---
 
