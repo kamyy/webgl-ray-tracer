@@ -19,6 +19,8 @@ import {
   configureRenderer,
   createTracerState,
   downloadScreenshot,
+  forgetMapTextures,
+  releaseMapTextures,
   renderReset,
   TracerInputs,
   watchSettings,
@@ -28,9 +30,10 @@ import { createWireframe } from '../lib/webgl/wireframe'
 interface PathTracerProps {
   packed: PackedScene | null // null while no scene is ready, and nothing is drawn
   interactingRef: RefObject<boolean> // true while a drag is held or the camera is moving
+  onProblem: (problem: string | null) => void // shows a sentence in the view when the scene cannot be drawn
 }
 
-export function PathTracer({ packed, interactingRef }: PathTracerProps) {
+export function PathTracer({ packed, interactingRef, onProblem }: PathTracerProps) {
   const gl = useThree(state => state.gl)
   const camera = useThree(state => state.camera) as PerspectiveCamera
   const size = useThree(state => state.size)
@@ -48,9 +51,35 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
   const inputs = useMemo<TracerInputs | null>(
     () =>
       packed && wireframe
-        ? { gl, camera, width, height, packed, accumulation, completed, randomTexture, pathTrace, display, wireframe }
+        ? {
+            gl,
+            camera,
+            width,
+            height,
+            packed,
+            onProblem,
+            accumulation,
+            completed,
+            randomTexture,
+            pathTrace,
+            display,
+            wireframe,
+          }
         : null,
-    [gl, camera, width, height, packed, accumulation, completed, randomTexture, pathTrace, display, wireframe],
+    [
+      gl,
+      camera,
+      width,
+      height,
+      packed,
+      onProblem,
+      accumulation,
+      completed,
+      randomTexture,
+      pathTrace,
+      display,
+      wireframe,
+    ],
   )
 
   useEffect(() => {
@@ -66,10 +95,13 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
 
   useEffect(() => watchSettings(state), [state])
 
-  // A lost context takes the accumulated image with it, so start over once it is back.
+  // A lost context takes the accumulated image and the map arrays with it, so start over once it is back.
   useEffect(() => {
     const canvas = gl.domElement
-    const restart = () => renderReset(state)
+    const restart = () => {
+      forgetMapTextures(state)
+      renderReset(state)
+    }
     canvas.addEventListener('webglcontextrestored', restart)
     return () => canvas.removeEventListener('webglcontextrestored', restart)
   }, [gl, state])
@@ -85,17 +117,17 @@ export function PathTracer({ packed, interactingRef }: PathTracerProps) {
     [gl, display, completed, state],
   )
 
-  // The packed textures and the base color maps leave the GPU when the scene is replaced. A bundled scene keeps its
-  // packed data and images in memory, so choosing it again uploads the textures again.
+  // The packed textures leave the GPU when the scene is replaced. A bundled scene keeps its packed data and images in
+  // memory, so choosing it again uploads the textures again. The tracer builds the map arrays again on its next band.
   useEffect(() => {
     return () => {
+      releaseMapTextures(state, gl)
       packed?.facesTexture.dispose()
       packed?.bvhTexture.dispose()
       packed?.materialsTexture.dispose()
       packed?.lightsTexture.dispose()
-      packed?.baseColorMaps.forEach(map => map?.dispose())
     }
-  }, [packed])
+  }, [gl, state, packed])
 
   // The wireframe's materials and box lines leave the GPU with the scene. A new one is made if the scene is chosen again.
   useEffect(() => () => wireframe?.dispose(), [wireframe])

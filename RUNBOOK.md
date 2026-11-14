@@ -77,13 +77,14 @@ Export the scene from Blender as a glTF binary (`.glb`) with Draco compression o
   - Expect the Base Color to tint every bounce, mirror reflections included.
   - Set Transmission above 0.5 for glass, and set its IOR (index of refraction), which controls how strongly it bends light. A surface with Transmission at 0.5 or below renders as opaque.
 - **Textures**
-  - Plug images into Base Color only. Normal, metallic and roughness textures are ignored, so bake fine detail into the base color or model it.
+  - Plug images into Base Color and, through a Normal Map node in Tangent Space, into Normal. Metallic and roughness textures are ignored. Glass and emissive surfaces ignore a normal map too.
+  - Feed the base color and normal images of one material from the same UV map and the same Mapping node, or the scene fails to load with a message naming the material.
   - Leave Emission Color unplugged on a surface that should not glow. An image plugged into it exports with an emission factor beside it, and the renderer turns the whole surface into a light of that single color.
   - Model cut-out shapes such as leaves and fences as geometry. An image's alpha is ignored, so an alpha-clipped leaf renders as a solid rectangle.
   - Give every textured mesh a UV map, the texture coordinates that place the image on each face. A mesh without one renders in a single color taken from a corner of the image, with no warning.
   - Use the Image Texture node's Extension setting and a Mapping node freely. Repeat, Extend and Mirror, and the mapping's offset, rotation and scale, all carry over.
   - Keep images as PNG, JPEG or WebP. A file whose textures were converted to KTX2, a GPU-compressed format, fails to load.
-  - Use at most `maxBaseColorMaps` (in `src/lib/webgl/sceneLayout.ts`) base color textures. An image used with two different Extension settings counts as two. If a scene needs more, combine its images into one texture atlas, a single image holding them side by side, with Blender's texture baking. The atlas takes one slot. A texture that repeats across a surface can't go in the atlas, because its UVs run past its own region into the neighbouring images.
+  - Keep the base color images square and one size, and the normal images too. One large image makes every image of its kind take as much memory ([Scene loading & BVH](ARCHITECTURE.md#3-scene-loading--bvh)).
 - **Geometry**
   - Join small objects into one mesh with Ctrl+J. Every mesh is padded to the size of the largest one, so many small meshes beside a large one waste memory.
   - Split a very large mesh into several. A single huge mesh can fail with the "too deeply nested" error in [Troubleshooting](#4-troubleshooting).

@@ -14,7 +14,7 @@
  *   u_bvh_sampler                    u_face_sampler                   u_material_sampler
  *   ┌──────────────────────┐         ┌──────────────────────┐         ┌──────────────────────┐
  *   │ node: box min/max,   │firstFace│ face: normal, three  │ mat     │ material: color,     │
- *   │ left, right child,   ├────────►│ vertices, vertex     ├────────►│ color map slot,      │
+ *   │ left, right child,   ├────────►│ vertices, vertex     ├────────►│ map layers,          │
  *   │ firstFace, faceCount │         │ normals and UVs, mat │ index   │ class, reflection,   │
  *   │                      │         │ index                │         │ gloss, refraction    │
  *   └──────────────────────┘         └──────────────────────┘         └──────────────────────┘
@@ -50,8 +50,9 @@ export const bvhMaxStackSize = 24
 //     8   │ vertex 0 u        v        vertex 1 u │ VERTEX_UV_0_INDEX
 //     9   │ vertex 1 v        vertex 2 u        v │ VERTEX_UV_1_INDEX
 //
-// The UVs are the texture coordinates of the material's base color map, with the map's offset, repeat and rotation
-// already applied. A face whose material has no map holds zeros there.
+// The UVs are the texture coordinates of the material's base color map, or of its normal map when it has no base color
+// map, with the map's offset, repeat and rotation already applied. A material's two maps share them. A face whose
+// material has no map holds zeros there.
 export const numTexelsPerFace = 10 // RGB texels. Must equal TEXELS_PER_FACE in src/shaders/pathTrace.frag.glsl.
 export const numFloatsPerFace = 30
 
@@ -103,19 +104,30 @@ export const bvhNodePayloadOffset = 8 // left child, right child, first face and
 // BVH_NODES_PER_ROW in src/shaders/pathTrace.frag.glsl.
 export const bvhNodesPerRow = 64
 
-// A material is two RGBA texels of four floats each, so a material is eight floats. The material texture is
+// A material is three RGBA texels of four floats each, so a material is 12 floats. The material texture is
 // `numTexelsPerMaterial` wide with one row per material, so material `i` is at y = i.
 //
-//   texel │ r          g                  b         a                │ shader constant
-//   ──────┼────────────────────────────────────────────────────────────┼───────────────────────
-//     0   │ color r    g                  b         color map slot   │ MATERIAL_COLOR_INDEX
-//     1   │ class      reflection ratio   gloss     refractive index │ MATERIAL_ATTRIB_INDEX
+//   texel │ r                g                  b                 a                │ shader constant
+//   ──────┼────────────────────────────────────────────────────────────────────────┼───────────────────────
+//     0   │ color r          g                  b                 color map layer  │ MATERIAL_COLOR_INDEX
+//     1   │ class            reflection ratio   gloss             refractive index │ MATERIAL_ATTRIB_INDEX
+//     2   │ color sampling   normal map layer   normal sampling   normal scale     │ MATERIAL_MAPS_INDEX
 //
-// The color is the emitted light for an emissive material and the base color for any other. The color map slot picks
-// which of the shader's `u_base_color_samplers` multiplies the base color, or is -1 when the material has no map. The
-// shader tests for a slot of 0 or more before converting it to an integer, so -1 needs no extra 0.5.
-export const numTexelsPerMaterial = 2 // RGBA texels
-export const numFloatsPerMaterial = 8
+// The color is the emitted light for an emissive material and the base color for any other. The color map layer picks a
+// layer of the shader's `u_color_map_sampler`, and the normal map layer one of `u_normal_map_sampler`. Either is -1
+// when the material has no such map. The shader tests for a layer of 0 or more before converting it to an integer, so
+// -1 needs no extra 0.5.
+//
+// A sampling code says how the shader reads a map, because every layer of a map array shares one set of sampler
+// settings. It is `wrapS + 3 * wrapT + 9 * nearest`, where a wrap is one of the `*_WRAP` values below and `nearest` is
+// 1 for a map that shows its texels as hard-edged squares.
+export const numTexelsPerMaterial = 3 // RGBA texels
+export const numFloatsPerMaterial = 12
+
+/** The wrap values in a sampling code. The values must equal the `*_WRAP` constants in the shader. */
+export const REPEAT_WRAP = 0
+export const CLAMP_WRAP = 1
+export const MIRROR_WRAP = 2
 
 // A light is one emissive face, three RGBA texels of four floats each, so a light is 12 floats. The shader reads the
 // emission color from the face's material.
@@ -132,12 +144,6 @@ export const numFloatsPerLight = 12
 // x = (l % lightsPerRow) * numTexelsPerLight, y = floor(l / lightsPerRow). Must equal LIGHTS_PER_ROW in
 // src/shaders/pathTrace.frag.glsl.
 export const lightsPerRow = 64
-
-// The most base color textures a scene may use, where a texture is one image with one set of wrap modes and filter.
-// Each one is bound to its own texture unit, and WebGL 2 promises
-// only 16 units to a fragment shader, of which the path tracer's scene textures take 5. Must equal MAX_BASE_COLOR_MAPS
-// in src/shaders/pathTrace.frag.glsl.
-export const maxBaseColorMaps = 8
 
 // The material classes the shader branches on. The values must equal the `*_MATERIAL` constants in the shader.
 export const EMISSIVE_MATERIAL = 0

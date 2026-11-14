@@ -80,6 +80,13 @@ const int TEXELS_PER_BVH_NODE = 3;
 
 const int MATERIAL_COLOR_INDEX = 0;
 const int MATERIAL_ATTRIB_INDEX = 1;
+const int MATERIAL_MAPS_INDEX = 2;
+
+// The wrap modes in a map's sampling code. Must equal `REPEAT_WRAP`, `CLAMP_WRAP` and `MIRROR_WRAP` in
+// `src/lib/webgl/sceneLayout.ts`.
+const int REPEAT_WRAP = 0;
+const int CLAMP_WRAP = 1;
+const int MIRROR_WRAP = 2;
 
 // Lights wrap onto rows of this many entries, like faces. Both constants must equal their counterparts in
 // `src/lib/webgl/sceneLayout.ts`: `lightsPerRow` and `numTexelsPerLight`.
@@ -91,9 +98,6 @@ const int LIGHT_VERTEX_0_INDEX = 0;
 const int LIGHT_VERTEX_1_INDEX = 1;
 const int LIGHT_VERTEX_2_INDEX = 2;
 
-// The number of base color map samplers. Must equal `maxBaseColorMaps` in `src/lib/webgl/sceneLayout.ts`.
-const int MAX_BASE_COLOR_MAPS = 8;
-
 // --- globals -------------------------------------------------------------------------
 uvec4 g_randGeneratorState; // random number generator current state
 
@@ -103,7 +107,8 @@ uniform highp sampler2DArray u_face_sampler;
 uniform highp sampler2DArray u_bvh_sampler;
 uniform highp sampler2D u_material_sampler;
 uniform highp sampler2D u_light_sampler; // one emissive face per entry, see `src/lib/webgl/sceneLayout.ts`
-uniform highp sampler2D u_base_color_samplers[MAX_BASE_COLOR_MAPS]; // only slots the materials name are read
+uniform highp sampler2DArray u_color_map_sampler; // every base color map, one image per layer, sRGB
+uniform highp sampler2DArray u_normal_map_sampler; // every normal map, one image per layer, read as stored
 
 uniform int u_num_objects; // number of models/objects to render
 uniform int u_num_lights; // number of emissive faces in the lights texture, 0 when the scene has no light
@@ -348,28 +353,86 @@ bool rayIntersectBVH(Ray r, out RayHitResult nearest) {
     return true;
 }
 
-// --- base color maps -----------------------------------------------------------------
-// The hit point's texture coordinates, blended from the face's three vertex UVs by the barycentric weights.
-vec2 hitUv(RayHitResult hit) {
-    vec3 uv0 = texelFetch(u_face_sampler, faceTexel(VERTEX_UV_0_INDEX, hit.fi, hit.oi), 0).xyz;
-    vec3 uv1 = texelFetch(u_face_sampler, faceTexel(VERTEX_UV_1_INDEX, hit.fi, hit.oi), 0).xyz;
-    return uv0.xy * hit.u + vec2(uv0.z, uv1.x) * hit.v + uv1.yz * hit.w;
+// --- maps ----------------------------------------------------------------------------
+// The face's three vertex UVs, which the materials' maps share.
+void faceUvs(RayHitResult hit, out vec2 uv0, out vec2 uv1, out vec2 uv2) {
+    vec3 texel0 = texelFetch(u_face_sampler, faceTexel(VERTEX_UV_0_INDEX, hit.fi, hit.oi), 0).xyz;
+    vec3 texel1 = texelFetch(u_face_sampler, faceTexel(VERTEX_UV_1_INDEX, hit.fi, hit.oi), 0).xyz;
+    uv0 = texel0.xy;
+    uv1 = vec2(texel0.z, texel1.x);
+    uv2 = texel1.yz;
 }
 
-// The color of map `slot` at `uv`, already in linear light because the maps are sRGB textures. GLSL ES 3.00 indexes a
-// sampler array only with a constant, so each slot needs its own case. `textureLod` reads the full-size image, because
-// there are no screen-space derivatives to pick a mipmap level with inside the bounce loop.
-vec3 sampleBaseColorMap(int slot, vec2 uv) {
-    switch (slot) {
-        case 0: return textureLod(u_base_color_samplers[0], uv, 0.0).rgb;
-        case 1: return textureLod(u_base_color_samplers[1], uv, 0.0).rgb;
-        case 2: return textureLod(u_base_color_samplers[2], uv, 0.0).rgb;
-        case 3: return textureLod(u_base_color_samplers[3], uv, 0.0).rgb;
-        case 4: return textureLod(u_base_color_samplers[4], uv, 0.0).rgb;
-        case 5: return textureLod(u_base_color_samplers[5], uv, 0.0).rgb;
-        case 6: return textureLod(u_base_color_samplers[6], uv, 0.0).rgb;
-        default: return textureLod(u_base_color_samplers[7], uv, 0.0).rgb;
+// Applies one wrap mode to one texture coordinate. The map array itself repeats, so a clamped or mirrored coordinate
+// stays half a texel inside the edge, where the filter cannot blend in the opposite edge.
+float wrapCoord(float coord, int wrap, float halfTexel) {
+    if (wrap == CLAMP_WRAP) {
+        return clamp(coord, halfTexel, 1.0 - halfTexel);
     }
+
+    if (wrap == MIRROR_WRAP) {
+        float folded = mod(coord, 2.0);
+        return clamp(folded > 1.0 ? 2.0 - folded : folded, halfTexel, 1.0 - halfTexel);
+    }
+
+    return coord;
+}
+
+// The texel of layer `layer` of `maps` at `uv`, read the way the sampling code says. The code holds what a sampler
+// object would, because every layer of an array shares one (see `src/lib/webgl/sceneLayout.ts`). `textureLod` reads the
+// full-size image, because there are no screen-space derivatives to pick a mipmap level with inside the bounce loop.
+vec3 sampleMap(highp sampler2DArray maps, float layer, float sampling, vec2 uv) {
+    int code = int(sampling);
+    vec2 size = vec2(textureSize(maps, 0).xy);
+    vec2 halfTexel = 0.5 / size;
+    uv = vec2(wrapCoord(uv.x, code % 3, halfTexel.x), wrapCoord(uv.y, (code / 3) % 3, halfTexel.y));
+    if (code >= 9) { // nearest filtering: read the center of the texel `uv` falls in, so the filter blends nothing
+        uv = (floor(uv * size) + 0.5) / size;
+    }
+
+    return textureLod(maps, vec3(uv, float(int(layer))), 0.0).rgb;
+}
+
+// Tilts the hit's shading normal by a normal map texel, which is a direction in the surface's tangent space: x along
+// increasing u, y up the image, z out of the surface. The tangent directions come from the face's positions and UVs.
+// glTF's v increases down the image, so "up the image" is against increasing v.
+vec3 perturbNormal(RayHitResult hit, vec2 uv0, vec2 uv1, vec2 uv2, vec3 mapTexel, float scale) {
+    vec3 p0 = texelFetch(u_face_sampler, faceTexel(VERTEX_0_POS_INDEX, hit.fi, hit.oi), 0).xyz;
+    vec3 p1 = texelFetch(u_face_sampler, faceTexel(VERTEX_1_POS_INDEX, hit.fi, hit.oi), 0).xyz;
+    vec3 p2 = texelFetch(u_face_sampler, faceTexel(VERTEX_2_POS_INDEX, hit.fi, hit.oi), 0).xyz;
+    vec3 edge1 = p1 - p0;
+    vec3 edge2 = p2 - p0;
+    vec2 duv1 = uv1 - uv0;
+    vec2 duv2 = uv2 - uv0;
+
+    // A face whose UVs have no area gives the map no direction to follow.
+    float det = duv1.x * duv2.y - duv2.x * duv1.y;
+    if (abs(det) < 1e-12) {
+        return hit.n;
+    }
+
+    // How the position moves as u and v grow across the face.
+    vec3 dPdu = (edge1 * duv2.y - edge2 * duv1.y) / det;
+    vec3 dPdv = (edge2 * duv1.x - edge1 * duv2.x) / det;
+
+    // The tangent is dPdu made perpendicular to the normal. The bitangent is perpendicular to both, and is flipped
+    // where the UVs are mirrored so that it still points up the image.
+    vec3 n = hit.n;
+    vec3 tangent = dPdu - n * dot(n, dPdu);
+    if (dot(tangent, tangent) < 1e-20) {
+        return n;
+    }
+
+    tangent = normalize(tangent);
+    vec3 bitangent = cross(n, tangent);
+    if (dot(bitangent, dPdv) > 0.0) {
+        bitangent = -bitangent;
+    }
+
+    vec3 m = mapTexel * 2.0 - 1.0;
+    m.xy *= scale;
+
+    return normalize(tangent * m.x + bitangent * m.y + n * m.z);
 }
 
 // --- ray cast from eye through image pixel -------------------------------------------
@@ -495,7 +558,7 @@ vec3 pathTrace(Ray ray) {
         }
 
         // The color texel holds the emitted light for an emissive material, and the base color for any other. Its w is
-        // the base color map slot, or -1 for none.
+        // the base color map layer, or -1 for none.
         vec4 colorTexel = texelFetch(u_material_sampler, ivec2(MATERIAL_COLOR_INDEX, hit.mi), 0);
         vec3 color = colorTexel.xyz;
         texel = texelFetch(u_material_sampler, ivec2(MATERIAL_ATTRIB_INDEX, hit.mi), 0);
@@ -512,14 +575,32 @@ vec3 pathTrace(Ray ray) {
             break;
         }
 
+        // The maps texel holds the color map's sampling code, the normal map layer or -1 for none, the normal map's
+        // sampling code and the normal scale.
         material.baseColor = color;
-        if (colorTexel.w >= 0.0) {
-            material.baseColor *= sampleBaseColorMap(int(colorTexel.w), hitUv(hit));
+        vec4 mapsTexel = texelFetch(u_material_sampler, ivec2(MATERIAL_MAPS_INDEX, hit.mi), 0);
+        bool colorMapped = colorTexel.w >= 0.0;
+        bool normalMapped = mapsTexel.y >= 0.0;
+        vec2 uv0, uv1, uv2, uv;
+        if (colorMapped || normalMapped) {
+            faceUvs(hit, uv0, uv1, uv2);
+            uv = uv0 * hit.u + uv1 * hit.v + uv2 * hit.w;
+        }
+
+        if (colorMapped) {
+            material.baseColor *= sampleMap(u_color_map_sampler, colorTexel.w, mapsTexel.x, uv);
         }
 
         if (i == u_num_bounces) { // out of bounces, so the surface glows with its own color as ambient light
             radiance += throughput * material.baseColor;
             break;
+        }
+
+        // The normal only steers the next bounce, so it is tilted after the out-of-bounces exit above.
+        vec3 unmappedNormal = hit.n;
+        if (normalMapped) {
+            vec3 mapTexel = sampleMap(u_normal_map_sampler, mapsTexel.y, mapsTexel.z, uv);
+            hit.n = perturbNormal(hit, uv0, uv1, uv2, mapTexel, mapsTexel.w);
         }
 
         if (material.materialClass == REFLECTIVE_MATERIAL) {
@@ -533,6 +614,12 @@ vec3 pathTrace(Ray ray) {
                 radiance += throughput * sampleDirectLight(hit, material.baseColor);
                 rayBounceOffDiffuse(ray, hit);
                 countEmission = false;
+            }
+
+            // A normal map can tilt the normal far enough to send the bounce into the surface. The surface absorbs
+            // such a ray, because nothing underneath the surface can light it.
+            if (normalMapped && dot(ray.dir, unmappedNormal) <= 0.0) {
+                break;
             }
         } else { // dielectric
             rayBounceOffDielectricSurface(ray, hit, material);
