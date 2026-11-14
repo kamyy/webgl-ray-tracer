@@ -78,6 +78,19 @@ function fitClippingToScene(camera: ThreePerspectiveCamera, root: Object3D) {
   camera.updateProjectionMatrix()
 }
 
+// Sets how close the camera can dolly to its orbit target before dolly pushes the target forward instead. Each dolly
+// step shrinks the distance to the target by a fixed fraction, so without this floor the camera slows to a stall as it
+// nears the target. With `infinityDolly`, a step at the floor moves the camera and the target forward together by a
+// fixed fraction of `minDistance`. Sizing the floor to the scene gives the same steady speed in any scene's units.
+function fitDollyToScene(controls: CameraControls, root: Object3D) {
+  const box = new Box3().setFromObject(root)
+  if (box.isEmpty()) {
+    return
+  }
+
+  controls.minDistance = box.getBoundingSphere(new Sphere()).radius / 4
+}
+
 // Loads the glTF file, packs it for the shader, checks that the GPU can hold it, and then hands the packed scene to the
 // path tracer. Both the load and the packing suspend, so the nearest `<Suspense>` shows the spinner until they finish.
 // The path tracer lives outside this component, so a new scene reuses its compiled shaders and render targets.
@@ -104,6 +117,12 @@ function TracedScene({
   useEffect(() => {
     fitClippingToScene(camera, gltf.scene)
   }, [camera, gltf.scene])
+
+  useEffect(() => {
+    if (controls) {
+      fitDollyToScene(controls, gltf.scene)
+    }
+  }, [controls, gltf.scene])
 
   useEffect(() => {
     useAppStore.getState().setBvhDepthLimit(packed.bvhDepth)
@@ -206,6 +225,8 @@ function Scene({
         azimuthRotateSpeed={0.5}
         polarRotateSpeed={0.5}
         dollyDragInverted
+        dollyToCursor
+        infinityDolly
         onControlStart={() => {
           draggingRef.current = true
           updateInteracting()
