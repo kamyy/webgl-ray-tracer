@@ -3,13 +3,12 @@
  *
  * It renders into the accumulation target with additive blending, so each draw adds one sample per pixel to the
  * running sum, and the alpha channel counts the samples. It reads the scene from the packed face, BVH and material
- * textures. A raw shader material is used because the GLSL declares its own inputs and outputs, and three.js would
- * otherwise add its own and clash with them.
+ * textures and the two map arrays. A raw shader material is used because the GLSL declares its own inputs and outputs, and
+ * three.js would otherwise add its own and clash with them.
  */
 import { AddEquation, CustomBlending, GLSL3, Matrix4, OneFactor, RawShaderMaterial, Texture, Vector3 } from 'three'
 import fragmentShader from '../../shaders/pathTrace.frag.glsl?raw'
 import vertexShader from '../../shaders/pathTrace.vert.glsl?raw'
-import { maxBaseColorMaps } from './sceneLayout'
 
 export function createPathTraceMaterial(): RawShaderMaterial {
   return new RawShaderMaterial({
@@ -43,8 +42,8 @@ export function createPathTraceMaterial(): RawShaderMaterial {
       u_bvh_sampler: { value: null as Texture | null },
       u_material_sampler: { value: null as Texture | null },
       u_light_sampler: { value: null as Texture | null },
-      // `packScene` fills every slot, with null for an unused one.
-      u_base_color_samplers: { value: new Array<Texture | null>(maxBaseColorMaps).fill(null) },
+      u_color_map_sampler: { value: null as Texture | null },
+      u_normal_map_sampler: { value: null as Texture | null },
     },
   })
 }

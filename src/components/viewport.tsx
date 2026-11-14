@@ -223,7 +223,7 @@ function Scene({
           updateInteracting()
         }}
       />
-      <PathTracer packed={packed} interactingRef={interactingRef} />
+      <PathTracer packed={packed} interactingRef={interactingRef} onProblem={onProblem} />
       {/* The key remounts the boundary, the spinner and the traced scene together, so a new scene starts clean. */}
       <SceneErrorBoundary key={scene.id} onError={onProblem}>
         <Suspense fallback={<LoadingNotice onLoadingChange={onLoadingChange} />}>

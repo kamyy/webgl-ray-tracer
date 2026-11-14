@@ -18,6 +18,7 @@
 import { DataTexture, Matrix4, PerspectiveCamera, WebGLRenderer, WebGLRenderTarget } from 'three'
 import { shallow } from 'zustand/shallow'
 import { useAppStore } from '../store/appStore'
+import { createMapTextures, disposeMapTextures, MapTextures } from './mapTextures'
 import { PackedScene } from './packScene'
 import { orthographicCamera, ShaderTriangle } from './shaderTriangle'
 import { Wireframe } from './wireframe'
@@ -64,6 +65,8 @@ export interface TracerState {
   pausedAt: number | null // Date.now() when the mesh wireframe paused tracing, or null while tracing runs
   wireframeKey: string // the wireframe settings and selection last drawn, or empty to force the next wireframe draw
   lastDrawnCamera: Matrix4 // the camera's world matrix when the canvas was last drawn, to notice that it moved
+  mapTextures: MapTextures | null // the scene's map arrays, built on its first traced band, or null before then
+  mapsFailedFor: PackedScene | null // the scene whose map arrays could not be built, so the build is not retried
 }
 
 // The objects that one frame of drawing needs, gathered so the drawing helpers take one argument.
@@ -73,6 +76,7 @@ export interface TracerInputs {
   width: number
   height: number
   packed: PackedScene
+  onProblem: (problem: string | null) => void // shows a sentence in the view when the scene cannot be drawn
   accumulation: WebGLRenderTarget
   completed: WebGLRenderTarget
   randomTexture: DataTexture
@@ -102,6 +106,8 @@ export function createTracerState(): TracerState {
     pausedAt: useAppStore.getState().showMeshWireframe ? Date.now() : null,
     wireframeKey: '',
     lastDrawnCamera: new Matrix4(),
+    mapTextures: null,
+    mapsFailedFor: null,
   }
 }
 
@@ -294,7 +300,7 @@ function nextBandRows(state: TracerState, height: number, isPreview: boolean): n
 
 // Adds a band of rows of the current sample to the running sum. Returns the number of rows drawn. The display pass runs
 // when a sample completes, at the next rendering tick.
-function drawBand(state: TracerState, inputs: TracerInputs, isPreview: boolean): number {
+function drawBand(state: TracerState, inputs: TracerInputs, mapTextures: MapTextures, isPreview: boolean): number {
   const { gl, camera, width, height, packed, accumulation, completed, randomTexture, pathTrace } = inputs
   const { shadingMethod, numSamples } = useAppStore.getState()
 
@@ -331,7 +337,8 @@ function drawBand(state: TracerState, inputs: TracerInputs, isPreview: boolean):
   uniforms.u_bvh_sampler.value = packed.bvhTexture
   uniforms.u_material_sampler.value = packed.materialsTexture
   uniforms.u_light_sampler.value = packed.lightsTexture
-  uniforms.u_base_color_samplers.value = packed.baseColorMaps
+  uniforms.u_color_map_sampler.value = mapTextures.color
+  uniforms.u_normal_map_sampler.value = mapTextures.normal
 
   // Shader triangle: trace the band and add it to the running sum.
   gl.setRenderTarget(accumulation)
@@ -390,6 +397,48 @@ function retireFinishedBands(context: WebGL2RenderingContext, state: TracerState
   }
 }
 
+// --- Map arrays ----------------------------------------------------------------------
+// The map arrays are raw WebGL textures, so three.js neither uploads them on first use nor restores them after a lost
+// context. The tracer builds them itself, right before the first band that reads them.
+
+// The map arrays for the scene being traced, built now if they are missing or belong to another scene. A scene whose
+// arrays cannot be built reports why once, and is not traced.
+function currentMapTextures(state: TracerState, inputs: TracerInputs): MapTextures | null {
+  if (state.mapTextures?.packed === inputs.packed) {
+    return state.mapTextures
+  }
+
+  if (state.mapsFailedFor === inputs.packed) {
+    return null
+  }
+
+  releaseMapTextures(state, inputs.gl)
+  try {
+    state.mapTextures = createMapTextures(inputs.gl, inputs.packed)
+  } catch (error) {
+    state.mapsFailedFor = inputs.packed
+    inputs.onProblem(`The scene could not be loaded: ${(error as Error).message}`)
+    return null
+  }
+
+  return state.mapTextures
+}
+
+/** Frees the map arrays, so the next traced band builds them again. Call it when the scene is replaced. */
+export function releaseMapTextures(state: TracerState, gl: WebGLRenderer) {
+  if (state.mapTextures) {
+    disposeMapTextures(gl, state.mapTextures)
+    state.mapTextures = null
+  }
+}
+
+/** Forgets the map arrays without freeing them. A lost context has already deleted them, so the next band rebuilds. */
+export function forgetMapTextures(state: TracerState) {
+  state.mapTextures = null
+}
+
+// --- Tracing step --------------------------------------------------------------------
+
 // Submits one band when the GPU has room and the settings call for one. Returns how many milliseconds to wait before
 // the next try.
 export function traceStep(state: TracerState, inputs: TracerInputs, interacting: boolean): number {
@@ -423,8 +472,13 @@ export function traceStep(state: TracerState, inputs: TracerInputs, interacting:
     return fencePollMs
   }
 
+  const mapTextures = currentMapTextures(state, inputs)
+  if (!mapTextures) {
+    return idlePollMs
+  }
+
   const submittedAt = performance.now()
-  const rows = drawBand(state, inputs, isPreview)
+  const rows = drawBand(state, inputs, mapTextures, isPreview)
 
   const fence = context.fenceSync(context.SYNC_GPU_COMMANDS_COMPLETE, 0)
   if (fence) {
