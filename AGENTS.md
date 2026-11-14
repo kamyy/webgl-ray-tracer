@@ -116,10 +116,7 @@ A single Vite + React app, with no server runtime.
     - `src/lib/webgl/bvhRaycast.ts`
     - `src/lib/webgl/wireframe.ts`
   - `bvhNodesPerRow`, `facesPerRow`, `lightsPerRow`, `numTexelsPerBvhNode`, `numTexelsPerFace` and `numTexelsPerLight` in `src/lib/webgl/sceneLayout.ts` must equal `BVH_NODES_PER_ROW`, `FACES_PER_ROW`, `LIGHTS_PER_ROW`, `TEXELS_PER_BVH_NODE`, `TEXELS_PER_FACE` and `TEXELS_PER_LIGHT` in the shader. They wrap each mesh, and the lights, onto rows so the textures stay under a phone GPU's height limit.
-  - The number of base color map slots is written in three places, which must agree:
-    - `maxBaseColorMaps` in `src/lib/webgl/sceneLayout.ts`.
-    - `MAX_BASE_COLOR_MAPS` in `src/shaders/pathTrace.frag.glsl`.
-    - The `switch` in `sampleBaseColorMap`, in the same shader file, which needs one case per slot.
+  - `REPEAT_WRAP`, `CLAMP_WRAP` and `MIRROR_WRAP` in `src/lib/webgl/sceneLayout.ts` must equal the `*_WRAP` constants in the shader. They make up the sampling code each map carries in its material.
   - A mismatch renders wrong geometry or colors and reports no error.
 - **The BVH is built in a Web Worker.** `src/lib/webgl/packScene.ts` sends world-space faces to `src/lib/webgl/bvhWorker.ts` and receives the packed arrays back, so the worker cannot import anything that touches `window` or three.js.
 - **Never pass the BVH traversal stack arrays to a GLSL function.** GLSL passes arrays by value, so a helper that pushes onto `stackNode` and `stackT` in `traceBVH` copies both arrays on every call, which makes rendering about 10 times slower. The pushes in `src/shaders/pathTrace.frag.glsl` are written out inline for this reason.
@@ -129,7 +126,12 @@ A single Vite + React app, with no server runtime.
 - **While the user is moving the camera, only the one-bounce preview renders.** `CameraControls` in `src/components/viewport.tsx` sets `interactingRef` from its `controlstart`, `controlend`, `wake` and `sleep` events. A new way to move the camera must set `interactingRef` too, or every step of the move queues full-sample bands and the readout flickers ([Rendering](ARCHITECTURE.md#2-rendering-pipeline)).
 - **Only `src/shaders/display.frag.glsl` leaves linear light.** The accumulation target and `src/shaders/pathTrace.frag.glsl` must hold linear values, because averaging values that were already converted gives the wrong average ([Rendering pipeline](ARCHITECTURE.md#2-rendering-pipeline)).
 - **Material behavior comes from the glTF material fields.** `packMaterials` in `src/lib/webgl/packScene.ts` reads them, and [Preparing a scene](RUNBOOK.md#15-preparing-a-scene) lists what each field and texture does. A glTF exported without these fields renders every surface as diffuse.
-- **A scene may use at most `maxBaseColorMaps` base color textures.** `collectBaseColorMaps` in `src/lib/webgl/packScene.ts` counts one image used with two wrap settings as two textures. It throws for a scene with more, and the view shows the message ([Scene loading & BVH](ARCHITECTURE.md#3-scene-loading--bvh)).
+- **Base color maps and normal maps each live in a map array, one image per layer.** `collectMaps` in `src/lib/webgl/packScene.ts` lists the images, and `createMapTextures` in `src/lib/webgl/mapTextures.ts` blits them into the layers ([Scene loading & BVH](ARCHITECTURE.md#3-scene-loading--bvh)).
+  - The map arrays are made with raw WebGL calls, so three.js neither uploads nor restores them. `currentMapTextures` in `src/lib/webgl/tracer.ts` builds them before the first band of a scene. `PathTracer` in `src/components/pathTracer.tsx` frees them when the scene changes, and forgets them after a lost context so the next band builds them again.
+  - Raw WebGL calls change state that three.js has cached, and three.js leaves state such as the scissor test from its last draw. Any new code that makes raw calls must call `gl.resetState()` before and after them, as `createMapTextures` does. Otherwise a leftover scissor clips the calls, or three.js draws with the wrong textures or framebuffer.
+  - `sampleMap` in `src/shaders/pathTrace.frag.glsl` applies each map's wrap mode and nearest filtering from its sampling code, so a new sampler setting must go into that code.
+- **A material's normal map must use the same UV map and texture transform as its base color map.** `checkMapUvs` in `src/lib/webgl/packScene.ts` throws for a material that breaks this, and the view shows the message ([Scene loading & BVH](ARCHITECTURE.md#3-scene-loading--bvh)).
+- **Lights and glass ignore normal maps.** The glass code decides whether a ray enters or leaves from the shading normal, so `normalMap` in `src/lib/webgl/packScene.ts` returns none for them.
 - **A scene opened from the user's drive is served from an object URL that `chooseScene` in `src/components/renderSettings.tsx` frees when another scene replaces it.** It has no starting `view`, so `TracedScene` in `src/components/viewport.tsx` frames the camera on it after it loads. Only a self-contained `.glb` works, because the browser gives the loader no neighbouring files.
 - **The focus distance and lens radius slider ranges come from the loaded scene.** `sizeRangesToScene` in `src/components/viewport.tsx` writes the ranges and the starting focus to the store each time a scene loads, so any new way of loading a scene must call it.
 - **The BVH depth sliders and the camera's near and far planes also come from the loaded scene.** `TracedScene` in `src/components/viewport.tsx` calls `setBvhDepthLimit` and `fitClippingToScene` when a scene loads, so any new way of loading a scene must call them too. Without `fitClippingToScene`, the rasterized wireframe of a very small or very large scene is clipped.
@@ -233,7 +235,7 @@ There is no test suite or runner. `pnpm lint`, `pnpm typecheck` and `pnpm build`
 
 ## 6. State / what's next
 
-The path tracer renders the bundled scenes, and any glTF scene whose materials use constant PBR factors and base color textures. Known gaps:
+The path tracer renders the bundled scenes, and any glTF scene whose materials use constant PBR factors, base color textures and normal textures. Known gaps:
 
-1. **Only base color textures, and a capped number of them per scene.** Every other material property is a constant factor ([Rendering gotchas](#3-rendering-gotchas)).
+1. **Only base color and normal textures.** Every other material property is a constant factor ([Rendering gotchas](#3-rendering-gotchas)).
 2. **No automated tests.** Shader and BVH regressions only show up in a manual render.
