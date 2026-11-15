@@ -586,6 +586,14 @@ vec3 pathTrace(Ray ray) {
             break;
         }
 
+        // An opaque surface reflects on whichever side the ray arrives from, so its normals are turned to face the
+        // ray. One-sided geometry such as a plane or a room's walls seen from inside would otherwise scatter through
+        // itself and get no direct light. Glass keeps the stored side, because it tells a ray entering from one leaving.
+        if (material.materialClass == REFLECTIVE_MATERIAL && dot(ray.dir, hit.fn) > 0.0) {
+            hit.fn = -hit.fn;
+            hit.n = -hit.n;
+        }
+
         // The maps texel holds the color map's sampling code, the normal map layer or -1 for none, the normal map's
         // sampling code and the normal scale.
         material.baseColor = color;
