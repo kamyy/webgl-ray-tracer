@@ -88,7 +88,7 @@ Export the scene from Blender as a glTF binary (`.glb`) with Draco compression o
 - **Geometry**
   - Join small objects into one mesh with Ctrl+J. Every mesh is padded to the size of the largest one, so many small meshes beside a large one waste memory.
   - Split a very large mesh into several. A single huge mesh can fail with the "too deeply nested" error in [Troubleshooting](#4-troubleshooting).
-  - Shade Smooth only shows when the app's Shading method setting is Phong. The setting starts at Flat, which draws every face flat.
+  - Shade Smooth only shows when the app's Shading method setting is Phong, its default. Flat draws every face flat.
 
 ### 1.6 Adding a bundled scene
 
