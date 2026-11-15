@@ -163,7 +163,7 @@ The scene is a glTF 2.0 binary, fetched from `/scenes/` or opened from the user'
   - From the fourth bounce on, Russian roulette ends a path with a chance that grows as its throughput dims, and divides a surviving path by its survival chance so the average is unchanged. Dim paths add little light, so ending them early speeds up each sample at the cost of slightly more noise per sample.
 - **`sampleDirectLight` samples the lights at every diffuse hit that can still bounce.** It picks an emissive face with a chance in proportion to its area, picks a uniform point on it and casts a shadow ray. Most diffuse hits then see the light directly instead of finding it by chance, so small lights converge much faster.
   - A ray that reaches a light right after a diffuse bounce adds no emission, because `sampleDirectLight` already counted that light. Emission still counts for the camera ray and after a mirror or glass bounce, which a shadow ray cannot follow. This avoids multiple importance sampling (MIS) at the cost of noisier paths that reach a light through a mirror.
-  - `sampleDirectLight` weights the light by the density of `rayBounceOffDiffuse`, `2 * cos(theta)^3 / PI`, so the lit areas keep the brightness the bounce rays give. A correct cosine-weighted bounce has density `cos(theta) / PI`, and that term changes with it.
+  - `sampleDirectLight` weights the light by the density of `rayBounceOffDiffuse`, the cosine-weighted `cos(theta) / PI`, so the lit areas keep the brightness the bounce rays give. A change to the diffuse bounce must change that term with it.
 - **Flat shading uses the face normal. Phong shading interpolates the vertex normals** with barycentric coordinates. `u_shading_method` selects between them.
 
 ---
@@ -270,7 +270,7 @@ The minimal path tracer.
 | Milestone                                                                     | Notes                                                                                                          |
 | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | ~~Camera ray per pixel with random jitter, averaged over many samples~~       | Samples accumulate progressively in a float texture.                                                           |
-| ~~Diffuse scattering with a bounce limit~~                                    | `randPosInUnitSphere` in `src/shaders/pathTrace.frag.glsl` picks the scatter direction.                        |
+| ~~Diffuse scattering with a bounce limit~~                                    | `randUnitVector` in `src/shaders/pathTrace.frag.glsl` picks the scatter direction.                             |
 | ~~Metal with fuzz~~                                                           | `reflectionRatio` and `reflectionGloss` blend glossy reflection with diffuse scattering.                       |
 | ~~Dielectrics: refraction, total internal reflection, Schlick approximation~~ | `rayBounceOffDielectricSurface` in `src/shaders/pathTrace.frag.glsl`.                                          |
 | ~~Adjustable field of view~~                                                  | The `cameraFov` setting.                                                                                       |
@@ -300,7 +300,7 @@ Noise reduction through principled sampling.
 | Milestone                                                         | Notes                                                      |
 | ----------------------------------------------------------------- | ---------------------------------------------------------- |
 | ~~Light sampling~~                                                | `sampleDirectLight` in `src/shaders/pathTrace.frag.glsl`.  |
-| Importance sampling with probability density functions (PDFs)     | Samples are not weighted by a density.                     |
+| Importance sampling with probability density functions (PDFs)     | Only light sampling and the diffuse bounce use a density.  |
 | Mixture PDFs                                                      | Blends scatter sampling with light sampling.               |
-| Orthonormal basis (ONB) for sampling around a surface normal      | Needed by cosine-weighted diffuse sampling.                |
+| Orthonormal basis (ONB) for sampling around a surface normal      | Needed by GGX sampling. The diffuse bounce needs none.     |
 | Material refactor around PDFs and a `scatter` and `emitted` split | `pathTrace` multiplies base colors along the path instead. |

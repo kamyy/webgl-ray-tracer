@@ -148,13 +148,20 @@ float rand() {
     return 2.3283064365387e-10 * float(g_randGeneratorState.x ^ g_randGeneratorState.y ^ g_randGeneratorState.z ^ g_randGeneratorState.w);
 }
 
-vec3 randPosInUnitSphere() {
-    vec3 p;
-    do
-    { p = 2.0 * vec3(rand(), rand(), rand()) + vec3(-1.0, -1.0, -1.0);
-    } while (dot(p, p) > 1.0);
+// A uniformly distributed direction, picked in closed form instead of by rejection. A rejection loop runs a different
+// number of times in each pixel, and the GPU waits for the slowest pixel in each group. The height `z` is uniform in
+// [-1, 1], because a sphere's area is spread evenly along its axis (Archimedes' hat-box theorem).
+vec3 randUnitVector() {
+    float z = 2.0 * rand() - 1.0;
+    float angle = 2.0 * PI * rand();
+    float r = sqrt(max(0.0, 1.0 - z * z));
+    return vec3(r * cos(angle), r * sin(angle), z);
+}
 
-    return p;
+// A uniformly distributed point inside the unit ball. The cube root spreads the radius so every shell gets points in
+// proportion to its volume.
+vec3 randPosInUnitSphere() {
+    return randUnitVector() * pow(rand(), 1.0 / 3.0);
 }
 
 // --- texel addresses -----------------------------------------------------------------
@@ -448,7 +455,11 @@ void rayBounceOffMirror(inout Ray ray, RayHitResult res, Material material) {
 
 void rayBounceOffDiffuse(inout Ray ray, RayHitResult res) {
     ray.origin = res.p + res.fn * EPSILON;
-    ray.dir = normalize(res.p + res.n + randPosInUnitSphere() - res.p);
+    // The normal plus a random unit vector gives the cosine-weighted (Lambertian) bounce. The sum is near zero when
+    // the random vector points almost straight back. Normalizing a sum that small would give NaN. The bounce follows
+    // the normal instead.
+    vec3 dir = res.n + randUnitVector();
+    ray.dir = dot(dir, dir) > 1e-8 ? normalize(dir) : res.n;
 }
 
 void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Material material) {
@@ -488,9 +499,9 @@ void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Material mat
 // Picks a point on a light, with a chance in proportion to each light's area, and returns the light that point sends to
 // the hit through the diffuse lobe. The result is zero when the point is behind the surface or something blocks it.
 //
-// `rayBounceOffDiffuse` sends the ray along n + a random point in the unit ball. That direction has the density
-// 2 * cos(theta)^3 / PI per unit of solid angle, with theta measured from the normal. A light sample must use the same
-// density, or the lit areas would come out a different brightness than the bounce rays give.
+// `rayBounceOffDiffuse` sends the ray along n + a random unit vector. That direction has the density cos(theta) / PI
+// per unit of solid angle, with theta measured from the normal. A light sample must use the same density, or the lit
+// areas would come out a different brightness than the bounce rays give.
 vec3 sampleDirectLight(RayHitResult hit, vec3 baseColor) {
     if (u_num_lights == 0) {
         return vec3(0.0);
@@ -540,7 +551,7 @@ vec3 sampleDirectLight(RayHitResult hit, vec3 baseColor) {
 
     // The bounce direction's density, times the base color and the light's emission, times the area-to-solid-angle
     // conversion, divided by the chance of picking this point (one over the total light area).
-    float density = 2.0 * cosSurface * cosSurface * cosSurface / PI;
+    float density = cosSurface / PI;
     return baseColor * emission * (density * cosLight * totalArea / (dist * dist));
 }
 
