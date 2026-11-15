@@ -498,11 +498,13 @@ void rayBounceOffDielectricSurface(inout Ray ray, RayHitResult res, Material mat
 // --- light sampling and path tracing -------------------------------------------------
 // Picks a point on a light, with a chance in proportion to each light's area, and returns the light that point sends to
 // the hit through the diffuse lobe. The result is zero when the point is behind the surface or something blocks it.
+// The result is also zero when the point is behind `unmappedNormal`, the normal before a normal map tilted it, because
+// `pathTrace` absorbs a bounce in that direction.
 //
 // `rayBounceOffDiffuse` sends the ray along n + a random unit vector. That direction has the density cos(theta) / PI
 // per unit of solid angle, with theta measured from the normal. A light sample must use the same density, or the lit
 // areas would come out a different brightness than the bounce rays give.
-vec3 sampleDirectLight(RayHitResult hit, vec3 baseColor) {
+vec3 sampleDirectLight(RayHitResult hit, vec3 unmappedNormal, vec3 baseColor) {
     if (u_num_lights == 0) {
         return vec3(0.0);
     }
@@ -541,7 +543,7 @@ vec3 sampleDirectLight(RayHitResult hit, vec3 baseColor) {
 
     float cosSurface = dot(hit.n, dir);
     float cosLight = abs(dot(lightNormal, dir)); // a light emits from both sides, like a ray that hits it
-    if (cosSurface <= 0.0 || cosLight <= 0.0) {
+    if (cosSurface <= 0.0 || cosLight <= 0.0 || dot(unmappedNormal, dir) <= 0.0) {
         return vec3(0.0);
     }
 
@@ -630,7 +632,7 @@ vec3 pathTrace(Ray ray) {
                 }
                 countEmission = true;
             } else {
-                radiance += throughput * sampleDirectLight(hit, material.baseColor);
+                radiance += throughput * sampleDirectLight(hit, unmappedNormal, material.baseColor);
                 rayBounceOffDiffuse(ray, hit);
                 countEmission = false;
             }
