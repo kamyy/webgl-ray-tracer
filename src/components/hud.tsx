@@ -238,7 +238,7 @@ function WireframeButton() {
       <Popover
         title="Wireframe debugging"
         icon={wireframeIcon}
-        className={`${popoverAbove} short:w-[min(40rem,calc(100vw-1.5rem))]`}
+        className={`${popoverAbove} short:w-[min(32rem,calc(100vw-1.5rem))]`}
         onClose={close}
       >
         <WireframeSettings />

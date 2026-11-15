@@ -14,11 +14,26 @@ interface RangeRowProps {
   max: number
   step?: number // the smallest change the slider and the number field make, 1 when left out
   disabled?: boolean // greys out the row and ignores input, for a setting that has no effect right now
+  narrow?: boolean // on a touch screen, shrinks the label and the number field to give the slider more room
   onChange: (value: number) => void
 }
 
-export function RangeRow({ title, hint, value, min, max, step = 1, disabled = false, onChange }: RangeRowProps) {
+export function RangeRow({
+  title,
+  hint,
+  value,
+  min,
+  max,
+  step = 1,
+  disabled = false,
+  narrow = false,
+  onChange,
+}: RangeRowProps) {
   const id = useId()
+
+  // A mouse keeps the full widths, because a desktop browser draws up and down arrows inside the number field.
+  const labelWidth = narrow ? 'w-24 pointer-coarse:w-16' : 'w-24'
+  const fieldWidth = narrow ? 'w-16 pointer-coarse:w-12' : 'w-16'
 
   // The text being typed, or null while the field shows the setting. Keeping the text lets the field hold a half-typed
   // number such as the 4 on the way to 45, which is below `min` for a setting like the field of view.
@@ -50,7 +65,7 @@ export function RangeRow({ title, hint, value, min, max, step = 1, disabled = fa
   // `useId` links each label to its slider, so tapping the label focuses it.
   return (
     <div className={`flex min-h-11 items-center gap-2.5 short:min-h-9 ${disabled ? 'opacity-40' : ''}`}>
-      <label htmlFor={id} title={hint} className="w-24 flex-none text-xs font-semibold">
+      <label htmlFor={id} title={hint} className={`${labelWidth} flex-none text-xs font-semibold`}>
         {title}
       </label>
       <input
@@ -66,7 +81,7 @@ export function RangeRow({ title, hint, value, min, max, step = 1, disabled = fa
         onChange={event => onChange(parseFloat(event.target.value))}
       />
       <input
-        className="min-h-9 w-16 flex-none rounded-lg border border-gray-300 bg-gray-100 px-2 text-right text-xs tabular-nums disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 short:min-h-8"
+        className={`min-h-9 ${fieldWidth} flex-none rounded-lg border border-gray-300 bg-gray-100 px-2 text-right text-xs tabular-nums disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 short:min-h-8`}
         type="number"
         min={min}
         max={max}

@@ -96,7 +96,7 @@ export function SettingsPanel() {
   return (
     <section
       aria-label="Render settings"
-      className={`${position} max-h-[calc(100%-7rem)] w-72 overflow-y-auto overscroll-contain rounded-2xl bg-white/70 p-3 shadow-xl backdrop-blur-md md:w-80 max-md:portrait:right-[max(0.75rem,env(safe-area-inset-right))] max-md:portrait:bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+3.5rem)] max-md:portrait:max-h-[calc(100%-10.5rem)] max-md:portrait:w-auto dark:bg-gray-900/70 short:landscape:w-[min(62rem,calc(100vw-15.5rem))]!`}
+      className={`${position} max-h-[calc(100%-7rem)] w-72 overflow-y-auto overscroll-contain rounded-2xl bg-white/70 p-3 shadow-xl backdrop-blur-md md:w-80 lg:w-96 max-md:portrait:right-[max(0.75rem,env(safe-area-inset-right))] max-md:portrait:bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+3.5rem)] max-md:portrait:max-h-[calc(100%-10.5rem)] max-md:portrait:w-auto dark:bg-gray-900/70 short:landscape:w-[min(62rem,calc(100vw-15.5rem))]!`}
     >
       <div className="mb-1 flex items-center gap-1">
         <button

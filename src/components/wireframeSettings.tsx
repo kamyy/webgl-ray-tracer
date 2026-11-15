@@ -63,15 +63,17 @@ export function WireframeSettings() {
 
   // The BVH boxes come from either a band of depths or one tapped triangle, so only the chosen mode's controls show.
   // The prompt takes the sliders' height, so switching modes leaves the popover the same size. On a short landscape
-  // screen the two sliders share one row, which leaves room for the space between the groups.
+  // screen the two sliders share one row, which leaves room for the space between the groups. Their rows are shorter
+  // there too, so a top margin keeps them clear of the segmented control.
   let boxControls: React.ReactNode = (
-    <div className="short:grid short:grid-cols-2 short:gap-x-3">
+    <div className="short:mt-2 short:grid short:grid-cols-2 short:gap-x-3">
       <RangeRow
         title="Min depth"
         value={bvhMinDepth}
         min={bvhDepthRange.min}
         max={bvhDepthRange.max}
         disabled={!showBvhWireframe}
+        narrow
         onChange={setBvhMinDepth}
       />
       <RangeRow
@@ -80,6 +82,7 @@ export function WireframeSettings() {
         min={bvhDepthRange.min}
         max={bvhDepthRange.max}
         disabled={!showBvhWireframe}
+        narrow
         onChange={setBvhMaxDepth}
       />
     </div>
@@ -87,7 +90,7 @@ export function WireframeSettings() {
   if (showSelectedBoxesOnly) {
     boxControls = (
       <p
-        className={`flex min-h-22 items-center text-xs text-gray-600 dark:text-gray-400 short:min-h-9 ${showBvhWireframe ? '' : 'opacity-40'}`}
+        className={`flex min-h-22 items-center text-xs text-gray-600 dark:text-gray-400 short:mt-2 short:min-h-9 ${showBvhWireframe ? '' : 'opacity-40'}`}
       >
         Select a triangle to show every BVH box from the root node down to its leaf node. Select empty space to clear.
       </p>
