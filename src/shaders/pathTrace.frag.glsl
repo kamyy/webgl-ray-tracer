@@ -672,8 +672,9 @@ void main() {
     g_randGeneratorState = texelFetch(u_random_sampler, fragCoord, 0)
                             + uvec4(u_sample_number, u_sample_number, u_sample_number, u_sample_number);
 
-    // The direction through this pixel in camera space (x right, y up, looking down -z), jittered inside the pixel.
-    vec3 dirCamera = normalize(vec3(v_eye_to_x + rand(), v_eye_to_y + rand(), -u_eye_to_image));
+    // The direction through this pixel in camera space (x right, y up, looking down -z), jittered across the pixel's
+    // square. The varyings hold the pixel's centre, so the jitter runs from half a pixel below it to half a pixel above.
+    vec3 dirCamera = normalize(vec3(v_eye_to_x + rand() - 0.5, v_eye_to_y + rand() - 0.5, -u_eye_to_image));
     vec3 dirWorld = normalize((u_eye_to_world * vec4(dirCamera, 0.0)).xyz);
 
     // Thin lens: every ray through this pixel meets at the point where the pinhole ray crosses the focus plane. The ray
