@@ -8,13 +8,16 @@
  * drive gets an exposure and contrast of 1, which shows its materials as they were authored.
  */
 
+// Both bundled rooms are open at the front and the top, and each starting camera sits outside the open front. Each view
+// keeps the floor's front edge below the frame and the missing ceiling above it. A lower eye or a steeper or shallower
+// tilt shows the black background at the bottom or top of the image.
 export const scenes: SceneInfo[] = [
   {
     id: 'suzanne',
     label: 'Suzanne',
     url: '/scenes/suzanne-D.glb',
     thumbnail: '/thumbnails/suzanne.jpg',
-    view: { eye: [0, 2, 10], target: [0, 2, 0] },
+    view: { eye: [-0.5, 4, 9], target: [-0.5, 1, -0.5] },
     exposure: 0.9,
     contrast: 1.4,
   },
@@ -23,7 +26,7 @@ export const scenes: SceneInfo[] = [
     label: 'Tricycle',
     url: '/scenes/tricycle-D.glb',
     thumbnail: '/thumbnails/tricycle.jpg',
-    view: { eye: [0, 2, 10], target: [0, 1.5, 0] },
+    view: { eye: [0, 4, 9], target: [0, 1.5, -1] },
     exposure: 0.9,
     contrast: 1.4,
   },
