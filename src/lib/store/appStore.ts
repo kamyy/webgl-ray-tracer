@@ -27,7 +27,7 @@ export enum ShadingMethod {
 // The settings the app starts with, which the reset button restores. The focus distance, exposure and contrast are
 // missing because they depend on the scene.
 const defaultSettings = {
-  shadingMethod: ShadingMethod.flat,
+  shadingMethod: ShadingMethod.phong,
   numBounces: 6,
   cameraFov: 45,
   lensRadius: 0,
