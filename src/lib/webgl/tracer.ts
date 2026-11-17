@@ -62,7 +62,8 @@ export interface TracerState {
   bands: Band[] // the bands still on the GPU, oldest first
   lastStatusTimestamp: number // when the counters were last written to the store
   lastCameraMatrix: Matrix4 // the camera's world matrix at the last frame, to notice that it moved
-  pausedAt: number | null // Date.now() when the mesh wireframe paused tracing, or null while tracing runs
+  paused: boolean // true while the mesh wireframe pauses tracing
+  clockStoppedAt: number | null // Date.now() when tracing last went idle, or null while it runs
   wireframeKey: string // the wireframe settings and selection last drawn, or empty to force the next wireframe draw
   lastDrawnCamera: Matrix4 // the camera's world matrix when the canvas was last drawn, to notice that it moved
   mapTextures: MapTextures | null // the scene's map arrays, built on its first traced band, or null before then
@@ -103,7 +104,8 @@ export function createTracerState(): TracerState {
     bands: [],
     lastStatusTimestamp: 0,
     lastCameraMatrix: new Matrix4(),
-    pausedAt: useAppStore.getState().showMeshWireframe ? Date.now() : null,
+    paused: useAppStore.getState().showMeshWireframe,
+    clockStoppedAt: null,
     wireframeKey: '',
     lastDrawnCamera: new Matrix4(),
     mapTextures: null,
@@ -127,15 +129,38 @@ export function renderReset(state: TracerState) {
   state.numBounces = useAppStore.getState().numBounces
   state.lensRadius = useAppStore.getState().lensRadius
   state.focusDistance = useAppStore.getState().focusDistance
-  state.restartTimestamp = Date.now()
-  if (state.pausedAt !== null) {
-    state.pausedAt = state.restartTimestamp
-  }
+  restartClock(state)
   state.wireframeKey = '' // a resize or a lost context empties the canvas, so any wireframe is drawn again
   useAppStore.getState().resetStatus()
 }
 
 // --- Status counters -----------------------------------------------------------------
+
+// Sets the elapsed time back to zero. A stopped clock stays stopped at zero.
+function restartClock(state: TracerState) {
+  state.restartTimestamp = Date.now()
+  if (state.clockStoppedAt !== null) {
+    state.clockStoppedAt = state.restartTimestamp
+  }
+}
+
+// Stops the clock while tracing is idle, so the elapsed, average and remaining times count tracing time only. Without
+// this, raising the sample count after a wait would average the wait into every sample. Returns the delay before the
+// next tracing step, so an idle return in `traceStep` stops the clock in the same statement.
+function idle(state: TracerState): number {
+  if (state.clockStoppedAt === null) {
+    state.clockStoppedAt = Date.now()
+  }
+  return idlePollMs
+}
+
+// Starts the clock again when tracing resumes, leaving the stopped time out of the elapsed time.
+function startClock(state: TracerState) {
+  if (state.clockStoppedAt !== null) {
+    state.restartTimestamp += Date.now() - state.clockStoppedAt
+    state.clockStoppedAt = null
+  }
+}
 
 // Formats a length of time with abbreviated units that grow with the value: `45s`, `3m 05s` or `1h 02m 05s`. A zero
 // or negative time is shown as `0s`.
@@ -168,8 +193,7 @@ function updateStatus(state: TracerState, numSamples: number, force: boolean) {
   }
   state.lastStatusTimestamp = now
 
-  // A paused render's clock stops when the pause starts, so the paused time stays out of every counter.
-  const elapsed = (state.pausedAt ?? now) - state.restartTimestamp
+  const elapsed = (state.clockStoppedAt ?? now) - state.restartTimestamp
   const average = elapsed / Math.max(state.samplesDone, 1)
   const eta = (numSamples - state.samplesDone) * average
   useAppStore.getState().setStatus({
@@ -364,7 +388,7 @@ function drawBand(state: TracerState, inputs: TracerInputs, mapTextures: MapText
       accumulation.scissorTest = false
       gl.setRenderTarget(accumulation)
       gl.clear()
-      state.restartTimestamp = Date.now()
+      restartClock(state)
     } else {
       ++state.samplesDone
     }
@@ -444,7 +468,7 @@ export function forgetMapTextures(state: TracerState) {
 export function traceStep(state: TracerState, inputs: TracerInputs, interacting: boolean): number {
   const context = inputs.gl.getContext() as WebGL2RenderingContext
   if (context.isContextLost()) {
-    return idlePollMs
+    return idle(state)
   }
 
   retireFinishedBands(context, state)
@@ -457,8 +481,8 @@ export function traceStep(state: TracerState, inputs: TracerInputs, interacting:
 
   // The mesh wireframe pauses tracing. The camera check above still runs during the pause, so moving the camera then
   // throws away the samples, and tracing starts over when the pause ends.
-  if (state.pausedAt !== null) {
-    return idlePollMs
+  if (state.paused) {
+    return idle(state)
   }
 
   // While the user is moving the camera, only the preview is drawn. A sample that has started is finished even when the
@@ -466,7 +490,7 @@ export function traceStep(state: TracerState, inputs: TracerInputs, interacting:
   const { numSamples } = useAppStore.getState()
   const isPreview = !state.previewDone
   if ((state.row === 0 && state.samplesDone >= numSamples) || (!isPreview && interacting)) {
-    return idlePollMs
+    return idle(state)
   }
   if (state.bands.length >= maxBandsInFlight) {
     return fencePollMs
@@ -474,9 +498,11 @@ export function traceStep(state: TracerState, inputs: TracerInputs, interacting:
 
   const mapTextures = currentMapTextures(state, inputs)
   if (!mapTextures) {
-    return idlePollMs
+    return idle(state)
   }
 
+  // The GPU waiting on bands in flight still counts as tracing, so only a submitted band starts the clock.
+  startClock(state)
   const submittedAt = performance.now()
   const rows = drawBand(state, inputs, mapTextures, isPreview)
 
@@ -540,19 +566,16 @@ export function watchSettings(state: TracerState) {
     { equalityFn: shallow },
   )
 
-  // The mesh wireframe pauses tracing while it is shown. The paused time is left out of the elapsed, average and
-  // remaining times, which count tracing time only. Switching back redraws the traced image, which a finished render
-  // would otherwise leave covered by the last wireframe frame.
+  // The mesh wireframe pauses tracing while it is shown, and `traceStep` stops the readout's clock for the pause.
+  // Switching back redraws the traced image, which a finished render would otherwise leave covered by the last wireframe
+  // frame.
   const stopMeshWireframe = useAppStore.subscribe(
     s => s.showMeshWireframe,
     shown => {
-      if (shown) {
-        state.pausedAt = Date.now()
-      } else if (state.pausedAt !== null) {
-        state.restartTimestamp += Date.now() - state.pausedAt
-        state.pausedAt = null
+      if (!shown && state.paused) {
         state.needsDisplay = true
       }
+      state.paused = shown
     },
   )
 
